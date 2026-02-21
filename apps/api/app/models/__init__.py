@@ -2,7 +2,7 @@ from app.models.audit import AuditLog, PatientAccessLog
 from app.models.base import Base
 from app.models.billing import UsageLedger
 from app.models.idempotency import IdempotencyKey
-from app.models.institution import Institution, InstitutionApiKey, InstitutionMember
+from app.models.institution import Institution, InstitutionApiKey, InstitutionInvite, InstitutionMember
 from app.models.notification import Notification
 from app.models.outbox import OutboxEvent
 from app.models.qc_decision import QCDecision
@@ -20,6 +20,7 @@ __all__ = [
     "IdempotencyKey",
     "Institution",
     "InstitutionApiKey",
+    "InstitutionInvite",
     "InstitutionMember",
     "Notification",
     "OutboxEvent",

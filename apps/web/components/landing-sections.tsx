@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   ShieldCheck,
   CurrencyKrw,
@@ -8,7 +9,33 @@ import {
   Desktop,
   FirstAidKit,
   ChartLineUp,
+  Brain,
 } from "phosphor-react";
+
+export function LandingNav() {
+  return (
+    <div className="topbar-wrap">
+      <div className="container topbar">
+        <div className="brand">
+          <div className="brand-logo">
+            <Brain size={20} weight="bold" />
+          </div>
+          <div>
+            <p className="brand-title">NeuroHub</p>
+          </div>
+        </div>
+        <div className="nav-row">
+          <Link className="btn btn-secondary btn-sm" href="/login">
+            로그인
+          </Link>
+          <Link className="btn btn-primary btn-sm" href="/register">
+            무료 시작하기
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function FeatureCards() {
   const features = [
@@ -85,19 +112,19 @@ export function WorkflowSteps() {
 export function AudienceCards() {
   const audiences = [
     {
-      icon: <Desktop size={22} weight="duotone" />,
-      title: "병원 IT 관리자",
-      desc: "AI 파이프라인 운영 자동화, API 키 관리, 시스템 모니터링",
-    },
-    {
       icon: <FirstAidKit size={22} weight="duotone" />,
-      title: "영상의학과 전문의",
-      desc: "분석 요청 생성, 결과 검토, 진단 보고서 확인",
+      title: "서비스 사용자",
+      desc: "의료 데이터를 제출하고, AI 분석 결과와 보고서를 간편하게 확인하세요.",
     },
     {
       icon: <ChartLineUp size={22} weight="duotone" />,
-      title: "의료기관 경영진",
-      desc: "비용 현황 파악, 규제 준수 보고, 운영 효율성 모니터링",
+      title: "전문가 리뷰어",
+      desc: "AI 분석 결과를 검토하고, 품질 검증과 전문가 의견을 제공하세요.",
+    },
+    {
+      icon: <Desktop size={22} weight="duotone" />,
+      title: "관리자",
+      desc: "시스템 운영, 사용자 관리, 서비스 구성을 한 곳에서 관리하세요.",
     },
   ];
 

@@ -14,6 +14,13 @@ class Institution(UUIDMixin, TimestampMixin, Base):
     code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
+    institution_type: Mapped[str] = mapped_column(String(20), nullable=False, default="HOSPITAL")
+    contact_email: Mapped[str | None] = mapped_column(String(200))
+    contact_phone: Mapped[str | None] = mapped_column(String(30))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+    )
 
     members: Mapped[list["InstitutionMember"]] = relationship(
         back_populates="institution",
@@ -76,4 +83,29 @@ class InstitutionApiKey(UUIDMixin, Base):
     )
 
     institution: Mapped["Institution"] = relationship(back_populates="api_keys")
+
+
+class InstitutionInvite(UUIDMixin, Base):
+    __tablename__ = "institution_invites"
+
+    institution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    email: Mapped[str] = mapped_column(String(200), nullable=False)
+    role_scope: Mapped[str | None] = mapped_column(String(50))
+    invite_token: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    invited_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 

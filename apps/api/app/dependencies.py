@@ -15,10 +15,22 @@ class CurrentUser(BaseModel):
     username: str
     institution_id: uuid.UUID
     roles: list[str] = []
+    user_type: str | None = None
 
     def has_any_role(self, *roles: str) -> bool:
         role_set = set(self.roles)
         return any(role in role_set for role in roles)
+
+
+def require_roles(*roles: str):
+    async def checker(user: CurrentUser = Depends(get_current_user)):
+        if not user.has_any_role(*roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Required roles: {', '.join(sorted(roles))}",
+            )
+        return user
+    return checker
 
 
 def _parse_uuid_or_default(value: str | None, default: str) -> uuid.UUID:

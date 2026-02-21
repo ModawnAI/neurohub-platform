@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,5 +26,20 @@ class User(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    # User type & onboarding
+    user_type: Mapped[str | None] = mapped_column(String(20))
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    phone: Mapped[str | None] = mapped_column(String(30))
+
+    # Expert-specific fields
+    specialization: Mapped[str | None] = mapped_column(String(200))
+    bio: Mapped[str | None] = mapped_column(Text)
+    expert_status: Mapped[str | None] = mapped_column(String(20))
+    expert_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expert_approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
     )
 

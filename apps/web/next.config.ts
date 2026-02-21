@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  typedRoutes: true,
+  // typedRoutes requires a build to generate route types; disabled for now
+  // typedRoutes: true,
   async rewrites() {
     const apiOrigin = process.env.API_ORIGIN ?? "http://localhost:8000";
     return [
