@@ -7,11 +7,13 @@ function getCookie(request: NextRequest, name: string): string | undefined {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const supabaseAuthCookie = request.cookies.getAll().find((c) => c.name.startsWith("sb-"));
-  const hasSession = !!supabaseAuthCookie?.value;
+  // Session is indicated by nh-onboarded cookie (set by fetchMe after successful auth).
+  // Note: the browser Supabase client uses localStorage, not cookies, so we can't
+  // rely on sb-* cookies here.
   const userType = getCookie(request, "nh-user-type");
   const onboarded = getCookie(request, "nh-onboarded");
   const expertStatus = getCookie(request, "nh-expert-status");
+  const hasSession = onboarded !== undefined;
 
   // Public pages: redirect to dashboard if already logged in
   if (pathname === "/login" || pathname === "/register") {
