@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Brain } from "phosphor-react";
+import { Brain, EnvelopeSimple } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -13,7 +13,9 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [registered, setRegistered] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const { signUp } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,12 +35,89 @@ export default function RegisterPage() {
 
     try {
       await signUp(email, password);
-      router.push("/onboarding");
+      setRegistered(true);
     } catch (err: any) {
       setError(err?.message || "회원가입에 실패했습니다.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    if (!supabase || resending) return;
+    setResending(true);
+    setResent(false);
+    try {
+      const { error: resendError } = await supabase.auth.resend({ type: "signup", email });
+      if (resendError) throw resendError;
+      setResent(true);
+    } catch {
+      // silently fail — don't reveal if email exists
+    } finally {
+      setResending(false);
+    }
+  }
+
+  if (registered) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "#dbeafe",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#1d4ed8",
+              }}
+            >
+              <EnvelopeSimple size={28} weight="duotone" />
+            </div>
+          </div>
+
+          <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0 0 0.5rem" }}>
+            이메일을 확인해 주세요
+          </h1>
+
+          <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1.5rem" }}>
+            <strong>{email}</strong>로 인증 메일을 보냈습니다.
+            <br />
+            메일함을 확인하고 인증 링크를 클릭하세요.
+          </p>
+
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "12px 16px",
+              fontSize: "0.85rem",
+              color: "var(--muted)",
+              marginBottom: "1.5rem",
+            }}
+          >
+            메일이 보이지 않으면 스팸 폴더를 확인해 주세요.
+          </div>
+
+          <button
+            className="btn btn-secondary"
+            onClick={handleResend}
+            disabled={resending || resent}
+            style={{ width: "100%", justifyContent: "center", marginBottom: "0.75rem" }}
+          >
+            {resent ? "인증 메일을 다시 보냈습니다" : resending ? "발송 중..." : "인증 메일 재발송"}
+          </button>
+
+          <p className="auth-footer">
+            <Link href="/login">로그인 페이지로 돌아가기</Link>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
