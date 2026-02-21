@@ -10,6 +10,7 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, PaperPlaneTilt, SpinnerGap } from "phosphor-react";
 
 function defaultIdempotencyKey() {
   return `req_${new Date()
@@ -80,98 +81,147 @@ export default function NewRequestPage() {
     });
   };
 
+  // Determine current step for indicator
+  const step1Done = Boolean(serviceId && pipelineId);
+  const step2Done = Boolean(patientRef.trim());
+
   return (
-    <section className="panel stack-md">
+    <div className="stack-lg">
+      {/* 페이지 헤더 */}
       <div>
-        <h2>신규 요청 생성</h2>
-        <p className="muted-text">서비스와 파이프라인을 선택하고 첫 케이스를 등록합니다.</p>
+        <h2 className="page-title">신규 요청 생성</h2>
+        <p className="page-subtitle">서비스와 파이프라인을 선택하고 첫 케이스를 등록합니다.</p>
       </div>
 
-      {servicesQuery.isError ? <p className="error-text">{servicesQuery.error.message}</p> : null}
-      {pipelinesQuery.isError ? <p className="error-text">{pipelinesQuery.error.message}</p> : null}
-      {createMutation.isError ? <p className="error-text">{createMutation.error.message}</p> : null}
-
-      <div className="form-grid">
-        <label className="field">
-          <span>서비스</span>
-          <select
-            className="select"
-            value={serviceId}
-            onChange={(event) => {
-              setServiceId(event.target.value);
-              setPipelineId("");
-            }}
-          >
-            <option value="">선택하세요</option>
-            {(servicesQuery.data?.items ?? []).map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.display_name} ({service.version})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>파이프라인</span>
-          <select
-            className="select"
-            value={pipelineId}
-            onChange={(event) => setPipelineId(event.target.value)}
-            disabled={!serviceId}
-          >
-            <option value="">선택하세요</option>
-            {(pipelinesQuery.data?.items ?? []).map((pipeline) => (
-              <option key={pipeline.id} value={pipeline.id}>
-                {pipeline.name} ({pipeline.version}){pipeline.is_default ? " [기본]" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>환자 참조 ID</span>
-          <input
-            className="input"
-            value={patientRef}
-            onChange={(event) => setPatientRef(event.target.value)}
-            placeholder="PT-2026-0001"
-          />
-        </label>
-
-        <label className="field">
-          <span>우선순위 (1~10)</span>
-          <input
-            className="input"
-            type="number"
-            min={1}
-            max={10}
-            value={priority}
-            onChange={(event) => setPriority(Number(event.target.value))}
-          />
-        </label>
-
-        <label className="field field-wide">
-          <span>Idempotency Key</span>
-          <input
-            className="input mono-field"
-            value={idempotencyKey}
-            onChange={(event) => setIdempotencyKey(event.target.value)}
-          />
-        </label>
+      {/* 단계 표시 */}
+      <div className="step-indicator">
+        <div className={`step-indicator-item${step1Done ? " done" : " active"}`}>
+          <span className="step-indicator-dot">1</span>
+          <span>서비스 선택</span>
+        </div>
+        <div className="step-indicator-line" />
+        <div className={`step-indicator-item${step2Done && step1Done ? " done" : step1Done ? " active" : ""}`}>
+          <span className="step-indicator-dot">2</span>
+          <span>케이스 등록</span>
+        </div>
+        <div className="step-indicator-line" />
+        <div className={`step-indicator-item${step1Done && step2Done ? " active" : ""}`}>
+          <span className="step-indicator-dot">3</span>
+          <span>확인 및 생성</span>
+        </div>
       </div>
 
-      <div className="action-row">
+      {/* 에러 메시지 */}
+      {servicesQuery.isError && <p className="error-text">{servicesQuery.error.message}</p>}
+      {pipelinesQuery.isError && <p className="error-text">{pipelinesQuery.error.message}</p>}
+      {createMutation.isError && <p className="error-text">{createMutation.error.message}</p>}
+
+      {/* 폼 */}
+      <section className="panel stack-md">
+        <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "var(--text-secondary)" }}>
+          서비스 및 파이프라인
+        </p>
+        <div className="form-grid">
+          <label className="field">
+            <span>서비스</span>
+            <select
+              className="select"
+              value={serviceId}
+              onChange={(event) => {
+                setServiceId(event.target.value);
+                setPipelineId("");
+              }}
+            >
+              <option value="">선택하세요</option>
+              {(servicesQuery.data?.items ?? []).map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.display_name} ({service.version})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span>파이프라인</span>
+            <select
+              className="select"
+              value={pipelineId}
+              onChange={(event) => setPipelineId(event.target.value)}
+              disabled={!serviceId}
+            >
+              <option value="">선택하세요</option>
+              {(pipelinesQuery.data?.items ?? []).map((pipeline) => (
+                <option key={pipeline.id} value={pipeline.id}>
+                  {pipeline.name} ({pipeline.version}){pipeline.is_default ? " [기본]" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="panel stack-md">
+        <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "var(--text-secondary)" }}>
+          케이스 정보
+        </p>
+        <div className="form-grid">
+          <label className="field">
+            <span>환자 참조 ID</span>
+            <input
+              className="input"
+              value={patientRef}
+              onChange={(event) => setPatientRef(event.target.value)}
+              placeholder="PT-2026-0001"
+            />
+          </label>
+
+          <label className="field">
+            <span>우선순위 (1~10)</span>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={10}
+              value={priority}
+              onChange={(event) => setPriority(Number(event.target.value))}
+            />
+          </label>
+
+          <label className="field field-wide">
+            <span>멱등성 키</span>
+            <input
+              className="input mono-field"
+              value={idempotencyKey}
+              onChange={(event) => setIdempotencyKey(event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      {/* 액션 버튼 */}
+      <div className="action-row" style={{ justifyContent: "flex-end" }}>
         <button
           className="btn btn-secondary"
           type="button"
           onClick={() => router.push("/requests")}
         >
+          <ArrowLeft size={14} weight="bold" />
           목록으로
         </button>
         <button className="btn btn-primary" type="button" disabled={disabled} onClick={submit}>
-          {createMutation.isPending ? "생성 중..." : "요청 생성"}
+          {createMutation.isPending ? (
+            <>
+              <SpinnerGap size={14} weight="bold" />
+              생성 중...
+            </>
+          ) : (
+            <>
+              <PaperPlaneTilt size={14} weight="bold" />
+              요청 생성
+            </>
+          )}
         </button>
       </div>
-    </section>
+    </div>
   );
 }

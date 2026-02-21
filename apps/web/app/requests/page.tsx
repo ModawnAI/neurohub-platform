@@ -12,17 +12,18 @@ import {
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { CheckCircle, PaperPlaneTilt, XCircle, Tray } from "phosphor-react";
 
 type FilterStatus = "ALL" | RequestStatus;
 
 const statusOptions: Array<{ value: FilterStatus; label: string }> = [
   { value: "ALL", label: "전체" },
   { value: "CREATED", label: "생성됨" },
-  { value: "STAGING", label: "스테이징" },
-  { value: "READY_TO_COMPUTE", label: "실행 준비" },
+  { value: "STAGING", label: "준비 중" },
+  { value: "READY_TO_COMPUTE", label: "분석 대기" },
   { value: "COMPUTING", label: "분석 중" },
-  { value: "QC", label: "QC" },
-  { value: "FINAL", label: "최종 완료" },
+  { value: "QC", label: "품질 검증" },
+  { value: "FINAL", label: "완료" },
   { value: "FAILED", label: "실패" },
   { value: "CANCELLED", label: "취소" },
 ];
@@ -83,93 +84,109 @@ export default function RequestsPage() {
   }, [query.data?.items, filter]);
 
   return (
-    <section className="panel stack-md">
-      <div className="panel-header-row">
+    <div className="stack-lg">
+      {/* 페이지 헤더 */}
+      <div className="page-header">
         <div>
-          <h2>요청 관리</h2>
-          <p className="muted-text">요청 상태 전이와 실행 제출을 한 화면에서 관리합니다.</p>
+          <h2 className="page-title">요청 관리</h2>
+          <p className="page-subtitle">요청 상태 전이와 실행 제출을 한 화면에서 관리합니다.</p>
         </div>
-        <select
-          className="select"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as FilterStatus)}
-          aria-label="상태 필터"
-        >
-          {statusOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
       </div>
 
-      {query.isLoading ? <p>요청 목록을 불러오는 중입니다...</p> : null}
-      {query.isError ? <p className="error-text">{query.error.message}</p> : null}
+      {/* 필터 탭 */}
+      <div className="filter-tabs">
+        {statusOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`filter-tab${filter === option.value ? " active" : ""}`}
+            onClick={() => setFilter(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
 
-      {!query.isLoading && !query.isError ? (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>요청 ID</th>
-                <th>상태</th>
-                <th>케이스 수</th>
-                <th>생성 시각</th>
-                <th>작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item) => (
-                <tr key={item.id}>
-                  <td className="mono-cell">{item.id.slice(0, 8)}...</td>
-                  <td>
-                    <RequestStatusChip status={item.status} />
-                  </td>
-                  <td>{item.case_count}</td>
-                  <td>{new Date(item.created_at).toLocaleString("ko-KR")}</td>
-                  <td>
-                    <div className="action-row">
-                      <button
-                        className="btn btn-secondary"
-                        type="button"
-                        disabled={!canConfirm(item) || confirmMutation.isPending}
-                        onClick={() => confirmMutation.mutate(item.id)}
-                      >
-                        확정
-                      </button>
-                      <button
-                        className="btn btn-primary"
-                        type="button"
-                        disabled={!canSubmit(item) || submitMutation.isPending}
-                        onClick={() => submitMutation.mutate(item.id)}
-                      >
-                        제출
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        type="button"
-                        disabled={!canCancel(item) || cancelMutation.isPending}
-                        onClick={() => {
-                          setCancelReason("운영상 취소");
-                          setSelectedCancelId(item.id);
-                        }}
-                      >
-                        취소
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!filtered.length ? (
+      {/* 테이블 */}
+      <section className="panel">
+        {query.isLoading && <p className="muted-text">요청 목록을 불러오는 중입니다...</p>}
+        {query.isError && <p className="error-text">{query.error.message}</p>}
+
+        {!query.isLoading && !query.isError && filtered.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
                 <tr>
-                  <td colSpan={5}>조건에 맞는 요청이 없습니다.</td>
+                  <th>요청 ID</th>
+                  <th>상태</th>
+                  <th>케이스 수</th>
+                  <th>생성 시각</th>
+                  <th>작업</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+              </thead>
+              <tbody>
+                {filtered.map((item) => (
+                  <tr key={item.id}>
+                    <td className="mono-cell">{item.id.slice(0, 8)}</td>
+                    <td>
+                      <RequestStatusChip status={item.status} />
+                    </td>
+                    <td>{item.case_count}</td>
+                    <td style={{ fontSize: 13, color: "var(--muted)" }}>
+                      {new Date(item.created_at).toLocaleString("ko-KR")}
+                    </td>
+                    <td>
+                      <div className="action-row">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          type="button"
+                          disabled={!canConfirm(item) || confirmMutation.isPending}
+                          onClick={() => confirmMutation.mutate(item.id)}
+                        >
+                          <CheckCircle size={14} weight="bold" />
+                          확정
+                        </button>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          type="button"
+                          disabled={!canSubmit(item) || submitMutation.isPending}
+                          onClick={() => submitMutation.mutate(item.id)}
+                        >
+                          <PaperPlaneTilt size={14} weight="bold" />
+                          제출
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          type="button"
+                          disabled={!canCancel(item) || cancelMutation.isPending}
+                          onClick={() => {
+                            setCancelReason("운영상 취소");
+                            setSelectedCancelId(item.id);
+                          }}
+                        >
+                          <XCircle size={14} weight="bold" />
+                          취소
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
+        {!query.isLoading && !query.isError && filtered.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Tray size={40} weight="duotone" />
+            </div>
+            <p className="empty-state-text">조건에 맞는 요청이 없습니다.</p>
+          </div>
+        )}
+      </section>
+
+      {/* 취소 다이얼로그 */}
       <Dialog.Root
         open={Boolean(selectedCancelId)}
         onOpenChange={(open) => !open && setSelectedCancelId(null)}
@@ -177,7 +194,7 @@ export default function RequestsPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
           <Dialog.Content className="dialog-content">
-            <Dialog.Title>요청 취소</Dialog.Title>
+            <Dialog.Title className="dialog-title">요청 취소</Dialog.Title>
             <Dialog.Description className="muted-text">
               취소 사유는 감사 로그에 기록됩니다.
             </Dialog.Description>
@@ -190,7 +207,7 @@ export default function RequestsPage() {
               placeholder="취소 사유를 입력하세요"
             />
 
-            <div className="action-row">
+            <div className="action-row" style={{ justifyContent: "flex-end" }}>
               <Dialog.Close asChild>
                 <button className="btn btn-secondary" type="button">
                   닫기
@@ -207,12 +224,13 @@ export default function RequestsPage() {
                   cancelMutation.mutate({ requestId: selectedCancelId, reason: cancelReason });
                 }}
               >
+                <XCircle size={14} weight="bold" />
                 취소 확정
               </button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </div>
   );
 }

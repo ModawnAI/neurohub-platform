@@ -4,11 +4,13 @@ import clsx from "clsx";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Brain, ChartBar, ListChecks, PlusCircle } from "phosphor-react";
+import type { ReactNode } from "react";
 
-const navItems: Array<{ href: Route; label: string }> = [
-  { href: "/dashboard", label: "대시보드" },
-  { href: "/requests", label: "요청 관리" },
-  { href: "/new-request", label: "신규 요청" },
+const navItems: Array<{ href: Route; label: string; icon: ReactNode }> = [
+  { href: "/dashboard", label: "대시보드", icon: <ChartBar size={16} weight="bold" /> },
+  { href: "/requests", label: "요청 관리", icon: <ListChecks size={16} weight="bold" /> },
+  { href: "/new-request", label: "신규 요청", icon: <PlusCircle size={16} weight="bold" /> },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -18,10 +20,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div>
       <header className="topbar-wrap">
         <div className="container topbar">
-          <div>
-            <p className="brand-eyebrow">의료 AI 워크플로우 오케스트레이션</p>
-            <h1 className="brand-title">NeuroHub</h1>
-          </div>
+          <Link href="/" className="brand">
+            <div className="brand-logo">
+              <Brain size={20} weight="bold" />
+            </div>
+            <div>
+              <h1 className="brand-title">NeuroHub</h1>
+              <p className="brand-eyebrow">의료 AI 워크플로우 플랫폼</p>
+            </div>
+          </Link>
           <nav className="nav-row" aria-label="주요 메뉴">
             {navItems.map((item) => (
               <Link
@@ -29,6 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
               >
+                {item.icon}
                 {item.label}
               </Link>
             ))}
