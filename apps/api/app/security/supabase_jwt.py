@@ -123,7 +123,7 @@ async def verify_supabase_jwt(token: str) -> dict[str, Any]:
         decode_kwargs: dict[str, Any] = {
             "token": token,
             "key": key,
-            "algorithms": ["RS256"],
+            "algorithms": ["RS256", "ES256"],
             "options": options,
         }
         if audience:
