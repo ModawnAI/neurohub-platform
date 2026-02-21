@@ -76,3 +76,8 @@ class ConfirmRequest(BaseModel):
 class CancelRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=2000)
 
+
+class TransitionRequest(BaseModel):
+    target_status: RequestStatus
+    note: str | None = Field(default=None, max_length=2000)
+

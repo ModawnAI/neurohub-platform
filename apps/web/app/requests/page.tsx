@@ -8,11 +8,12 @@ import {
   confirmRequest,
   listRequests,
   submitRequest,
+  transitionRequest,
 } from "@/lib/api";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { CheckCircle, PaperPlaneTilt, XCircle, Tray } from "phosphor-react";
+import { CheckCircle, PaperPlaneTilt, XCircle, Tray, ArrowRight } from "phosphor-react";
 
 type FilterStatus = "ALL" | RequestStatus;
 
@@ -27,6 +28,15 @@ const statusOptions: Array<{ value: FilterStatus; label: string }> = [
   { value: "FAILED", label: "실패" },
   { value: "CANCELLED", label: "취소" },
 ];
+
+const NEXT_STATUS: Partial<Record<RequestStatus, { target: RequestStatus; label: string }>> = {
+  CREATED: { target: "RECEIVING", label: "수신 시작" },
+  RECEIVING: { target: "STAGING", label: "준비 완료" },
+};
+
+function canAdvance(item: RequestRead) {
+  return item.status in NEXT_STATUS;
+}
 
 function canConfirm(item: RequestRead) {
   return item.status === "STAGING";
@@ -73,6 +83,12 @@ export default function RequestsPage() {
       setSelectedCancelId(null);
       await refresh();
     },
+  });
+
+  const advanceMutation = useMutation({
+    mutationFn: ({ requestId, targetStatus }: { requestId: string; targetStatus: RequestStatus }) =>
+      transitionRequest(requestId, targetStatus),
+    onSuccess: refresh,
   });
 
   const filtered = useMemo(() => {
@@ -137,6 +153,20 @@ export default function RequestsPage() {
                     </td>
                     <td>
                       <div className="action-row">
+                        {canAdvance(item) && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            type="button"
+                            disabled={advanceMutation.isPending}
+                            onClick={() => {
+                              const next = NEXT_STATUS[item.status];
+                              if (next) advanceMutation.mutate({ requestId: item.id, targetStatus: next.target });
+                            }}
+                          >
+                            <ArrowRight size={14} weight="bold" />
+                            {NEXT_STATUS[item.status]?.label ?? "진행"}
+                          </button>
+                        )}
                         <button
                           className="btn btn-secondary btn-sm"
                           type="button"

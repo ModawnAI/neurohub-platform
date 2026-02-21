@@ -21,6 +21,7 @@ from app.schemas.request import (
     RequestListResponse,
     RequestRead,
     RequestStatus,
+    TransitionRequest,
 )
 from app.services.state_machine import RequestStatus as SMStatus
 from app.services.state_machine import validate_transition
@@ -300,6 +301,44 @@ async def get_request(
     user: AuthenticatedUser,
 ):
     req = await _load_request_or_404(db, request_id, user.institution_id)
+    return _to_read(req)
+
+
+@router.post("/requests/{request_id}/transition", response_model=RequestRead)
+async def transition_request(
+    request_id: uuid.UUID,
+    body: TransitionRequest,
+    db: DbSession,
+    user: AuthenticatedUser,
+    http_request: FastAPIRequest,
+):
+    """Generic state transition endpoint for advancing a request through the workflow."""
+    req = await _load_request_or_404(db, request_id, user.institution_id, for_update=True)
+    from_state = SMStatus(req.status)
+    to_state = SMStatus(body.target_status.value)
+    validate_transition(from_state, to_state, user)
+
+    before = {"status": req.status}
+    req.status = to_state.value
+
+    # Auto-advance case statuses when transitioning to STAGING
+    if to_state == SMStatus.STAGING:
+        for case in req.cases:
+            case.status = "READY"
+
+    _add_audit(
+        db=db,
+        user_id=user.id,
+        institution_id=user.institution_id,
+        action=f"TRANSITION_{from_state.value}_TO_{to_state.value}",
+        entity_type="request",
+        entity_id=req.id,
+        before_state=before,
+        after_state={"status": req.status, "note": body.note},
+        ip=_client_ip(http_request),
+    )
+    await db.flush()
+    await db.refresh(req)
     return _to_read(req)
 
 

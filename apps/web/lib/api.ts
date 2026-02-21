@@ -124,6 +124,13 @@ export async function createRequest(payload: {
   });
 }
 
+export async function transitionRequest(requestId: string, targetStatus: RequestStatus, note?: string) {
+  return apiFetch<RequestRead>(`/requests/${requestId}/transition`, {
+    method: "POST",
+    body: JSON.stringify({ target_status: targetStatus, note }),
+  });
+}
+
 export async function confirmRequest(requestId: string) {
   return apiFetch<RequestRead>(`/requests/${requestId}/confirm`, {
     method: "POST",
