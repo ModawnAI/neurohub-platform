@@ -113,6 +113,27 @@ a {
   gap: 6px;
 }
 
+/* ── Hamburger + mobile menu (hidden on desktop) ── */
+
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.hamburger-btn:hover {
+  background: var(--surface-2);
+}
+
+.mobile-menu {
+  display: none;
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;
@@ -1605,7 +1626,7 @@ a {
     padding: 16px;
   }
 
-  /* ── Landing: Nav ── */
+  /* ── Landing: Nav + Hamburger ── */
   .topbar {
     padding: 0;
   }
@@ -1614,9 +1635,43 @@ a {
     font-size: 17px;
   }
 
-  .nav-row .btn {
-    padding: 8px 12px;
-    font-size: 12px;
+  .nav-desktop {
+    display: none;
+  }
+
+  .hamburger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-menu {
+    display: block;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+    border-top: 1px solid transparent;
+  }
+
+  .mobile-menu-open {
+    max-height: 200px;
+    opacity: 1;
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+  }
+
+  .mobile-menu-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+
+  .mobile-menu-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
   }
 
   /* ── Landing: Hero ── */
@@ -1671,6 +1726,14 @@ a {
 
   .feature-card {
     padding: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .feature-card .feature-card-icon {
+    margin-bottom: 0;
+    flex-shrink: 0;
   }
 
   .audience-grid {

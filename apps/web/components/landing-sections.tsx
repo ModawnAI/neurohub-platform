@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
@@ -10,9 +11,13 @@ import {
   FirstAidKit,
   ChartLineUp,
   Brain,
+  List,
+  X,
 } from "phosphor-react";
 
 export function LandingNav() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="topbar-wrap">
       <div className="container topbar">
@@ -24,11 +29,43 @@ export function LandingNav() {
             <p className="brand-title">NeuroHub</p>
           </div>
         </div>
-        <div className="nav-row">
+
+        {/* Desktop nav — hidden on mobile */}
+        <div className="nav-row nav-desktop">
           <Link className="btn btn-secondary btn-sm" href="/login">
             로그인
           </Link>
           <Link className="btn btn-primary btn-sm" href="/register">
+            무료 시작하기
+          </Link>
+        </div>
+
+        {/* Hamburger — visible on mobile only */}
+        <button
+          className="hamburger-btn"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? <X size={24} weight="bold" /> : <List size={24} weight="bold" />}
+        </button>
+      </div>
+
+      {/* Mobile drawer */}
+      <div className={`mobile-menu${menuOpen ? " mobile-menu-open" : ""}`}>
+        <div className="container mobile-menu-inner">
+          <Link
+            className="btn btn-secondary mobile-menu-btn"
+            href="/login"
+            onClick={() => setMenuOpen(false)}
+          >
+            로그인
+          </Link>
+          <Link
+            className="btn btn-primary mobile-menu-btn"
+            href="/register"
+            onClick={() => setMenuOpen(false)}
+          >
             무료 시작하기
           </Link>
         </div>
