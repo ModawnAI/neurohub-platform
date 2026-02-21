@@ -20,58 +20,51 @@ export function LandingNav() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="topbar-wrap">
-      <div className="container topbar">
-        <div className="brand">
-          <div className="brand-logo">
-            <Brain size={20} weight="bold" />
+    <nav className="lnav">
+      <div className="lnav-inner container">
+        {/* Brand */}
+        <Link href="/" className="lnav-brand">
+          <div className="lnav-logo">
+            <Brain size={18} weight="bold" />
           </div>
-          <div>
-            <p className="brand-title">NeuroHub</p>
-          </div>
-        </div>
+          <span className="lnav-wordmark">NeuroHub</span>
+        </Link>
 
-        {/* Desktop nav — hidden on mobile */}
-        <div className="nav-row nav-desktop">
-          <Link className="btn btn-secondary btn-sm" href="/login">
+        {/* Desktop actions */}
+        <div className="lnav-actions">
+          <Link href="/login" className="lnav-link">
             로그인
           </Link>
-          <Link className="btn btn-primary btn-sm" href="/register">
+          <Link href="/register" className="lnav-cta">
             무료 시작하기
           </Link>
         </div>
 
-        {/* Hamburger — visible on mobile only */}
+        {/* Mobile hamburger */}
         <button
-          className="hamburger-btn"
+          className="lnav-hamburger"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}
           aria-expanded={menuOpen}
         >
-          {menuOpen ? <X size={24} weight="bold" /> : <List size={24} weight="bold" />}
+          {menuOpen ? <X size={22} weight="bold" /> : <List size={22} weight="bold" />}
         </button>
       </div>
 
-      {/* Mobile drawer */}
-      <div className={`mobile-menu${menuOpen ? " mobile-menu-open" : ""}`}>
-        <div className="container mobile-menu-inner">
-          <Link
-            className="btn btn-secondary mobile-menu-btn"
-            href="/login"
-            onClick={() => setMenuOpen(false)}
-          >
-            로그인
-          </Link>
-          <Link
-            className="btn btn-primary mobile-menu-btn"
-            href="/register"
-            onClick={() => setMenuOpen(false)}
-          >
-            무료 시작하기
-          </Link>
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div className="lnav-mobile">
+          <div className="lnav-mobile-inner container">
+            <Link href="/login" className="lnav-mobile-link" onClick={() => setMenuOpen(false)}>
+              로그인
+            </Link>
+            <Link href="/register" className="lnav-mobile-cta" onClick={() => setMenuOpen(false)}>
+              무료 시작하기
+            </Link>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </nav>
   );
 }
 
