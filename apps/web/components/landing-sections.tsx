@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ShieldCheck,
   CurrencyKrw,
@@ -142,6 +143,42 @@ export function WorkflowSteps() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+export function VisionarySection() {
+  return (
+    <div className="visionary-card">
+      <div className="visionary-photo">
+        <Image
+          src="/prof-park.png"
+          alt="박해정 교수"
+          width={180}
+          height={180}
+          className="visionary-img"
+        />
+      </div>
+      <div className="visionary-body">
+        <p className="visionary-label">Visionary</p>
+        <h3 className="visionary-name">박해정 교수</h3>
+        <p className="visionary-affiliation">
+          연세대학교 의과대학 핵의학교실
+        </p>
+        <p className="visionary-bio">
+          서울대학교 의용생체공학 박사, 하버드 의대 연구원 출신으로 시스템 뇌과학, 뇌영상학,
+          인공지능 의학 응용 분야의 세계적 연구자입니다. 현재 연세대 시스템과학융합연구원 원장,
+          중개뇌인지시스템 센터장을 맡고 있으며, 2024년 국제뇌기능매핑학회(OHBM) 조직위원장을
+          역임했습니다. 뇌 연결망 모델링과 AI 기반 의료 영상 분석을 결합하여 NeuroHub의 비전을
+          제시하고 있습니다.
+        </p>
+        <div className="visionary-fields">
+          <span className="visionary-tag">시스템 뇌과학</span>
+          <span className="visionary-tag">뇌영상학</span>
+          <span className="visionary-tag">AI 의학 응용</span>
+          <span className="visionary-tag">신경핵의학</span>
+        </div>
+      </div>
     </div>
   );
 }

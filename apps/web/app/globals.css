@@ -74,6 +74,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  padding: 14px 0;
 }
 
 .brand {
@@ -593,6 +594,92 @@ a {
   font-size: 14px;
   color: var(--muted);
   margin: 0 0 24px;
+}
+
+/* ── Visionary section ── */
+
+.visionary-card {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.visionary-photo {
+  flex-shrink: 0;
+}
+
+.visionary-img {
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.visionary-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.visionary-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px;
+}
+
+.visionary-name {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+
+.visionary-affiliation {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+
+.visionary-bio {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+}
+
+.visionary-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.visionary-tag {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Landing footer ── */
+
+.landing-footer {
+  text-align: center;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 48px;
+}
+
+.landing-footer-text {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
 }
 
 /* ── Step indicator (new-request) ── */
@@ -1765,6 +1852,19 @@ a {
   .workflow-step .workflow-step-number {
     margin: 0;
     flex-shrink: 0;
+  }
+
+  /* ── Landing: Visionary ── */
+  .visionary-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 24px 20px;
+    gap: 20px;
+  }
+
+  .visionary-fields {
+    justify-content: center;
   }
 
   /* ── Landing: Footer CTA ── */

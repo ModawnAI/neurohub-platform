@@ -1,4 +1,10 @@
-import { FeatureCards, WorkflowSteps, AudienceCards, LandingNav } from "@/components/landing-sections";
+import {
+  FeatureCards,
+  WorkflowSteps,
+  AudienceCards,
+  VisionarySection,
+  LandingNav,
+} from "@/components/landing-sections";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -64,6 +70,15 @@ export default function HomePage() {
           <AudienceCards />
         </section>
 
+        {/* Visionary */}
+        <section className="landing-section">
+          <h2 className="landing-section-title">Visionary</h2>
+          <p className="landing-section-subtitle">
+            NeuroHub의 비전을 이끄는 연구자를 소개합니다.
+          </p>
+          <VisionarySection />
+        </section>
+
         {/* 하단 CTA */}
         <section className="footer-cta">
           <h2 className="footer-cta-title">NeuroHub로 의료 AI 워크플로우를 시작하세요</h2>
@@ -80,6 +95,13 @@ export default function HomePage() {
           </div>
         </section>
       </div>
+
+      {/* Copyright footer */}
+      <footer className="landing-footer">
+        <p className="landing-footer-text">
+          &copy; 2026 NeuroHub. All rights reserved.
+        </p>
+      </footer>
     </div>
   );
 }
