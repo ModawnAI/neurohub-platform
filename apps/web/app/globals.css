@@ -1598,11 +1598,6 @@ a {
   .audience-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
 
 @media (max-width: 720px) {
@@ -1610,20 +1605,81 @@ a {
     padding: 16px;
   }
 
-  .landing-hero-title {
-    font-size: 26px;
+  /* ── Landing: Nav ── */
+  .topbar {
+    padding: 0;
   }
 
+  .brand-title {
+    font-size: 17px;
+  }
+
+  .nav-row .btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  /* ── Landing: Hero ── */
   .landing-hero {
-    padding: 32px 0 24px;
+    padding: 28px 0 20px;
+  }
+
+  .hero-badge {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+
+  .landing-hero-title {
+    font-size: 24px;
+    line-height: 1.3;
+  }
+
+  .landing-hero-subtitle {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 12px;
+  }
+
+  .hero-actions {
+    margin-top: 20px;
+  }
+
+  .hero-actions .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* ── Landing: Sections ── */
+  .landing-section {
+    padding: 32px 0;
+  }
+
+  .landing-section-title {
+    font-size: 20px;
+  }
+
+  .landing-section-subtitle {
+    font-size: 13px;
+    margin-bottom: 24px;
   }
 
   .feature-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .feature-card {
+    padding: 20px;
   }
 
   .audience-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .audience-card {
+    padding: 20px 16px;
   }
 
   .workflow-steps {
@@ -1645,8 +1701,24 @@ a {
 
   .workflow-step .workflow-step-number {
     margin: 0;
+    flex-shrink: 0;
   }
 
+  /* ── Landing: Footer CTA ── */
+  .footer-cta {
+    padding: 32px 16px;
+    margin-top: 8px;
+  }
+
+  .footer-cta-title {
+    font-size: 19px;
+  }
+
+  .footer-cta-subtitle {
+    font-size: 13px;
+  }
+
+  /* ── App layout ── */
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -1663,6 +1735,10 @@ a {
   .page-header {
     flex-direction: column;
     gap: 12px;
+  }
+
+  .page-title {
+    font-size: 18px;
   }
 
   .step-indicator {
@@ -1727,5 +1803,28 @@ a {
 
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* ── Auth pages mobile ── */
+  .auth-card {
+    padding: 24px 20px;
+  }
+
+  .auth-brand-text {
+    font-size: 20px;
+  }
+
+  /* ── Tables ── */
+  .table {
+    min-width: 560px;
+  }
+
+  /* ── Metric cards ── */
+  .metric-value {
+    font-size: 22px;
+  }
+
+  .greeting {
+    font-size: 20px;
   }
 }
