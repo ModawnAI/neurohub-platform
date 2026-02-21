@@ -29,3 +29,4 @@ htmlcov/
 
 # Supabase local cache
 supabase/.temp/
+.vercel
