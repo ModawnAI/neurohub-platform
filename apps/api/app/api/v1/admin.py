@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.dependencies import AuthenticatedUser, DbSession, require_roles
+from app.dependencies import CurrentUser, DbSession, require_roles
 from app.models.institution import Institution
 from app.models.request import Request
 from app.models.service import ServiceDefinition
@@ -11,7 +11,7 @@ from app.schemas.request import RequestListResponse, RequestRead
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-AdminUser = Depends(require_roles("SYSTEM_ADMIN"))
+_require_admin = require_roles("SYSTEM_ADMIN")
 
 
 def _to_read(req: Request) -> RequestRead:
@@ -38,7 +38,7 @@ def _to_read(req: Request) -> RequestRead:
 
 
 @router.get("/stats")
-async def get_admin_stats(db: DbSession, user: AuthenticatedUser = AdminUser):
+async def get_admin_stats(db: DbSession, user: CurrentUser = Depends(_require_admin)):
     total_requests = (await db.execute(select(func.count(Request.id)))).scalar() or 0
 
     status_counts = {}
@@ -88,7 +88,7 @@ async def get_admin_stats(db: DbSession, user: AuthenticatedUser = AdminUser):
 @router.get("/requests", response_model=RequestListResponse)
 async def list_all_requests(
     db: DbSession,
-    user: AuthenticatedUser = AdminUser,
+    user: CurrentUser = Depends(_require_admin),
     request_status: str | None = Query(default=None, alias="status"),
 ):
     query = select(Request).options(selectinload(Request.cases))

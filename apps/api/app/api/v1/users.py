@@ -3,14 +3,14 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from app.dependencies import AuthenticatedUser, DbSession, require_roles
+from app.dependencies import CurrentUser, DbSession, require_roles
 from app.models.institution import Institution, InstitutionMember
 from app.models.user import User
 from app.schemas.user import ExpertApproval, UserListResponse, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-AdminUser = Depends(require_roles("SYSTEM_ADMIN"))
+_require_admin = require_roles("SYSTEM_ADMIN")
 
 
 def _user_to_read(user: User, institution_id=None, institution_name=None, role_scope=None) -> UserRead:
@@ -36,7 +36,7 @@ def _user_to_read(user: User, institution_id=None, institution_name=None, role_s
 @router.get("", response_model=UserListResponse)
 async def list_users(
     db: DbSession,
-    user: AuthenticatedUser = AdminUser,
+    user: CurrentUser = Depends(_require_admin),
     user_type: str | None = Query(default=None),
     expert_status: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
@@ -81,7 +81,7 @@ async def list_users(
 
 
 @router.get("/{user_id}", response_model=UserRead)
-async def get_user(user_id: str, db: DbSession, user: AuthenticatedUser = AdminUser):
+async def get_user(user_id: str, db: DbSession, user: CurrentUser = Depends(_require_admin)):
     result = await db.execute(
         select(User, InstitutionMember, Institution)
         .outerjoin(InstitutionMember, InstitutionMember.user_id == User.id)
@@ -101,7 +101,7 @@ async def get_user(user_id: str, db: DbSession, user: AuthenticatedUser = AdminU
 
 
 @router.patch("/{user_id}", response_model=UserRead)
-async def update_user(user_id: str, body: UserUpdate, db: DbSession, user: AuthenticatedUser = AdminUser):
+async def update_user(user_id: str, body: UserUpdate, db: DbSession, user: CurrentUser = Depends(_require_admin)):
     result = await db.execute(select(User).where(User.id == user_id))
     db_user = result.scalar_one_or_none()
     if not db_user:
@@ -130,7 +130,7 @@ async def update_user(user_id: str, body: UserUpdate, db: DbSession, user: Authe
 
 
 @router.post("/{user_id}/approve-expert", response_model=UserRead)
-async def approve_expert(user_id: str, db: DbSession, user: AuthenticatedUser = AdminUser):
+async def approve_expert(user_id: str, db: DbSession, user: CurrentUser = Depends(_require_admin)):
     result = await db.execute(select(User).where(User.id == user_id))
     db_user = result.scalar_one_or_none()
     if not db_user:
@@ -163,7 +163,7 @@ async def approve_expert(user_id: str, db: DbSession, user: AuthenticatedUser = 
 
 
 @router.post("/{user_id}/reject-expert", response_model=UserRead)
-async def reject_expert(user_id: str, body: ExpertApproval, db: DbSession, user: AuthenticatedUser = AdminUser):
+async def reject_expert(user_id: str, body: ExpertApproval, db: DbSession, user: CurrentUser = Depends(_require_admin)):
     result = await db.execute(select(User).where(User.id == user_id))
     db_user = result.scalar_one_or_none()
     if not db_user:

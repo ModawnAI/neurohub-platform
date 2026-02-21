@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.dependencies import AuthenticatedUser, DbSession, require_roles
+from app.dependencies import CurrentUser, DbSession, require_roles
 from app.models.qc_decision import QCDecision
 from app.models.report import Report, ReportReview
 from app.models.request import Case, Request
@@ -20,7 +20,7 @@ from app.services.state_machine import validate_transition
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
-ExpertUser = Depends(require_roles("REVIEWER", "SYSTEM_ADMIN"))
+_require_expert = require_roles("REVIEWER", "SYSTEM_ADMIN")
 
 
 def _request_to_queue_item(req: Request) -> ReviewQueueItem:
@@ -42,7 +42,7 @@ def _request_to_queue_item(req: Request) -> ReviewQueueItem:
 @router.get("/queue", response_model=ReviewQueueResponse)
 async def list_review_queue(
     db: DbSession,
-    user: AuthenticatedUser = ExpertUser,
+    user: CurrentUser = Depends(_require_expert),
     status_filter: str | None = Query(default=None, alias="status"),
 ):
     review_statuses = ["QC", "EXPERT_REVIEW"]
@@ -81,7 +81,7 @@ async def list_review_queue(
 
 
 @router.get("/{request_id}", response_model=ReviewDetail)
-async def get_review_detail(request_id: str, db: DbSession, user: AuthenticatedUser = ExpertUser):
+async def get_review_detail(request_id: str, db: DbSession, user: CurrentUser = Depends(_require_expert)):
     result = await db.execute(
         select(Request)
         .options(selectinload(Request.cases).selectinload(Case.files))
@@ -199,7 +199,7 @@ async def submit_qc_decision(
     request_id: str,
     body: QCDecisionCreate,
     db: DbSession,
-    user: AuthenticatedUser = ExpertUser,
+    user: CurrentUser = Depends(_require_expert),
 ):
     result = await db.execute(
         select(Request).where(Request.id == request_id, Request.institution_id == user.institution_id)
@@ -239,7 +239,7 @@ async def submit_report_review(
     request_id: str,
     body: ReportReviewCreate,
     db: DbSession,
-    user: AuthenticatedUser = ExpertUser,
+    user: CurrentUser = Depends(_require_expert),
 ):
     result = await db.execute(
         select(Request).where(Request.id == request_id, Request.institution_id == user.institution_id)
