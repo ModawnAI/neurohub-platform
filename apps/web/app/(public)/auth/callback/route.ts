@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -20,7 +21,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=config", origin));
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
+      },
+    },
+  });
 
   const { error } = await supabase.auth.verifyOtp({ token_hash, type });
 
