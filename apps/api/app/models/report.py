@@ -1,0 +1,56 @@
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base, TimestampMixin, UUIDMixin
+
+
+class Report(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "reports"
+
+    institution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("requests.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="GENERATING")
+    title: Mapped[str | None] = mapped_column(String(500))
+    content: Mapped[dict | None] = mapped_column(JSONB)
+    summary: Mapped[str | None] = mapped_column(Text)
+    pdf_storage_path: Mapped[str | None] = mapped_column(String(1000))
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    celery_task_id: Mapped[str | None] = mapped_column(String(200))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+
+
+class ReportReview(UUIDMixin, Base):
+    __tablename__ = "report_reviews"
+
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("reports.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    reviewer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=False,
+    )
+    decision: Mapped[str] = mapped_column(String(30), nullable=False)
+    comments: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+

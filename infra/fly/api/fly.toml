@@ -1,0 +1,54 @@
+app = "neurohub-api"
+primary_region = "nrt"
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "../../../apps/api/Dockerfile"
+
+[env]
+  APP_ENV = "production"
+  APP_DEBUG = "false"
+  PORT = "8080"
+
+[processes]
+  app = "uvicorn app.main:app --host 0.0.0.0 --port 8080"
+  worker = "celery -A app.worker.celery_app:celery_app worker -Q compute,reporting -l info --concurrency=4"
+  reconciler = "python -m app.reconciler"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 200
+    soft_limit = 100
+
+# API process VM
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["app"]
+
+# Worker process VM (needs more resources for compute tasks)
+[[vm]]
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 2
+  processes = ["worker"]
+
+# Reconciler process VM (lightweight)
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["reconciler"]
+
+[deploy]
+  release_command = "alembic upgrade head"

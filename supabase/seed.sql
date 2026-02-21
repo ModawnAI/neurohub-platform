@@ -1,0 +1,2 @@
+-- NeuroHub Supabase seed placeholder.
+-- DB domain seed is handled by /apps/api/scripts/seed_dev.py.
