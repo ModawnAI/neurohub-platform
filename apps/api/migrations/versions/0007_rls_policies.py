@@ -1,12 +1,12 @@
 """Add Row Level Security policies to all tenant-scoped tables.
 
 Revision ID: 0007_rls_policies
-Revises: 0005_api_key_scopes
+Revises: 0006_webhooks
 """
 from alembic import op
 
 revision = "0007_rls_policies"
-down_revision = "0005_api_key_scopes"
+down_revision = "0006_webhooks"
 branch_labels = None
 depends_on = None
 
