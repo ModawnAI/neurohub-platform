@@ -25,8 +25,8 @@ def upgrade() -> None:
         postgresql_where="status = 'RUNNING'",
     )
     op.create_index(
-        "idx_notifications_unread", "notifications", ["user_id", "read_at"],
-        postgresql_where="read_at IS NULL",
+        "idx_notifications_unread", "notifications", ["user_id", "is_read"],
+        postgresql_where="is_read = false",
     )
     op.create_index("idx_cases_request", "cases", ["request_id"])
     op.create_index("idx_case_files_case", "case_files", ["case_id"])

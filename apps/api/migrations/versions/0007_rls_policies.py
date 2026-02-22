@@ -16,9 +16,7 @@ INSTITUTION_SCOPED = [
     "cases",
     "case_files",
     "runs",
-    "run_steps",
     "reports",
-    "report_reviews",
     "qc_decisions",
     "audit_logs",
     "patient_access_logs",
@@ -27,13 +25,15 @@ INSTITUTION_SCOPED = [
     "institution_members",
     "institution_api_keys",
     "institution_invites",
-    "outbox_events",
-    "upload_sessions",
     "webhooks",
 ]
 
-# Tables scoped by user_id instead
-USER_SCOPED = [
+# Tables without institution_id — service-role-only access
+SERVICE_ONLY = [
+    "run_steps",
+    "report_reviews",
+    "outbox_events",
+    "upload_sessions",
     "idempotency_keys",
 ]
 
@@ -74,15 +74,16 @@ def upgrade() -> None:
             WITH CHECK (institution_id = public.current_institution_id());
         """)
 
-    # User-scoped tables
-    op.execute("ALTER TABLE idempotency_keys ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE idempotency_keys FORCE ROW LEVEL SECURITY;")
-    op.execute("""
-        CREATE POLICY "idempotency_keys_service_bypass" ON idempotency_keys
-        FOR ALL TO service_role
-        USING (true)
-        WITH CHECK (true);
-    """)
+    # Tables without institution_id — service role only
+    for table in SERVICE_ONLY:
+        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
+        op.execute(f"""
+            CREATE POLICY "{table}_service_bypass" ON {table}
+            FOR ALL TO service_role
+            USING (true)
+            WITH CHECK (true);
+        """)
 
     # Institutions table - users can read their own institution
     op.execute("ALTER TABLE institutions ENABLE ROW LEVEL SECURITY;")
@@ -141,7 +142,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    all_tables = INSTITUTION_SCOPED + USER_SCOPED + [
+    all_tables = INSTITUTION_SCOPED + SERVICE_ONLY + [
         "institutions", "users", "service_definitions", "pipeline_definitions"
     ]
     for table in all_tables:
