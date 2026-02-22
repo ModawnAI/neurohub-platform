@@ -1,61 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash } from "phosphor-react";
-import { listServices, listPipelines, createRequest } from "@/lib/api";
+import { ArrowLeft } from "phosphor-react";
+import { listServices, listPipelines, createRequest, confirmRequest, submitRequest } from "@/lib/api";
+import { useWizard } from "@/lib/use-wizard";
+import { StepIndicator } from "@/components/wizard/step-indicator";
+import { StepServiceSelect } from "@/components/wizard/step-service-select";
+import { StepCaseInput } from "@/components/wizard/step-case-input";
+import { StepFileUpload } from "@/components/wizard/step-file-upload";
+import { StepReviewSubmit } from "@/components/wizard/step-review-submit";
+import { EMPTY_DRAFT, type WizardDraft } from "@/components/wizard/types";
 
-interface CaseInput {
-  patient_ref: string;
-  demographics: Record<string, string>;
-}
+const STEPS = ["서비스 선택", "케이스 입력", "파일 업로드", "확인 및 제출"];
+const DRAFT_KEY = "neurohub-new-request-draft";
 
 export default function UserNewRequestPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [cases, setCases] = useState<CaseInput[]>([{ patient_ref: "", demographics: {} }]);
   const [error, setError] = useState("");
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [caseIds, setCaseIds] = useState<string[]>([]);
+
+  const { step, draft, setDraft, next, prev, goTo, clearDraft, hasSavedDraft, isLast } = useWizard<WizardDraft>({
+    totalSteps: STEPS.length,
+    draftKey: DRAFT_KEY,
+    initialDraft: EMPTY_DRAFT,
+    canAdvance: (s, d) => {
+      if (s === 1) return !!d.service_id;
+      if (s === 2) return d.cases.some((c) => c.patient_ref.trim());
+      return true;
+    },
+  });
 
   const { data: servicesData } = useQuery({ queryKey: ["services"], queryFn: listServices });
   const services = servicesData?.items ?? [];
-
-  const selectedService = services.find((s) => s.id === selectedServiceId);
+  const selectedService = services.find((s) => s.id === draft.service_id);
 
   const { data: pipelinesData } = useQuery({
-    queryKey: ["pipelines", selectedServiceId],
-    queryFn: () => listPipelines(selectedServiceId!),
-    enabled: !!selectedServiceId,
+    queryKey: ["pipelines", draft.service_id],
+    queryFn: () => listPipelines(draft.service_id!),
+    enabled: !!draft.service_id,
   });
   const defaultPipeline = pipelinesData?.items?.find((p) => p.is_default) || pipelinesData?.items?.[0];
 
+  // Create the request when advancing to step 3 (file upload)
   const createMut = useMutation({
-    mutationFn: () =>
-      createRequest({
-        service_id: selectedServiceId!,
+    mutationFn: async () => {
+      if (requestId) return { id: requestId, caseIds };
+      const validCases = draft.cases.filter((c) => c.patient_ref.trim());
+      const result = await createRequest({
+        service_id: draft.service_id!,
         pipeline_id: defaultPipeline!.id,
-        priority: 5,
-        cases: cases.filter((c) => c.patient_ref.trim()),
+        priority: draft.priority,
+        cases: validCases,
         idempotency_key: `web-${Date.now()}`,
-      }),
-    onSuccess: () => router.push("/user/requests"),
+      });
+      return result;
+    },
+    onSuccess: (result: any) => {
+      if (result.id && !requestId) {
+        setRequestId(result.id);
+        // Extract case IDs from the created request
+        if (result.cases) {
+          setCaseIds(result.cases.map((c: any) => c.id));
+        }
+      }
+    },
     onError: (err: any) => setError(err?.message || "요청 생성에 실패했습니다."),
   });
 
-  function addCase() {
-    setCases([...cases, { patient_ref: "", demographics: {} }]);
-  }
+  // Submit (confirm + submit) the request on final step
+  const submitMut = useMutation({
+    mutationFn: async () => {
+      if (!requestId) throw new Error("요청이 생성되지 않았습니다.");
+      await confirmRequest(requestId);
+      return submitRequest(requestId);
+    },
+    onSuccess: () => {
+      clearDraft();
+      router.push("/user/requests");
+    },
+    onError: (err: any) => setError(err?.message || "요청 제출에 실패했습니다."),
+  });
 
-  function removeCase(idx: number) {
-    setCases(cases.filter((_, i) => i !== idx));
-  }
+  const handleAdvanceToUpload = useCallback(async () => {
+    setError("");
+    if (!requestId) {
+      createMut.mutate(undefined, { onSuccess: () => next() });
+    } else {
+      next();
+    }
+  }, [requestId, createMut, next]);
 
-  function updatePatientRef(idx: number, val: string) {
-    const next = [...cases];
-    if (next[idx]) next[idx].patient_ref = val;
-    setCases(next);
-  }
+  const handleFilesUploaded = useCallback(
+    (caseIndex: number, fileIds: string[]) => {
+      setDraft({
+        uploaded_files: { ...draft.uploaded_files, [caseIndex]: fileIds },
+      });
+    },
+    [draft.uploaded_files, setDraft],
+  );
 
   return (
     <div className="stack-lg">
@@ -65,122 +110,66 @@ export default function UserNewRequestPage() {
 
       <h1 className="page-title">새 요청 만들기</h1>
 
-      <div className="step-indicator">
-        {["서비스 선택", "케이스 입력", "확인 및 제출"].map((label, i) => (
-          <div key={label} style={{ display: "flex", alignItems: "center" }}>
-            {i > 0 && <div className="step-indicator-line" />}
-            <div className={`step-indicator-item ${step === i + 1 ? "active" : step > i + 1 ? "done" : ""}`}>
-              <div className="step-indicator-dot">{step > i + 1 ? <Check size={12} /> : i + 1}</div>
-              <span>{label}</span>
-            </div>
+      {hasSavedDraft && step === 1 && (
+        <div className="draft-banner">
+          이전에 작성 중인 요청이 있습니다.
+          <div className="draft-banner-actions">
+            <button className="btn btn-sm btn-secondary" onClick={clearDraft}>
+              삭제
+            </button>
+            <button className="btn btn-sm btn-primary" onClick={() => goTo(2)}>
+              이어서 작성
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {/* Step 1: Service Selection */}
+      <StepIndicator steps={STEPS} current={step} />
+
       {step === 1 && (
-        <div className="stack-lg">
-          <p className="muted-text">분석할 서비스를 선택하세요</p>
-          {services.length === 0 ? (
-            <div className="empty-state"><p className="empty-state-text">사용 가능한 서비스가 없습니다.</p></div>
-          ) : (
-            <div className="grid-2">
-              {services.map((svc) => (
-                <button
-                  key={svc.id}
-                  className={`type-selector-card ${selectedServiceId === svc.id ? "selected" : ""}`}
-                  onClick={() => setSelectedServiceId(svc.id)}
-                  style={{ textAlign: "left" }}
-                >
-                  <p className="type-selector-title">{svc.display_name}</p>
-                  <p className="type-selector-desc">{svc.department || svc.name} &middot; v{svc.version}</p>
-                </button>
-              ))}
-            </div>
-          )}
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button className="btn btn-primary" disabled={!selectedServiceId} onClick={() => setStep(2)}>
-              다음 <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
+        <StepServiceSelect
+          services={services}
+          selectedId={draft.service_id}
+          onSelect={(id) => {
+            setDraft({ service_id: id });
+            const pipeline = pipelinesData?.items?.find((p) => p.is_default) || pipelinesData?.items?.[0];
+            if (pipeline) setDraft({ pipeline_id: pipeline.id });
+          }}
+          onNext={next}
+        />
       )}
 
-      {/* Step 2: Cases */}
       {step === 2 && (
-        <div className="stack-lg">
-          <p className="muted-text">환자 케이스 정보를 입력하세요</p>
-          <div className="stack-md">
-            {cases.map((c, idx) => (
-              <div key={idx} className="panel" style={{ display: "flex", alignItems: "center", gap: 12, padding: 16 }}>
-                <span style={{ fontWeight: 700, color: "var(--muted)", fontSize: 13, flexShrink: 0 }}>
-                  #{idx + 1}
-                </span>
-                <input
-                  className="input"
-                  placeholder="환자 참조 ID"
-                  value={c.patient_ref}
-                  onChange={(e) => updatePatientRef(idx, e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                {cases.length > 1 && (
-                  <button className="btn btn-danger btn-sm" onClick={() => removeCase(idx)} title="삭제">
-                    <Trash size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <button className="btn btn-secondary btn-sm" onClick={addCase}>
-            <Plus size={14} /> 케이스 추가
-          </button>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <button className="btn btn-secondary" onClick={() => setStep(1)}>
-              <ArrowLeft size={16} /> 이전
-            </button>
-            <button
-              className="btn btn-primary"
-              disabled={!cases.some((c) => c.patient_ref.trim())}
-              onClick={() => setStep(3)}
-            >
-              다음 <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
+        <StepCaseInput
+          cases={draft.cases}
+          onChange={(cases) => setDraft({ cases })}
+          onNext={handleAdvanceToUpload}
+          onPrev={prev}
+        />
       )}
 
-      {/* Step 3: Confirm */}
       {step === 3 && (
-        <div className="stack-lg">
-          <div className="panel">
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>요청 요약</h3>
-            <div className="stack-md">
-              <div>
-                <p className="detail-label">서비스</p>
-                <p className="detail-value">{selectedService?.display_name || "-"}</p>
-              </div>
-              <div>
-                <p className="detail-label">케이스 수</p>
-                <p className="detail-value">{cases.filter((c) => c.patient_ref.trim()).length}건</p>
-              </div>
-              <div>
-                <p className="detail-label">환자 참조 ID</p>
-                <p className="detail-value">{cases.filter((c) => c.patient_ref.trim()).map((c) => c.patient_ref).join(", ")}</p>
-              </div>
-            </div>
-          </div>
+        <StepFileUpload
+          requestId={requestId}
+          cases={draft.cases}
+          caseIds={caseIds}
+          uploadedFiles={draft.uploaded_files}
+          onFilesUploaded={handleFilesUploaded}
+          onNext={next}
+          onPrev={prev}
+        />
+      )}
 
-          {error && <p className="error-text">{error}</p>}
-
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <button className="btn btn-secondary" onClick={() => setStep(2)}>
-              <ArrowLeft size={16} /> 이전
-            </button>
-            <button className="btn btn-primary" onClick={() => createMut.mutate()} disabled={createMut.isPending}>
-              {createMut.isPending ? <span className="spinner" /> : <>요청 생성 <Check size={16} /></>}
-            </button>
-          </div>
-        </div>
+      {step === 4 && (
+        <StepReviewSubmit
+          service={selectedService}
+          cases={draft.cases}
+          uploadedFiles={draft.uploaded_files}
+          onPrev={prev}
+          onSubmit={() => submitMut.mutate()}
+          isPending={submitMut.isPending}
+          error={error}
+        />
       )}
     </div>
   );

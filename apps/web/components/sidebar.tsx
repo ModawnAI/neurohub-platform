@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Brain, SignOut } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
 import clsx from "clsx";
+import { NotificationBell } from "@/components/notification-bell";
 
 interface NavItem {
   href: string;
@@ -52,6 +53,7 @@ export function Sidebar({ items, userTypeLabel }: SidebarProps) {
       </nav>
 
       <div className="sidebar-user">
+        <NotificationBell />
         <div className="sidebar-user-avatar">{initial.toUpperCase()}</div>
         <div className="sidebar-user-info">
           <p className="sidebar-user-name">{user?.displayName || user?.email || "사용자"}</p>

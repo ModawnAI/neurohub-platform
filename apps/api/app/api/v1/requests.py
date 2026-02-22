@@ -14,11 +14,11 @@ from app.models.outbox import OutboxEvent
 from app.models.request import Case, Request
 from app.models.run import Run, RunStep
 from app.models.service import PipelineDefinition, ServiceDefinition
+from app.schemas.pagination import PaginatedResponse
 from app.schemas.request import (
     CancelRequest,
     ConfirmRequest,
     RequestCreate,
-    RequestListResponse,
     RequestRead,
     RequestStatus,
     TransitionRequest,
@@ -273,11 +273,13 @@ async def create_request(
     return response_payload
 
 
-@router.get("/requests", response_model=RequestListResponse)
+@router.get("/requests", response_model=PaginatedResponse[RequestRead])
 async def list_requests(
     db: DbSession,
     user: AuthenticatedUser,
     status_filter: RequestStatus | None = Query(default=None, alias="status"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     query = select(Request).where(Request.institution_id == user.institution_id)
     count_query = select(func.count(Request.id)).where(Request.institution_id == user.institution_id)
@@ -289,9 +291,15 @@ async def list_requests(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    result = await db.execute(query.order_by(Request.created_at.desc()).limit(200))
+    result = await db.execute(query.order_by(Request.created_at.desc()).offset(offset).limit(limit))
     rows = result.scalars().all()
-    return RequestListResponse(items=[_to_read(r) for r in rows], total=total)
+    return PaginatedResponse(
+        items=[_to_read(r) for r in rows],
+        total=total,
+        offset=offset,
+        limit=limit,
+        has_more=(offset + limit) < total,
+    )
 
 
 @router.get("/requests/{request_id}", response_model=RequestRead)

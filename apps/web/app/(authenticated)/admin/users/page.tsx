@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { listUsers, approveExpert, rejectExpert, type UserRead } from "@/lib/api";
+import { CaretLeft, CaretRight } from "phosphor-react";
 
 type FilterTab = "all" | "SERVICE_USER" | "EXPERT" | "ADMIN" | "PENDING";
+const PAGE_SIZE = 20;
 
 const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
   { key: "all", label: "전체" },
@@ -22,6 +25,8 @@ const USER_TYPE_LABELS: Record<string, string> = {
 
 export default function AdminUsersPage() {
   const [filter, setFilter] = useState<FilterTab>("all");
+  const [page, setPage] = useState(0);
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const params = filter === "PENDING"
@@ -45,20 +50,27 @@ export default function AdminUsersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
-  const users = data?.items ?? [];
+  const allUsers = data?.items ?? [];
+  const totalPages = Math.max(1, Math.ceil(allUsers.length / PAGE_SIZE));
+  const users = allUsers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const handleFilterChange = (key: FilterTab) => {
+    setFilter(key);
+    setPage(0);
+  };
 
   return (
     <div className="stack-lg">
       <div className="page-header">
         <div>
           <h1 className="page-title">사용자 관리</h1>
-          <p className="page-subtitle">시스템 사용자를 관리합니다</p>
+          <p className="page-subtitle">시스템 사용자를 관리합니다 ({data?.total ?? 0}명)</p>
         </div>
       </div>
 
       <div className="filter-tabs">
         {FILTER_TABS.map((tab) => (
-          <button key={tab.key} className={`filter-tab ${filter === tab.key ? "active" : ""}`} onClick={() => setFilter(tab.key)}>
+          <button key={tab.key} className={`filter-tab ${filter === tab.key ? "active" : ""}`} onClick={() => handleFilterChange(tab.key)}>
             {tab.label}
           </button>
         ))}
@@ -83,7 +95,7 @@ export default function AdminUsersPage() {
               </thead>
               <tbody>
                 {users.map((u: UserRead) => (
-                  <tr key={u.id}>
+                  <tr key={u.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/users/${u.id}`)}>
                     <td>{u.display_name || u.username}</td>
                     <td>{u.email || "-"}</td>
                     <td>
@@ -108,7 +120,7 @@ export default function AdminUsersPage() {
                     <td>{u.institution_name || "-"}</td>
                     <td>{u.created_at ? new Date(u.created_at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
-                      <div className="action-row">
+                      <div className="action-row" onClick={(e) => e.stopPropagation()}>
                         {u.user_type === "EXPERT" && u.expert_status === "PENDING_APPROVAL" && (
                           <>
                             <button className="btn btn-sm btn-primary" onClick={() => approveMut.mutate(u.id)} disabled={approveMut.isPending}>
@@ -124,11 +136,23 @@ export default function AdminUsersPage() {
                   </tr>
                 ))}
                 {users.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>사용자가 없습니다.</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>사용자가 없습니다.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="pagination" style={{ marginTop: 16 }}>
+              <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                <CaretLeft size={14} /> 이전
+              </button>
+              <span className="pagination-info">{page + 1} / {totalPages}</span>
+              <button className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+                다음 <CaretRight size={14} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

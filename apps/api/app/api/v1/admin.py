@@ -1,13 +1,19 @@
+import uuid
+from datetime import date, datetime
+
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DbSession, require_roles
+from app.models.audit import AuditLog
 from app.models.institution import Institution
 from app.models.request import Request
 from app.models.service import ServiceDefinition
 from app.models.user import User
-from app.schemas.request import RequestListResponse, RequestRead
+from app.schemas.pagination import PaginatedResponse
+from app.schemas.request import RequestRead
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -85,27 +91,104 @@ async def get_admin_stats(db: DbSession, user: CurrentUser = Depends(_require_ad
     }
 
 
-@router.get("/requests", response_model=RequestListResponse)
+@router.get("/requests", response_model=PaginatedResponse[RequestRead])
 async def list_all_requests(
     db: DbSession,
     user: CurrentUser = Depends(_require_admin),
     request_status: str | None = Query(default=None, alias="status"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     query = select(Request).options(selectinload(Request.cases))
+    count_query = select(func.count(Request.id))
 
     if request_status:
         query = query.where(Request.status == request_status)
+        count_query = count_query.where(Request.status == request_status)
 
-    query = query.order_by(Request.created_at.desc())
-    result = await db.execute(query)
+    total = (await db.execute(count_query)).scalar() or 0
+    result = await db.execute(
+        query.order_by(Request.created_at.desc()).offset(offset).limit(limit)
+    )
     requests = result.scalars().all()
 
-    count_query = select(func.count(Request.id))
-    if request_status:
-        count_query = count_query.where(Request.status == request_status)
-    total = (await db.execute(count_query)).scalar() or 0
-
-    return RequestListResponse(
+    return PaginatedResponse(
         items=[_to_read(r) for r in requests],
         total=total,
+        offset=offset,
+        limit=limit,
+        has_more=(offset + limit) < total,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Audit Logs
+# ---------------------------------------------------------------------------
+
+class AuditLogRead(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID | None
+    institution_id: uuid.UUID | None
+    action: str
+    entity_type: str
+    entity_id: uuid.UUID
+    before_state: dict | None = None
+    after_state: dict | None = None
+    ip_address: str | None = None
+    created_at: datetime
+
+
+@router.get("/audit-logs", response_model=PaginatedResponse[AuditLogRead])
+async def list_audit_logs(
+    db: DbSession,
+    user: CurrentUser = Depends(_require_admin),
+    action: str | None = Query(default=None),
+    entity_type: str | None = Query(default=None),
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    filters = []
+    if action:
+        filters.append(AuditLog.action == action)
+    if entity_type:
+        filters.append(AuditLog.entity_type == entity_type)
+    if from_date:
+        filters.append(AuditLog.created_at >= datetime.combine(from_date, datetime.min.time()))
+    if to_date:
+        filters.append(AuditLog.created_at <= datetime.combine(to_date, datetime.max.time()))
+
+    count_result = await db.execute(select(func.count(AuditLog.id)).where(*filters))
+    total = count_result.scalar_one()
+
+    result = await db.execute(
+        select(AuditLog)
+        .where(*filters)
+        .order_by(AuditLog.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+
+    return PaginatedResponse(
+        items=[
+            AuditLogRead(
+                id=log.id,
+                user_id=log.user_id,
+                institution_id=log.institution_id,
+                action=log.action,
+                entity_type=log.entity_type,
+                entity_id=log.entity_id,
+                before_state=log.before_state,
+                after_state=log.after_state,
+                ip_address=log.ip_address,
+                created_at=log.created_at,
+            )
+            for log in logs
+        ],
+        total=total,
+        offset=offset,
+        limit=limit,
+        has_more=(offset + limit) < total,
     )

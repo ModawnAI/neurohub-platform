@@ -378,3 +378,214 @@ export async function listAllRequests(status?: string) {
   const params = status ? `?status=${status}` : "";
   return apiFetch<{ items: RequestRead[]; total: number }>(`/admin/requests${params}`);
 }
+
+// ── File Upload ──
+
+export interface CaseFileRead {
+  id: string;
+  case_id: string;
+  slot: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number | null;
+  checksum: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface CaseRead {
+  id: string;
+  request_id: string;
+  patient_ref: string;
+  status: string;
+  demographics: Record<string, unknown> | null;
+}
+
+export async function listCases(requestId: string) {
+  return apiFetch<{ items: CaseRead[] }>(`/requests/${requestId}/cases`);
+}
+
+export async function initiateUpload(
+  requestId: string,
+  caseId: string,
+  payload: { filename: string; content_type: string; slot: string },
+) {
+  return apiFetch<{ file_id: string; upload_url: string; upload_session_id: string }>(
+    `/requests/${requestId}/cases/${caseId}/files/presign`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function completeUpload(
+  requestId: string,
+  caseId: string,
+  fileId: string,
+  payload: { checksum: string; size_bytes: number },
+) {
+  return apiFetch<CaseFileRead>(
+    `/requests/${requestId}/cases/${caseId}/files/${fileId}/complete`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function uploadFileToStorage(
+  url: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)));
+    xhr.onerror = () => reject(new Error("Upload network error"));
+    xhr.send(file);
+  });
+}
+
+export async function listCaseFiles(requestId: string, caseId: string) {
+  return apiFetch<{ items: CaseFileRead[] }>(`/requests/${requestId}/cases/${caseId}/files`);
+}
+
+export async function getDownloadUrl(requestId: string, caseId: string, fileId: string) {
+  return apiFetch<{ download_url: string; expires_in: number }>(
+    `/requests/${requestId}/cases/${caseId}/files/${fileId}/download`,
+  );
+}
+
+// ── Notifications ──
+
+export interface NotificationRead {
+  id: string;
+  event_type: string;
+  title: string;
+  body: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export async function listNotifications(unreadOnly = false) {
+  const params = unreadOnly ? "?unread_only=true" : "";
+  return apiFetch<{ items: NotificationRead[]; total: number }>(`/notifications${params}`);
+}
+
+export async function markNotificationRead(notificationId: string) {
+  return apiFetch<{ status: string }>(`/notifications/${notificationId}/read`, { method: "POST" });
+}
+
+export async function markAllNotificationsRead() {
+  return apiFetch<{ updated: number }>("/notifications/read-all", { method: "POST" });
+}
+
+// ── API Keys (Admin) ──
+
+export interface ApiKeyRead {
+  id: string;
+  name: string;
+  key_prefix: string;
+  status: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export async function listApiKeys(orgId: string) {
+  return apiFetch<{ items: ApiKeyRead[] }>(`/organizations/${orgId}/api-keys`);
+}
+
+export async function createApiKey(orgId: string, payload: { name: string; expires_in_days?: number }) {
+  return apiFetch<{ id: string; api_key: string; name: string; key_prefix: string; expires_at: string | null }>(
+    `/organizations/${orgId}/api-keys`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function revokeApiKey(orgId: string, keyId: string) {
+  return apiFetch<{ status: string }>(`/organizations/${orgId}/api-keys/${keyId}`, { method: "DELETE" });
+}
+
+// ── Billing ──
+
+export interface UsageEntry {
+  service_name: string;
+  charge_type: string;
+  total_amount: number;
+  count: number;
+}
+
+export async function getUsage(startDate: string, endDate: string) {
+  return apiFetch<{ items: UsageEntry[] }>(`/billing/usage?start_date=${startDate}&end_date=${endDate}`);
+}
+
+// ── Admin: Audit Logs ──
+
+export interface AuditLogRead {
+  id: string;
+  actor_id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  diff: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function listAuditLogs(params?: { action?: string; entity_type?: string; from?: string; to?: string; limit?: number; offset?: number }) {
+  const searchParams = new URLSearchParams();
+  if (params?.action) searchParams.set("action", params.action);
+  if (params?.entity_type) searchParams.set("entity_type", params.entity_type);
+  if (params?.from) searchParams.set("from", params.from);
+  if (params?.to) searchParams.set("to", params.to);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.offset) searchParams.set("offset", String(params.offset));
+  const qs = searchParams.toString();
+  return apiFetch<{ items: AuditLogRead[]; total: number }>(`/admin/audit-logs${qs ? `?${qs}` : ""}`);
+}
+
+// ── Admin: Service CRUD ──
+
+export async function createService(payload: { name: string; display_name: string; version?: string; department?: string; description?: string }) {
+  return apiFetch<ServiceRead>("/services", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function updateService(serviceId: string, payload: { display_name?: string; version?: string; department?: string; description?: string; status?: string }) {
+  return apiFetch<ServiceRead>(`/services/${serviceId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+// ── Admin: Organization Update ──
+
+export async function updateOrganization(orgId: string, payload: { name?: string; contact_email?: string; contact_phone?: string; status?: string }) {
+  return apiFetch<OrgRead>(`/organizations/${orgId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+// ── Typed API Error ──
+
+export class ApiError extends Error {
+  status: number;
+  code: string;
+  detail: string;
+
+  constructor(status: number, code: string, message: string, detail = "") {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
+// ── Transition Record (for enhanced timeline) ──
+
+export interface TransitionRecord {
+  from_status: string;
+  to_status: string;
+  actor_id: string | null;
+  note: string | null;
+  created_at: string;
+}

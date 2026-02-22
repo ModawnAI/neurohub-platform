@@ -1,11 +1,13 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UUIDMixin
+
+MAX_RETRIES = 5
 
 
 class OutboxEvent(UUIDMixin, Base):
@@ -17,6 +19,7 @@ class OutboxEvent(UUIDMixin, Base):
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_detail: Mapped[str | None] = mapped_column(Text)
     available_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

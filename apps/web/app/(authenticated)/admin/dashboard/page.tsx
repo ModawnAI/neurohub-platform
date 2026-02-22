@@ -57,7 +57,7 @@ export default function AdminDashboard() {
 
       {mockRequests.length > 0 && (
         <div className="panel">
-          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px" }}>요청 상태 분포</h3>
+          <h3 className="panel-title-mb">요청 상태 분포</h3>
           <StatusBar items={mockRequests.map(r => ({ status: r.status } as any))} />
         </div>
       )}
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
       <div className="dashboard-columns">
         <div className="panel">
           <div className="panel-header-row" style={{ marginBottom: 12 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>빠른 작업</h3>
+            <h3 className="panel-title">빠른 작업</h3>
           </div>
           <div className="stack-md">
             <button className="btn btn-secondary" onClick={() => router.push("/admin/requests")} style={{ width: "100%" }}>
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="panel">
-          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px" }}>시스템 요약</h3>
+          <h3 className="panel-title-mb">시스템 요약</h3>
           <div className="stack-md">
             <div>
               <p className="detail-label">전체 기관</p>

@@ -30,7 +30,7 @@ export default function ExpertSettingsPage() {
       <h1 className="page-title">설정</h1>
 
       <div className="panel">
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 16px" }}>프로필</h2>
+        <h2 className="panel-title-mb">프로필</h2>
         <div className="auth-form">
           <label className="field">
             이메일
@@ -56,7 +56,7 @@ export default function ExpertSettingsPage() {
       </div>
 
       <div className="panel">
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>전문가 상태</h2>
+        <h2 className="panel-title-mb">전문가 상태</h2>
         {user?.expertStatus === "APPROVED" ? (
           <div className="banner banner-success">승인된 전문가입니다. 리뷰 기능을 사용할 수 있습니다.</div>
         ) : user?.expertStatus === "PENDING_APPROVAL" ? (

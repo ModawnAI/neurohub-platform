@@ -6,6 +6,8 @@ import { Brain, User, MagnifyingGlass, GearSix, ArrowRight, ArrowLeft, Check } f
 import { TypeSelector } from "@/components/type-selector";
 import { completeOnboarding } from "@/lib/api";
 import { useAuth, getRoleHomePath } from "@/lib/auth";
+import { useZodForm } from "@/lib/use-zod-form";
+import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas";
 
 type UserType = "SERVICE_USER" | "EXPERT" | "ADMIN";
 type OrgType = "individual" | "hospital";
@@ -31,52 +33,67 @@ const USER_TYPE_OPTIONS = [
   },
 ];
 
+const INITIAL: OnboardingFormValues = {
+  user_type: "SERVICE_USER",
+  display_name: "",
+  phone: "",
+  specialization: "",
+  bio: "",
+  organization_name: "",
+  organization_code: "",
+  organization_type: "individual",
+};
+
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
-  const [userType, setUserType] = useState<UserType | null>(null);
-  const [displayName, setDisplayName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [specialization, setSpecialization] = useState("");
-  const [bio, setBio] = useState("");
   const [orgType, setOrgType] = useState<OrgType>("individual");
-  const [orgName, setOrgName] = useState("");
-  const [orgCode, setOrgCode] = useState("");
-  const [error, setError] = useState("");
+  const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { refreshUser } = useAuth();
 
+  const { values, errors, setField, validate } = useZodForm(onboardingSchema, INITIAL);
+
+  const userType = values.user_type as UserType;
+
   function canProceedStep1() {
-    return userType !== null;
+    return !!userType;
   }
 
   function canProceedStep2() {
-    if (!displayName.trim()) return false;
-    if (userType === "ADMIN" && !orgName.trim()) return false;
-    if (userType === "SERVICE_USER" && orgType === "hospital" && !orgName.trim()) return false;
+    if (!values.display_name.trim()) return false;
+    if (userType === "ADMIN" && !values.organization_name?.trim()) return false;
+    if (userType === "SERVICE_USER" && orgType === "hospital" && !values.organization_name?.trim()) return false;
     return true;
   }
 
+  function handleNextToStep3() {
+    setField("organization_type", userType === "ADMIN" ? "hospital" : orgType);
+    const result = validate();
+    if (!result) return;
+    setStep(3);
+  }
+
   async function handleComplete() {
-    setError("");
+    setApiError("");
     setLoading(true);
 
     try {
       await completeOnboarding({
-        user_type: userType!,
-        display_name: displayName,
-        phone: phone || undefined,
-        specialization: userType === "EXPERT" ? specialization || undefined : undefined,
-        bio: userType === "EXPERT" ? bio || undefined : undefined,
-        organization_name: orgType === "hospital" || userType === "ADMIN" ? orgName : undefined,
-        organization_code: orgType === "hospital" || userType === "ADMIN" ? orgCode || undefined : undefined,
+        user_type: userType,
+        display_name: values.display_name,
+        phone: values.phone || undefined,
+        specialization: userType === "EXPERT" ? values.specialization || undefined : undefined,
+        bio: userType === "EXPERT" ? values.bio || undefined : undefined,
+        organization_name: orgType === "hospital" || userType === "ADMIN" ? values.organization_name : undefined,
+        organization_code: orgType === "hospital" || userType === "ADMIN" ? values.organization_code || undefined : undefined,
         organization_type: userType === "ADMIN" ? "hospital" : orgType,
       });
 
       await refreshUser();
       router.push(getRoleHomePath(userType));
     } catch (err: any) {
-      setError(err?.message || "온보딩에 실패했습니다.");
+      setApiError(err?.message || "온보딩에 실패했습니다.");
       setLoading(false);
     }
   }
@@ -111,8 +128,12 @@ export default function OnboardingPage() {
               <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>어떤 역할로 사용하시겠어요?</h2>
               <p className="muted-text">사용 목적에 맞는 유형을 선택하세요</p>
             </div>
-            <TypeSelector options={USER_TYPE_OPTIONS} selected={userType} onSelect={setUserType} />
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <TypeSelector
+              options={USER_TYPE_OPTIONS}
+              selected={userType}
+              onSelect={(val) => setField("user_type", val)}
+            />
+            <div className="nav-buttons-end">
               <button className="btn btn-primary" disabled={!canProceedStep1()} onClick={() => setStep(2)}>
                 다음 <ArrowRight size={16} />
               </button>
@@ -131,23 +152,45 @@ export default function OnboardingPage() {
             <div className="auth-form">
               <label className="field">
                 표시 이름
-                <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="홍길동" required />
+                <input
+                  className="input"
+                  value={values.display_name}
+                  onChange={(e) => setField("display_name", e.target.value)}
+                  placeholder="홍길동"
+                />
+                {errors.display_name && <span className="error-text">{errors.display_name}</span>}
               </label>
 
               <label className="field">
                 연락처 (선택)
-                <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" />
+                <input
+                  className="input"
+                  value={values.phone ?? ""}
+                  onChange={(e) => setField("phone", e.target.value)}
+                  placeholder="010-0000-0000"
+                />
               </label>
 
               {userType === "EXPERT" && (
                 <>
                   <label className="field">
                     전문 분야
-                    <input className="input" value={specialization} onChange={(e) => setSpecialization(e.target.value)} placeholder="예: 신경영상, 뇌 MRI 분석" />
+                    <input
+                      className="input"
+                      value={values.specialization ?? ""}
+                      onChange={(e) => setField("specialization", e.target.value)}
+                      placeholder="예: 신경영상, 뇌 MRI 분석"
+                    />
                   </label>
                   <label className="field">
                     소개 (선택)
-                    <textarea className="textarea" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="간단한 자기 소개를 입력하세요" rows={3} />
+                    <textarea
+                      className="textarea"
+                      value={values.bio ?? ""}
+                      onChange={(e) => setField("bio", e.target.value)}
+                      placeholder="간단한 자기 소개를 입력하세요"
+                      rows={3}
+                    />
                   </label>
                 </>
               )}
@@ -182,21 +225,32 @@ export default function OnboardingPage() {
                 <>
                   <label className="field">
                     기관명
-                    <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="OO 병원" required />
+                    <input
+                      className="input"
+                      value={values.organization_name ?? ""}
+                      onChange={(e) => setField("organization_name", e.target.value)}
+                      placeholder="OO 병원"
+                    />
+                    {errors.organization_name && <span className="error-text">{errors.organization_name}</span>}
                   </label>
                   <label className="field">
                     기관 코드 (선택)
-                    <input className="input" value={orgCode} onChange={(e) => setOrgCode(e.target.value)} placeholder="영문/숫자 조합 (예: hospital-01)" />
+                    <input
+                      className="input"
+                      value={values.organization_code ?? ""}
+                      onChange={(e) => setField("organization_code", e.target.value)}
+                      placeholder="영문/숫자 조합 (예: hospital-01)"
+                    />
                   </label>
                 </>
               )}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div className="nav-buttons">
               <button className="btn btn-secondary" onClick={() => setStep(1)}>
                 <ArrowLeft size={16} /> 이전
               </button>
-              <button className="btn btn-primary" disabled={!canProceedStep2()} onClick={() => setStep(3)}>
+              <button className="btn btn-primary" disabled={!canProceedStep2()} onClick={handleNextToStep3}>
                 다음 <ArrowRight size={16} />
               </button>
             </div>
@@ -221,24 +275,24 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <p className="detail-label">이름</p>
-                  <p className="detail-value">{displayName}</p>
+                  <p className="detail-value">{values.display_name}</p>
                 </div>
-                {phone && (
+                {values.phone && (
                   <div>
                     <p className="detail-label">연락처</p>
-                    <p className="detail-value">{phone}</p>
+                    <p className="detail-value">{values.phone}</p>
                   </div>
                 )}
-                {userType === "EXPERT" && specialization && (
+                {userType === "EXPERT" && values.specialization && (
                   <div>
                     <p className="detail-label">전문 분야</p>
-                    <p className="detail-value">{specialization}</p>
+                    <p className="detail-value">{values.specialization}</p>
                   </div>
                 )}
-                {(orgType === "hospital" || userType === "ADMIN") && orgName && (
+                {(orgType === "hospital" || userType === "ADMIN") && values.organization_name && (
                   <div>
                     <p className="detail-label">소속 기관</p>
-                    <p className="detail-value">{orgName}</p>
+                    <p className="detail-value">{values.organization_name}</p>
                   </div>
                 )}
               </div>
@@ -250,9 +304,9 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {error && <p className="error-text">{error}</p>}
+            {apiError && <p className="error-text">{apiError}</p>}
 
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div className="nav-buttons">
               <button className="btn btn-secondary" onClick={() => setStep(2)}>
                 <ArrowLeft size={16} /> 이전
               </button>

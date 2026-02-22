@@ -1,11 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "phosphor-react";
-import { getRequest, cancelRequest, type RequestStatus } from "@/lib/api";
+import { ArrowLeft, DownloadSimple, File, FileText } from "phosphor-react";
+import {
+  getRequest,
+  cancelRequest,
+  listCases,
+  listCaseFiles,
+  getDownloadUrl,
+  type RequestStatus,
+  type CaseRead,
+  type CaseFileRead,
+} from "@/lib/api";
 import { Timeline } from "@/components/timeline";
-import { useState } from "react";
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   CREATED: "생성됨", RECEIVING: "수신 중", STAGING: "준비 중",
@@ -15,6 +24,84 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 };
 
 const CANCELLABLE: RequestStatus[] = ["CREATED", "RECEIVING", "STAGING", "READY_TO_COMPUTE"];
+
+function formatBytes(bytes: number | null): string {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: filesData, isLoading } = useQuery({
+    queryKey: ["case-files", requestId, caseItem.id],
+    queryFn: () => listCaseFiles(requestId, caseItem.id),
+    enabled: expanded,
+  });
+
+  const handleDownload = async (file: CaseFileRead) => {
+    try {
+      const { download_url } = await getDownloadUrl(requestId, caseItem.id, file.id);
+      window.open(download_url, "_blank");
+    } catch {
+      alert("다운로드 URL을 가져올 수 없습니다.");
+    }
+  };
+
+  const files = filesData?.items ?? [];
+
+  return (
+    <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          background: "none", border: "none", cursor: "pointer", width: "100%",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "8px 0", fontSize: 14,
+        }}
+      >
+        <span>
+          <strong>케이스:</strong> {caseItem.patient_ref}{" "}
+          <span className="muted-text" style={{ fontSize: 12 }}>({caseItem.status})</span>
+        </span>
+        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? "접기" : "파일 보기"}</span>
+      </button>
+
+      {expanded && (
+        <div style={{ paddingLeft: 16, marginTop: 8 }}>
+          {isLoading ? (
+            <span className="spinner" />
+          ) : files.length === 0 ? (
+            <p className="muted-text" style={{ fontSize: 13 }}>업로드된 파일이 없습니다.</p>
+          ) : (
+            <div className="stack-sm">
+              {files.map((file) => (
+                <div key={file.id} className="file-info-card">
+                  <div className="file-info-card-icon"><File size={20} /></div>
+                  <div className="file-info-card-body">
+                    <p className="file-info-card-name">{file.filename}</p>
+                    <p className="file-info-card-meta">{file.slot} &middot; {formatBytes(file.size_bytes)}</p>
+                  </div>
+                  {file.status === "COMPLETED" && (
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => handleDownload(file)}
+                      title="다운로드"
+                    >
+                      <DownloadSimple size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function UserRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +113,12 @@ export default function UserRequestDetailPage() {
   const { data: request, isLoading } = useQuery({
     queryKey: ["request", id],
     queryFn: () => getRequest(id),
+    enabled: !!id,
+  });
+
+  const { data: casesData } = useQuery({
+    queryKey: ["request-cases", id],
+    queryFn: () => listCases(id),
     enabled: !!id,
   });
 
@@ -42,6 +135,13 @@ export default function UserRequestDetailPage() {
 
   const serviceSnapshot = (request as any).service_snapshot;
   const canCancel = CANCELLABLE.includes(request.status);
+  const cases: CaseRead[] = casesData?.items ?? [];
+
+  const handleViewReport = () => {
+    // Reports are accessible through the request's report endpoint
+    // For now, open the download flow for report files
+    alert("보고서 다운로드 기능이 곧 제공됩니다.");
+  };
 
   return (
     <div className="stack-lg">
@@ -61,13 +161,13 @@ export default function UserRequestDetailPage() {
 
       <div className="detail-grid">
         <div className="panel">
-          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>진행 상태</h3>
+          <h3 className="panel-title-mb">진행 상태</h3>
           <Timeline currentStatus={request.status} createdAt={request.created_at} updatedAt={request.updated_at} />
         </div>
 
         <div className="stack-md">
           <div className="panel">
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px" }}>요청 정보</h3>
+            <h3 className="panel-title-mb">요청 정보</h3>
             <div className="stack-md">
               <div>
                 <p className="detail-label">서비스</p>
@@ -90,12 +190,24 @@ export default function UserRequestDetailPage() {
             </div>
           </div>
 
+          {/* Case Files Section */}
+          {cases.length > 0 && (
+            <div className="panel">
+              <h3 className="panel-title-mb">케이스 및 파일</h3>
+              <div className="stack-sm">
+                {cases.map((c) => (
+                  <CaseFilesSection key={c.id} requestId={id} caseItem={c} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {request.status === "FINAL" && (
             <div className="panel" style={{ background: "var(--success-light)", borderColor: "#86efac" }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px", color: "var(--success)" }}>분석 완료</h3>
+              <h3 className="panel-title" style={{ marginBottom: 8, color: "var(--success)" }}>분석 완료</h3>
               <p className="muted-text">AI 분석이 완료되었습니다. 보고서를 확인하세요.</p>
-              <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>
-                보고서 보기
+              <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleViewReport}>
+                <FileText size={16} /> 보고서 보기
               </button>
             </div>
           )}

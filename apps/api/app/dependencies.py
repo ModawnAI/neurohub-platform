@@ -1,8 +1,12 @@
+import hashlib
+import hmac
 import uuid
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -95,13 +99,63 @@ def _user_from_jwt_claims(claims: dict) -> CurrentUser:
     )
 
 
+async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None:
+    """Resolve an API key to a CurrentUser. Returns None if key is invalid."""
+    from app.models.institution import InstitutionApiKey
+
+    prefix = api_key[:12]
+    result = await db.execute(
+        select(InstitutionApiKey).where(
+            InstitutionApiKey.key_prefix == prefix,
+            InstitutionApiKey.status == "ACTIVE",
+        )
+    )
+    key_record = result.scalar_one_or_none()
+    if not key_record:
+        return None
+
+    # Constant-time comparison
+    expected_hash = key_record.key_hash
+    actual_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    if not hmac.compare_digest(expected_hash, actual_hash):
+        return None
+
+    # Check expiration
+    if key_record.expires_at and key_record.expires_at < datetime.now(timezone.utc):
+        return None
+
+    # Update last_used_at
+    key_record.last_used_at = datetime.now(timezone.utc)
+
+    return CurrentUser(
+        id=key_record.created_by or uuid.UUID("00000000-0000-0000-0000-000000000000"),
+        username=f"api-key:{key_record.name}",
+        institution_id=key_record.institution_id,
+        roles=["PHYSICIAN"],
+        user_type="SERVICE_USER",
+    )
+
+
 async def get_current_user(
     authorization: str | None = Header(default=None, alias="Authorization"),
+    x_api_key: str | None = Header(default=None),
     x_user_id: str | None = Header(default=None),
     x_username: str | None = Header(default=None),
     x_institution_id: str | None = Header(default=None),
     x_roles: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
 ) -> CurrentUser:
+    # 1. API Key authentication (B2B)
+    if x_api_key:
+        user = await _resolve_api_key(x_api_key, db)
+        if user:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired API key",
+        )
+
+    # 2. JWT Bearer token authentication
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()
         if token:

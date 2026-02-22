@@ -30,3 +30,19 @@ class ServiceListResponse(BaseModel):
 
 class PipelineListResponse(BaseModel):
     items: list[PipelineRead]
+
+
+class ServiceCreate(BaseModel):
+    name: str
+    display_name: str
+    version: str = "1.0"
+    department: str | None = None
+    description: str | None = None
+
+
+class ServiceUpdate(BaseModel):
+    display_name: str | None = None
+    version: str | None = None
+    department: str | None = None
+    description: str | None = None
+    status: str | None = None

@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body>
+        <a href="#main-content" className="skip-nav">메인 콘텐츠로 건너뛰기</a>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -202,7 +202,9 @@ async def submit_qc_decision(
     user: CurrentUser = Depends(_require_expert),
 ):
     result = await db.execute(
-        select(Request).where(Request.id == request_id, Request.institution_id == user.institution_id)
+        select(Request)
+        .where(Request.id == request_id, Request.institution_id == user.institution_id)
+        .with_for_update()
     )
     req = result.scalar_one_or_none()
     if not req:
@@ -242,7 +244,9 @@ async def submit_report_review(
     user: CurrentUser = Depends(_require_expert),
 ):
     result = await db.execute(
-        select(Request).where(Request.id == request_id, Request.institution_id == user.institution_id)
+        select(Request)
+        .where(Request.id == request_id, Request.institution_id == user.institution_id)
+        .with_for_update()
     )
     req = result.scalar_one_or_none()
     if not req:

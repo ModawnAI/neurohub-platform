@@ -1,4 +1,22 @@
-FROM python:3.12-slim AS base
+## ── Stage 1: Builder ──
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir --prefix=/install .
+
+## ── Stage 2: Runtime ──
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -6,17 +24,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends curl libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1001 appuser \
+    && useradd --uid 1001 --gid 1001 --no-create-home appuser
 
-COPY pyproject.toml ./
+COPY --from=builder /install /usr/local
+
 COPY alembic.ini ./
 COPY app ./app
 COPY migrations ./migrations
 COPY scripts ./scripts
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8080
 

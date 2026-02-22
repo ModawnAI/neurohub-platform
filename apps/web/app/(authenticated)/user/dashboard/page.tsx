@@ -58,7 +58,7 @@ export default function UserDashboard() {
 
       <div className="panel">
         <div className="panel-header-row" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>최근 요청</h2>
+          <h2 className="panel-title">최근 요청</h2>
           <button className="btn btn-secondary btn-sm" onClick={() => router.push("/user/requests")}>
             전체 보기
           </button>
