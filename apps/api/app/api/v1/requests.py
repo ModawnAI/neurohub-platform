@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi import Request as FastAPIRequest
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
 from app.dependencies import AuthenticatedUser, DbSession
@@ -183,7 +184,11 @@ async def create_request(
             payload_hash=payload_hash,
         )
         if existing:
-            return _to_read(existing)
+            read = _to_read(existing)
+            return JSONResponse(
+                status_code=200,
+                content=read.model_dump(mode="json"),
+            )
 
         idempotency_record = IdempotencyKey(
             scope=IDEMPOTENCY_SCOPE_UI_REQUEST,

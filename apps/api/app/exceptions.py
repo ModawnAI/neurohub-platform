@@ -60,3 +60,13 @@ class ValidationError(NeuroHubError):
             status_code=422,
             detail=detail,
         )
+
+
+class RateLimitError(NeuroHubError):
+    def __init__(self, retry_after: int = 60):
+        super().__init__(
+            code="RATE_LIMITED",
+            message="Too many requests. Please try again later.",
+            status_code=429,
+            detail={"retry_after": retry_after},
+        )

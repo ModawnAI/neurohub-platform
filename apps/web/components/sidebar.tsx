@@ -6,6 +6,7 @@ import { Brain, SignOut } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
 import clsx from "clsx";
 import { NotificationBell } from "@/components/notification-bell";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 interface NavItem {
   href: string;
@@ -31,30 +32,32 @@ export function Sidebar({ items, userTypeLabel }: SidebarProps) {
   const initial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || "U";
 
   return (
-    <aside className="sidebar">
-      <Link href="/" className="sidebar-brand">
+    <aside className="sidebar" role="navigation" aria-label="메인 내비게이션">
+      <Link href="/" className="sidebar-brand" aria-label="NeuroHub 홈으로 이동">
         <div className="sidebar-brand-icon">
           <Brain size={20} weight="bold" />
         </div>
         <span className="sidebar-brand-text">NeuroHub</span>
       </Link>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" aria-label="페이지 내비게이션">
         {items.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={clsx("sidebar-link", pathname === item.href && "sidebar-link-active")}
+            aria-current={pathname === item.href ? "page" : undefined}
           >
-            <span className="sidebar-link-icon">{item.icon}</span>
+            <span className="sidebar-link-icon" aria-hidden="true">{item.icon}</span>
             {item.label}
           </Link>
         ))}
       </nav>
 
       <div className="sidebar-user">
+        <LanguageSwitcher />
         <NotificationBell />
-        <div className="sidebar-user-avatar">{initial.toUpperCase()}</div>
+        <div className="sidebar-user-avatar" aria-hidden="true">{initial.toUpperCase()}</div>
         <div className="sidebar-user-info">
           <p className="sidebar-user-name">{user?.displayName || user?.email || "사용자"}</p>
           <p className="sidebar-user-role">{userTypeLabel}</p>
@@ -64,6 +67,7 @@ export function Sidebar({ items, userTypeLabel }: SidebarProps) {
           onClick={() => signOut()}
           style={{ width: "auto", padding: "6px" }}
           title="로그아웃"
+          aria-label="로그아웃"
         >
           <SignOut size={18} />
         </button>

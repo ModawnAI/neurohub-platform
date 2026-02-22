@@ -11,6 +11,7 @@ from app.models.request import Case, CaseFile, Request, UploadSession
 from app.models.run import Run, RunStep
 from app.models.service import PipelineDefinition, ServiceDefinition
 from app.models.user import User
+from app.models.webhook import Webhook
 
 __all__ = [
     "AuditLog",
@@ -36,4 +37,5 @@ __all__ = [
     "UploadSession",
     "UsageLedger",
     "User",
+    "Webhook",
 ]

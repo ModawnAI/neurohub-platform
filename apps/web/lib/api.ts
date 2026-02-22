@@ -2,6 +2,22 @@ import { supabase } from "@/lib/supabase";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
+// ── Typed API Error ──
+
+export class ApiError extends Error {
+  status: number;
+  code: string;
+  detail: string;
+
+  constructor(status: number, code: string, message: string, detail = "") {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
 export type RequestStatus =
   | "CREATED"
   | "RECEIVING"
@@ -85,19 +101,35 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (!response.ok) {
     let detail = "";
+    let errorCode = "";
     try {
-      const body = (await response.json()) as { detail?: string | { message?: string } };
+      const body = (await response.json()) as { detail?: string | { error?: string; message?: string } };
       if (typeof body.detail === "string") {
         detail = body.detail;
-      } else if (body.detail?.message) {
-        detail = body.detail.message;
+      } else if (body.detail) {
+        errorCode = body.detail.error ?? "";
+        detail = body.detail.message ?? "";
       }
     } catch {
       detail = "";
     }
 
+    if (response.status === 409 && errorCode === "IDEMPOTENCY_CONFLICT") {
+      throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "동일한 요청 키로 다른 내용이 전송되었습니다.", detail);
+    }
+    if (response.status === 409) {
+      throw new ApiError(409, "CONFLICT", detail || "상태 충돌이 발생했습니다. 현재 상태를 확인해 주세요.", detail);
+    }
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      throw new ApiError(401, "UNAUTHORIZED", "인증이 필요합니다.", detail);
+    }
+    if (response.status === 403) {
+      throw new ApiError(403, "FORBIDDEN", "접근 권한이 없습니다.", detail);
+    }
+
     const message = detail || `API ${response.status}: ${response.statusText}`;
-    throw new Error(message);
+    throw new ApiError(response.status, errorCode || `HTTP_${response.status}`, message, detail);
   }
 
   return response.json() as Promise<T>;
@@ -564,21 +596,6 @@ export async function updateOrganization(orgId: string, payload: { name?: string
   return apiFetch<OrgRead>(`/organizations/${orgId}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-// ── Typed API Error ──
-
-export class ApiError extends Error {
-  status: number;
-  code: string;
-  detail: string;
-
-  constructor(status: number, code: string, message: string, detail = "") {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.code = code;
-    this.detail = detail;
-  }
-}
 
 // ── Transition Record (for enhanced timeline) ──
 

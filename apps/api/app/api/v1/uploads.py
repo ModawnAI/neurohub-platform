@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.dependencies import AuthenticatedUser, DbSession
-from app.models.audit import AuditLog
+from app.models.audit import AuditLog, PatientAccessLog
 from app.models.outbox import OutboxEvent
 from app.models.request import Case, CaseFile, Request, UploadSession
 from app.schemas.upload import (
@@ -65,6 +65,28 @@ async def _load_case_or_404(
     return case
 
 
+async def _log_patient_access(
+    db: DbSession,
+    institution_id: uuid.UUID,
+    user_id: uuid.UUID,
+    patient_ref: str,
+    access_type: str,
+    resource_type: str,
+    resource_id: uuid.UUID,
+    ip_address: str | None = None,
+):
+    """Create a HIPAA-compliant patient access log entry."""
+    db.add(PatientAccessLog(
+        institution_id=institution_id,
+        user_id=user_id,
+        patient_ref=patient_ref,
+        access_type=access_type,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        ip_address=ip_address,
+    ))
+
+
 # ---------------------------------------------------------------------------
 # GET /requests/{request_id}/cases
 # ---------------------------------------------------------------------------
@@ -103,6 +125,7 @@ async def presign_upload(
     request_id: uuid.UUID,
     case_id: uuid.UUID,
     body: UploadPresignRequest,
+    request: FastAPIRequest,
     db: DbSession,
     user: AuthenticatedUser,
 ):
@@ -178,6 +201,16 @@ async def presign_upload(
         )
     )
 
+    # HIPAA: log patient data access
+    await _log_patient_access(
+        db, user.institution_id, user.id,
+        patient_ref=case.patient_ref or "UNKNOWN",
+        access_type="UPLOAD",
+        resource_type="case_file",
+        resource_id=case_file.id,
+        ip_address=request.client.host if request.client else None,
+    )
+
     await db.flush()
 
     return UploadPresignResponse(
@@ -199,6 +232,7 @@ async def complete_upload(
     case_id: uuid.UUID,
     file_id: uuid.UUID,
     body: UploadCompleteRequest,
+    request: FastAPIRequest,
     db: DbSession,
     user: AuthenticatedUser,
 ):
@@ -225,6 +259,17 @@ async def complete_upload(
     # Mark upload session as completed
     if case_file.upload_session:
         case_file.upload_session.completed_at = datetime.now(timezone.utc)
+
+    # HIPAA: log patient data access
+    case = await _load_case_or_404(db, case_id, request_id, user.institution_id)
+    await _log_patient_access(
+        db, user.institution_id, user.id,
+        patient_ref=case.patient_ref or "UNKNOWN",
+        access_type="UPLOAD_COMPLETE",
+        resource_type="case_file",
+        resource_id=file_id,
+        ip_address=request.client.host if request.client else None,
+    )
 
     await db.flush()
     await db.refresh(case_file)
@@ -287,6 +332,7 @@ async def get_download_url(
     request_id: uuid.UUID,
     case_id: uuid.UUID,
     file_id: uuid.UUID,
+    request: FastAPIRequest,
     db: DbSession,
     user: AuthenticatedUser,
 ):
@@ -308,6 +354,17 @@ async def get_download_url(
 
     if case_file.upload_status != "COMPLETED":
         raise HTTPException(status_code=409, detail="File upload not completed yet")
+
+    # HIPAA: log patient data access
+    case = await _load_case_or_404(db, case_id, request_id, user.institution_id)
+    await _log_patient_access(
+        db, user.institution_id, user.id,
+        patient_ref=case.patient_ref or "UNKNOWN",
+        access_type="DOWNLOAD",
+        resource_type="case_file",
+        resource_id=file_id,
+        ip_address=request.client.host if request.client else None,
+    )
 
     url = await storage_svc.create_presigned_download(
         bucket=settings.storage_bucket_inputs,

@@ -11,6 +11,7 @@ class UploadPresignRequest(BaseModel):
     file_name: str = Field(..., min_length=1, max_length=500)
     content_type: str = Field(default="application/octet-stream", max_length=200)
     file_size: int = Field(..., gt=0)
+    case_id: uuid.UUID | None = None  # Required for B2B uploads
 
 
 class UploadPresignResponse(BaseModel):
@@ -21,6 +22,7 @@ class UploadPresignResponse(BaseModel):
 
 class UploadCompleteRequest(BaseModel):
     checksum_sha256: str = Field(..., min_length=64, max_length=64)
+    case_file_id: uuid.UUID | None = None  # Required for B2B uploads
 
 
 class CaseFileRead(BaseModel):

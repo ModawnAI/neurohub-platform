@@ -23,15 +23,23 @@ export function NotificationBell() {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button className="notification-bell" onClick={() => setOpen(!open)}>
+      <button
+        className="notification-bell"
+        onClick={() => setOpen(!open)}
+        aria-label={unreadCount > 0 ? `알림 ${unreadCount}개 읽지 않음` : "알림"}
+        aria-expanded={open}
+        aria-haspopup="true"
+      >
         <Bell size={20} weight={unreadCount > 0 ? "fill" : "regular"} />
         {unreadCount > 0 && (
-          <span className="notification-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
+          <span className="notification-badge" aria-hidden="true">{unreadCount > 9 ? "9+" : unreadCount}</span>
         )}
       </button>
 
       {open && (
         <div
+          role="menu"
+          aria-label="알림 목록"
           style={{
             position: "absolute",
             top: "100%",
@@ -53,6 +61,7 @@ export function NotificationBell() {
                 className="btn btn-sm btn-secondary"
                 onClick={() => markAllRead()}
                 style={{ fontSize: 11, padding: "4px 8px" }}
+                aria-label="모든 알림을 읽음으로 표시"
               >
                 <CheckCircle size={12} /> 모두 읽음
               </button>
@@ -60,14 +69,17 @@ export function NotificationBell() {
           </div>
 
           {notifications.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+            <div role="menuitem" style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
               알림이 없습니다
             </div>
           ) : (
             notifications.slice(0, 20).map((n: NotificationRead) => (
               <div
                 key={n.id}
+                role="menuitem"
+                tabIndex={0}
                 onClick={() => { if (!n.is_read) markRead(n.id); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !n.is_read) markRead(n.id); }}
                 style={{
                   padding: "10px 16px",
                   borderBottom: "1px solid var(--border)",

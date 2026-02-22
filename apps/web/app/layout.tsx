@@ -22,9 +22,22 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/style.min.css"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <a href="#main-content" className="skip-nav">메인 콘텐츠로 건너뛰기</a>
         <Providers>{children}</Providers>
+        <div aria-live="polite" aria-atomic="true" className="status-announcer" id="status-announcer" />
       </body>
     </html>
   );

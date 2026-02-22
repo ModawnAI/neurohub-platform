@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -81,7 +83,7 @@ async def list_review_queue(
 
 
 @router.get("/{request_id}", response_model=ReviewDetail)
-async def get_review_detail(request_id: str, db: DbSession, user: CurrentUser = Depends(_require_expert)):
+async def get_review_detail(request_id: uuid.UUID, db: DbSession, user: CurrentUser = Depends(_require_expert)):
     result = await db.execute(
         select(Request)
         .options(selectinload(Request.cases).selectinload(Case.files))
@@ -128,7 +130,7 @@ async def get_review_detail(request_id: str, db: DbSession, user: CurrentUser = 
             "status": r.status,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "steps": [
-                {"name": s.step_name, "status": s.status, "image": s.container_image}
+                {"name": s.step_name, "status": s.status, "image": s.docker_image}
                 for s in (r.steps or [])
             ],
         }
@@ -142,9 +144,10 @@ async def get_review_detail(request_id: str, db: DbSession, user: CurrentUser = 
     reports_data = [
         {
             "id": str(r.id),
-            "report_type": r.report_type,
             "status": r.status,
-            "storage_path": r.storage_path,
+            "title": r.title,
+            "summary": r.summary,
+            "storage_path": r.pdf_storage_path,
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in reports
@@ -196,7 +199,7 @@ async def get_review_detail(request_id: str, db: DbSession, user: CurrentUser = 
 
 @router.post("/{request_id}/qc-decision", status_code=status.HTTP_200_OK)
 async def submit_qc_decision(
-    request_id: str,
+    request_id: uuid.UUID,
     body: QCDecisionCreate,
     db: DbSession,
     user: CurrentUser = Depends(_require_expert),
@@ -213,6 +216,7 @@ async def submit_qc_decision(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Request is not in QC status")
 
     qc = QCDecision(
+        institution_id=user.institution_id,
         request_id=req.id,
         reviewer_id=user.id,
         decision=body.decision,
@@ -238,7 +242,7 @@ async def submit_qc_decision(
 
 @router.post("/{request_id}/report-review", status_code=status.HTTP_200_OK)
 async def submit_report_review(
-    request_id: str,
+    request_id: uuid.UUID,
     body: ReportReviewCreate,
     db: DbSession,
     user: CurrentUser = Depends(_require_expert),

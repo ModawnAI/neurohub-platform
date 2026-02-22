@@ -27,6 +27,7 @@ TRANSITIONS: dict[tuple[RequestStatus, RequestStatus], set[str]] = {
     (RequestStatus.COMPUTING, RequestStatus.QC): {"SYSTEM_ADMIN"},
     (RequestStatus.QC, RequestStatus.REPORTING): {"REVIEWER", "TECHNICIAN", "SYSTEM_ADMIN"},
     (RequestStatus.QC, RequestStatus.FAILED): {"REVIEWER", "TECHNICIAN", "SYSTEM_ADMIN"},
+    (RequestStatus.QC, RequestStatus.COMPUTING): {"REVIEWER", "SYSTEM_ADMIN"},
     (RequestStatus.REPORTING, RequestStatus.EXPERT_REVIEW): {"SYSTEM_ADMIN"},
     (RequestStatus.REPORTING, RequestStatus.FINAL): {"REVIEWER", "SYSTEM_ADMIN"},
     (RequestStatus.EXPERT_REVIEW, RequestStatus.FINAL): {"REVIEWER", "SYSTEM_ADMIN"},

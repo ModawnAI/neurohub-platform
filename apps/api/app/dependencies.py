@@ -20,10 +20,21 @@ class CurrentUser(BaseModel):
     institution_id: uuid.UUID
     roles: list[str] = []
     user_type: str | None = None
+    api_key_scopes: list[str] | None = None
 
     def has_any_role(self, *roles: str) -> bool:
         role_set = set(self.roles)
         return any(role in role_set for role in roles)
+
+    def has_scope(self, scope: str) -> bool:
+        """Check if the user (via API key) has a required scope.
+
+        Returns True if the user is not an API key user (no scope restrictions)
+        or if the scope is in the user's API key scopes.
+        """
+        if self.api_key_scopes is None:
+            return True
+        return scope in self.api_key_scopes
 
 
 def require_roles(*roles: str):
@@ -133,6 +144,7 @@ async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None
         institution_id=key_record.institution_id,
         roles=["PHYSICIAN"],
         user_type="SERVICE_USER",
+        api_key_scopes=key_record.scopes or ["read", "write"],
     )
 
 
