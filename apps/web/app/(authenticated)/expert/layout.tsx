@@ -2,26 +2,28 @@
 
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import { House, ListChecks, GearSix } from "phosphor-react";
-
-const NAV_ITEMS = [
-  { href: "/expert/dashboard", label: "대시보드", icon: <House size={20} /> },
-  { href: "/expert/reviews", label: "리뷰 대기", icon: <ListChecks size={20} /> },
-  { href: "/expert/settings", label: "설정", icon: <GearSix size={20} /> },
-];
 
 export default function ExpertLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const t = useT();
   const isPending = user?.expertStatus === "PENDING_APPROVAL";
+
+  const navItems = [
+    { href: "/expert/dashboard", label: t("nav.dashboard"), icon: <House size={20} /> },
+    { href: "/expert/reviews", label: t("nav.reviewQueue"), icon: <ListChecks size={20} /> },
+    { href: "/expert/settings", label: t("nav.settings"), icon: <GearSix size={20} /> },
+  ];
 
   return (
     <div className="app-layout">
-      <Sidebar items={NAV_ITEMS} userTypeLabel="전문가 리뷰어" />
+      <Sidebar items={navItems} />
       <main className="main-content">
         <div className="main-content-inner">
           {isPending && (
             <div className="banner banner-warning" style={{ marginBottom: 20 }}>
-              관리자 승인 대기 중입니다. 승인 후 리뷰 기능을 사용할 수 있습니다.
+              {t("expert.pendingApproval")}
             </div>
           )}
           {children}

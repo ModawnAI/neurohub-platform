@@ -1,23 +1,26 @@
 "use client";
 
 import { Sidebar } from "@/components/sidebar";
+import { useT } from "@/lib/i18n";
 import { House, ListChecks, Users, Buildings, Cube, GearSix, ClockCounterClockwise, Key } from "phosphor-react";
 
-const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "대시보드", icon: <House size={20} /> },
-  { href: "/admin/requests", label: "요청 관리", icon: <ListChecks size={20} /> },
-  { href: "/admin/users", label: "사용자 관리", icon: <Users size={20} /> },
-  { href: "/admin/organizations", label: "기관 관리", icon: <Buildings size={20} /> },
-  { href: "/admin/services", label: "서비스 관리", icon: <Cube size={20} /> },
-  { href: "/admin/api-keys", label: "API 키", icon: <Key size={20} /> },
-  { href: "/admin/audit-logs", label: "감사 로그", icon: <ClockCounterClockwise size={20} /> },
-  { href: "/admin/settings", label: "설정", icon: <GearSix size={20} /> },
-];
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
+
+  const navItems = [
+    { href: "/admin/dashboard", label: t("nav.dashboard"), icon: <House size={20} /> },
+    { href: "/admin/requests", label: t("nav.requests"), icon: <ListChecks size={20} /> },
+    { href: "/admin/users", label: t("nav.users"), icon: <Users size={20} /> },
+    { href: "/admin/organizations", label: t("nav.organizations"), icon: <Buildings size={20} /> },
+    { href: "/admin/services", label: t("nav.services"), icon: <Cube size={20} /> },
+    { href: "/admin/api-keys", label: t("nav.apiKeys"), icon: <Key size={20} /> },
+    { href: "/admin/audit-logs", label: t("nav.auditLogs"), icon: <ClockCounterClockwise size={20} /> },
+    { href: "/admin/settings", label: t("nav.settings"), icon: <GearSix size={20} /> },
+  ];
+
   return (
     <div className="app-layout">
-      <Sidebar items={NAV_ITEMS} userTypeLabel="관리자" />
+      <Sidebar items={navItems} />
       <main className="main-content">
         <div className="main-content-inner">{children}</div>
       </main>

@@ -34,6 +34,29 @@ export const ko = {
     reviews: "리뷰",
     newRequest: "새 요청",
     notifications: "알림",
+    serviceCatalog: "서비스 카탈로그",
+    myRequests: "내 요청",
+    reviewQueue: "리뷰 대기",
+  },
+  sidebar: {
+    home: "NeuroHub 홈으로 이동",
+    mainNav: "메인 내비게이션",
+    pageNav: "페이지 내비게이션",
+    logout: "로그아웃",
+    user: "사용자",
+    switchToEn: "Switch to English",
+    switchToKo: "한국어로 전환",
+  },
+  notification: {
+    title: "알림",
+    markAllRead: "모두 읽음",
+    empty: "알림이 없습니다",
+    unreadCount: "알림 {count}개 읽지 않음",
+    markAllReadLabel: "모든 알림을 읽음으로 표시",
+    list: "알림 목록",
+  },
+  expert: {
+    pendingApproval: "관리자 승인 대기 중입니다. 승인 후 리뷰 기능을 사용할 수 있습니다.",
   },
   status: {
     CREATED: "생성됨",
@@ -55,4 +78,9 @@ export const ko = {
   },
 } as const;
 
-export type TranslationKeys = { [K in keyof typeof ko]: { [P in keyof (typeof ko)[K]]: string } };
+/** Structural type: same shape as `ko` but all leaf values are `string` */
+type DeepStringify<T> = {
+  [K in keyof T]: T[K] extends Record<string, unknown> ? DeepStringify<T[K]> : string;
+};
+
+export type TranslationKeys = DeepStringify<typeof ko>;

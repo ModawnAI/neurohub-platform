@@ -1,21 +1,22 @@
 "use client";
 
-import { useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { ko, type TranslationKeys } from "./ko";
 import { en } from "./en";
+import React from "react";
 
 const TRANSLATIONS: Record<string, TranslationKeys> = { ko, en };
 
-type Locale = "ko" | "en";
+export type Locale = "ko" | "en";
 
-let currentLocale: Locale = "ko";
+const STORAGE_KEY = "neurohub-locale";
 
-export function setLocale(locale: Locale) {
-  currentLocale = locale;
-}
-
-export function getLocale(): Locale {
-  return currentLocale;
+function getInitialLocale(): Locale {
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "ko" || stored === "en") return stored;
+  }
+  return "ko";
 }
 
 type NestedKeyOf<T> = T extends Record<string, unknown>
@@ -26,7 +27,7 @@ type NestedKeyOf<T> = T extends Record<string, unknown>
     }[keyof T & string]
   : never;
 
-type TranslationKey = NestedKeyOf<TranslationKeys>;
+export type TranslationKey = NestedKeyOf<TranslationKeys>;
 
 function getNestedValue(obj: Record<string, unknown>, path: string): string {
   const parts = path.split(".");
@@ -41,13 +42,54 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string {
   return typeof current === "string" ? current : path;
 }
 
-export function t(key: TranslationKey): string {
-  const translations = TRANSLATIONS[currentLocale] ?? ko;
-  return getNestedValue(translations as unknown as Record<string, unknown>, key);
+interface LocaleContextValue {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+}
+
+const LocaleContext = createContext<LocaleContextValue>({
+  locale: "ko",
+  setLocale: () => {},
+});
+
+export function LocaleProvider({ children }: { children: React.ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>("ko");
+
+  useEffect(() => {
+    setLocaleState(getInitialLocale());
+  }, []);
+
+  const setLocale = useCallback((next: Locale) => {
+    setLocaleState(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, next);
+    }
+  }, []);
+
+  return React.createElement(
+    LocaleContext.Provider,
+    { value: { locale, setLocale } },
+    children,
+  );
+}
+
+export function useLocale() {
+  return useContext(LocaleContext);
 }
 
 export function useT() {
-  return useCallback((key: TranslationKey): string => {
-    return t(key);
-  }, []);
+  const { locale } = useContext(LocaleContext);
+  return useCallback(
+    (key: TranslationKey): string => {
+      const translations = TRANSLATIONS[locale] ?? ko;
+      return getNestedValue(translations as unknown as Record<string, unknown>, key);
+    },
+    [locale],
+  );
+}
+
+/** Non-hook translation for use outside React components */
+export function t(key: TranslationKey, locale: Locale = "ko"): string {
+  const translations = TRANSLATIONS[locale] ?? ko;
+  return getNestedValue(translations as unknown as Record<string, unknown>, key);
 }

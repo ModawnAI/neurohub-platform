@@ -1,20 +1,23 @@
 "use client";
 
 import { Sidebar } from "@/components/sidebar";
+import { useT } from "@/lib/i18n";
 import { House, ListChecks, PlusCircle, Cube, GearSix } from "phosphor-react";
 
-const NAV_ITEMS = [
-  { href: "/user/dashboard", label: "대시보드", icon: <House size={20} /> },
-  { href: "/user/services", label: "서비스 카탈로그", icon: <Cube size={20} /> },
-  { href: "/user/requests", label: "내 요청", icon: <ListChecks size={20} /> },
-  { href: "/user/new-request", label: "새 요청", icon: <PlusCircle size={20} /> },
-  { href: "/user/settings", label: "설정", icon: <GearSix size={20} /> },
-];
-
 export default function UserLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
+
+  const navItems = [
+    { href: "/user/dashboard", label: t("nav.dashboard"), icon: <House size={20} /> },
+    { href: "/user/services", label: t("nav.serviceCatalog"), icon: <Cube size={20} /> },
+    { href: "/user/requests", label: t("nav.myRequests"), icon: <ListChecks size={20} /> },
+    { href: "/user/new-request", label: t("nav.newRequest"), icon: <PlusCircle size={20} /> },
+    { href: "/user/settings", label: t("nav.settings"), icon: <GearSix size={20} /> },
+  ];
+
   return (
     <div className="app-layout">
-      <Sidebar items={NAV_ITEMS} userTypeLabel="서비스 사용자" />
+      <Sidebar items={navItems} />
       <main className="main-content">
         <div className="main-content-inner">{children}</div>
       </main>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Brain, SignOut } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import clsx from "clsx";
 import { NotificationBell } from "@/components/notification-bell";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -16,31 +17,27 @@ interface NavItem {
 
 interface SidebarProps {
   items: NavItem[];
-  userTypeLabel: string;
 }
 
-const USER_TYPE_LABELS: Record<string, string> = {
-  SERVICE_USER: "서비스 사용자",
-  EXPERT: "전문가 리뷰어",
-  ADMIN: "관리자",
-};
-
-export function Sidebar({ items, userTypeLabel }: SidebarProps) {
+export function Sidebar({ items }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const t = useT();
 
   const initial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || "U";
+  const userTypeKey = user?.userType as "SERVICE_USER" | "EXPERT" | "ADMIN" | null;
+  const roleLabel = userTypeKey ? t(`userType.${userTypeKey}`) : "";
 
   return (
-    <aside className="sidebar" role="navigation" aria-label="메인 내비게이션">
-      <Link href="/" className="sidebar-brand" aria-label="NeuroHub 홈으로 이동">
+    <aside className="sidebar" role="navigation" aria-label={t("sidebar.mainNav")}>
+      <Link href="/" className="sidebar-brand" aria-label={t("sidebar.home")}>
         <div className="sidebar-brand-icon">
           <Brain size={20} weight="bold" />
         </div>
         <span className="sidebar-brand-text">NeuroHub</span>
       </Link>
 
-      <nav className="sidebar-nav" aria-label="페이지 내비게이션">
+      <nav className="sidebar-nav" aria-label={t("sidebar.pageNav")}>
         {items.map((item) => (
           <Link
             key={item.href}
@@ -55,22 +52,25 @@ export function Sidebar({ items, userTypeLabel }: SidebarProps) {
       </nav>
 
       <div className="sidebar-user">
-        <LanguageSwitcher />
-        <NotificationBell />
-        <div className="sidebar-user-avatar" aria-hidden="true">{initial.toUpperCase()}</div>
-        <div className="sidebar-user-info">
-          <p className="sidebar-user-name">{user?.displayName || user?.email || "사용자"}</p>
-          <p className="sidebar-user-role">{userTypeLabel}</p>
+        <div className="sidebar-user-profile">
+          <div className="sidebar-user-avatar" aria-hidden="true">{initial.toUpperCase()}</div>
+          <div className="sidebar-user-info">
+            <p className="sidebar-user-name">{user?.displayName || user?.email || t("sidebar.user")}</p>
+            {roleLabel && <p className="sidebar-user-role">{roleLabel}</p>}
+          </div>
         </div>
-        <button
-          className="sidebar-link"
-          onClick={() => signOut()}
-          style={{ width: "auto", padding: "6px" }}
-          title="로그아웃"
-          aria-label="로그아웃"
-        >
-          <SignOut size={18} />
-        </button>
+        <div className="sidebar-user-actions">
+          <LanguageSwitcher />
+          <NotificationBell />
+          <button
+            className="sidebar-action-btn"
+            onClick={() => signOut()}
+            title={t("sidebar.logout")}
+            aria-label={t("sidebar.logout")}
+          >
+            <SignOut size={18} />
+          </button>
+        </div>
       </div>
     </aside>
   );
