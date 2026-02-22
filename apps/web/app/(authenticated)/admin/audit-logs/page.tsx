@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listAuditLogs, type AuditLogRead } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 export default function AdminAuditLogsPage() {
+  const t = useT();
   const [action, setAction] = useState("");
   const [entityType, setEntityType] = useState("");
   const [page, setPage] = useState(0);
@@ -29,8 +31,8 @@ export default function AdminAuditLogsPage() {
     <div className="stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">감사 로그</h1>
-          <p className="page-subtitle">시스템 내 모든 주요 활동 기록입니다</p>
+          <h1 className="page-title">{t("adminAuditLogs.title")}</h1>
+          <p className="page-subtitle">{t("adminAuditLogs.subtitle")}</p>
         </div>
       </div>
 
@@ -39,20 +41,20 @@ export default function AdminAuditLogsPage() {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <input
             className="input"
-            placeholder="액션 필터 (예: CREATE)"
+            placeholder={t("adminAuditLogs.actionFilter")}
             value={action}
             onChange={(e) => { setAction(e.target.value); setPage(0); }}
             style={{ width: 200 }}
           />
           <input
             className="input"
-            placeholder="엔티티 타입 (예: REQUEST)"
+            placeholder={t("adminAuditLogs.entityTypeFilter")}
             value={entityType}
             onChange={(e) => { setEntityType(e.target.value); setPage(0); }}
             style={{ width: 200 }}
           />
           <span className="muted-text" style={{ fontSize: 12 }}>
-            총 {total}건
+            {t("common.total")} {total}건
           </span>
         </div>
       </div>
@@ -65,11 +67,11 @@ export default function AdminAuditLogsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>시간</th>
-                  <th>액션</th>
-                  <th>엔티티</th>
-                  <th>엔티티 ID</th>
-                  <th>액터</th>
+                  <th>{t("adminAuditLogs.tableTimestamp")}</th>
+                  <th>{t("adminAuditLogs.tableAction")}</th>
+                  <th>{t("adminAuditLogs.tableEntity")}</th>
+                  <th>{t("adminAuditLogs.tableEntityId")}</th>
+                  <th>{t("adminAuditLogs.tableActor")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,7 +89,7 @@ export default function AdminAuditLogsPage() {
                 {logs.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
-                      로그가 없습니다.
+                      {t("adminAuditLogs.noLogs")}
                     </td>
                   </tr>
                 )}
@@ -99,13 +101,13 @@ export default function AdminAuditLogsPage() {
           {total > limit && (
             <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 16 }}>
               <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                이전
+                {t("common.paginationPrev")}
               </button>
               <span className="muted-text" style={{ fontSize: 13, lineHeight: "32px" }}>
                 {page + 1} / {Math.ceil(total / limit)}
               </span>
               <button className="btn btn-sm btn-secondary" disabled={!hasMore} onClick={() => setPage(page + 1)}>
-                다음
+                {t("common.paginationNext")}
               </button>
             </div>
           )}

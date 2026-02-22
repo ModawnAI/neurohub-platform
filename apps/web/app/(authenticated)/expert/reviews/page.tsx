@@ -5,28 +5,30 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { CaretRight } from "phosphor-react";
 import { listReviewQueue, type ReviewQueueItem } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 type FilterTab = "QC" | "EXPERT_REVIEW" | "completed";
 
-const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
-  { key: "QC", label: "QC 대기" },
-  { key: "EXPERT_REVIEW", label: "전문가 검토 대기" },
-  { key: "completed", label: "완료" },
-];
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 대기 중`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 대기 중`;
-  return `${Math.floor(hr / 24)}일 대기 중`;
-}
-
 export default function ExpertReviewsPage() {
+  const t = useT();
   const [filter, setFilter] = useState<FilterTab>("QC");
   const router = useRouter();
+
+  const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
+    { key: "QC", label: t("expertReviews.filterQC") },
+    { key: "EXPERT_REVIEW", label: t("expertReviews.filterExpertReview") },
+    { key: "completed", label: t("expertReviews.filterCompleted") },
+  ];
+
+  function relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return t("relativeTime.justNow");
+    if (min < 60) return t("relativeTime.minutesWaiting").replace("{n}", String(min));
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return t("relativeTime.hoursWaiting").replace("{n}", String(hr));
+    return t("relativeTime.daysWaiting").replace("{n}", String(Math.floor(hr / 24)));
+  }
   const { data, isLoading } = useQuery({
     queryKey: ["review-queue", filter],
     queryFn: () => listReviewQueue(filter),
@@ -38,8 +40,8 @@ export default function ExpertReviewsPage() {
     <div className="stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">리뷰 대기열</h1>
-          <p className="page-subtitle">검토가 필요한 요청 목록입니다</p>
+          <h1 className="page-title">{t("expertReviews.title")}</h1>
+          <p className="page-subtitle">{t("expertReviews.subtitle")}</p>
         </div>
       </div>
 
@@ -59,7 +61,7 @@ export default function ExpertReviewsPage() {
         <div className="loading-center"><span className="spinner" /></div>
       ) : items.length === 0 ? (
         <div className="empty-state">
-          <p className="empty-state-text">대기 중인 리뷰가 없습니다.</p>
+          <p className="empty-state-text">{t("expertReviews.noPending")}</p>
         </div>
       ) : (
         <div className="stack-md">
@@ -71,13 +73,13 @@ export default function ExpertReviewsPage() {
             >
               <div className="request-card-body">
                 <p className="request-card-title">
-                  {item.service_display_name || item.service_name || "AI 분석"}
+                  {item.service_display_name || item.service_name || t("expertReviews.defaultServiceName")}
                 </p>
                 <p className="request-card-meta">
                   <span className={`status-chip status-${item.status.toLowerCase()}`}>
-                    {item.status === "QC" ? "품질 검증" : "전문가 검토"}
+                    {item.status === "QC" ? t("status.QC") : t("status.EXPERT_REVIEW")}
                   </span>
-                  <span>케이스 {item.case_count}건</span>
+                  <span>{t("expertReviews.cases")} {item.case_count}건</span>
                   <span>{relativeTime(item.created_at)}</span>
                 </p>
               </div>

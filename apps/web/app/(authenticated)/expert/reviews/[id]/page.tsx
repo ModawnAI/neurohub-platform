@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { useZodForm } from "@/lib/use-zod-form";
 import { qcDecisionSchema, reportReviewSchema, type QCDecisionValues, type ReportReviewValues } from "@/lib/schemas";
+import { useT } from "@/lib/i18n";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "—";
@@ -23,6 +24,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { id: string; patient_ref: string; status: string } }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   const { data: filesData, isLoading } = useQuery({
@@ -36,7 +38,7 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
       const { download_url } = await getDownloadUrl(requestId, caseItem.id, file.id);
       window.open(download_url, "_blank");
     } catch {
-      alert("다운로드 URL을 가져올 수 없습니다.");
+      alert(t("expertReviewDetail.errorDownloadUrl"));
     }
   };
 
@@ -56,7 +58,7 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
           <strong>#{caseItem.patient_ref}</strong>{" "}
           <span className="muted-text" style={{ fontSize: 12 }}>({caseItem.status})</span>
         </span>
-        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? "접기" : "파일 보기"}</span>
+        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? t("common.collapse") : t("common.viewFiles")}</span>
       </button>
 
       {expanded && (
@@ -64,7 +66,7 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
           {isLoading ? (
             <span className="spinner" />
           ) : files.length === 0 ? (
-            <p className="muted-text" style={{ fontSize: 13 }}>파일 없음</p>
+            <p className="muted-text" style={{ fontSize: 13 }}>{t("common.noFiles")}</p>
           ) : (
             <div className="stack-sm">
               {files.map((file) => (
@@ -90,6 +92,7 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
 }
 
 export default function ExpertReviewDetailPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -113,7 +116,7 @@ export default function ExpertReviewDetailPage() {
   const qcMut = useMutation({
     mutationFn: () => {
       const validated = qcForm.validate();
-      if (!validated) throw new Error("입력값을 확인하세요");
+      if (!validated) throw new Error(t("expertReviewDetail.errorValidateInput"));
       return submitQCDecision(id, {
         decision: validated.decision,
         qc_score: validated.qc_score,
@@ -130,7 +133,7 @@ export default function ExpertReviewDetailPage() {
   const reportMut = useMutation({
     mutationFn: () => {
       const validated = reportForm.validate();
-      if (!validated) throw new Error("입력값을 확인하세요");
+      if (!validated) throw new Error(t("expertReviewDetail.errorValidateInput"));
       return submitReportReview(id, {
         decision: validated.decision,
         comments: validated.comments || undefined,
@@ -144,7 +147,7 @@ export default function ExpertReviewDetailPage() {
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
-  if (!data) return <div className="empty-state"><p className="empty-state-text">리뷰를 찾을 수 없습니다.</p></div>;
+  if (!data) return <div className="empty-state"><p className="empty-state-text">{t("expertReviewDetail.notFound")}</p></div>;
 
   const { request, cases, runs, reports, qc_decisions } = data;
   const isQC = request.status === "QC";
@@ -154,33 +157,33 @@ export default function ExpertReviewDetailPage() {
   return (
     <div className="stack-lg">
       <button className="back-link" onClick={() => router.push("/expert/reviews")}>
-        <ArrowLeft size={16} /> 리뷰 대기열로 돌아가기
+        <ArrowLeft size={16} /> {t("expertReviewDetail.backToQueue")}
       </button>
 
       <div className="page-header">
         <div>
-          <h1 className="page-title">{serviceSnapshot?.display_name || "AI 분석 리뷰"}</h1>
+          <h1 className="page-title">{serviceSnapshot?.display_name || t("expertReviewDetail.defaultServiceName")}</h1>
           <p className="page-subtitle">요청 #{id.slice(0, 8)}</p>
         </div>
         <span className={`status-chip status-${request.status.toLowerCase()}`}>
-          {isQC ? "품질 검증" : "전문가 검토"}
+          {isQC ? t("status.QC") : t("status.EXPERT_REVIEW")}
         </span>
       </div>
 
       {/* Request Info */}
       <div className="panel">
-        <h3 className="panel-title-mb">요청 정보</h3>
+        <h3 className="panel-title-mb">{t("expertReviewDetail.requestInfo")}</h3>
         <div className="grid-3">
           <div>
-            <p className="detail-label">케이스 수</p>
+            <p className="detail-label">{t("expertReviewDetail.caseCount")}</p>
             <p className="detail-value">{request.case_count}건</p>
           </div>
           <div>
-            <p className="detail-label">우선순위</p>
+            <p className="detail-label">{t("expertReviewDetail.priority")}</p>
             <p className="detail-value">{request.priority}</p>
           </div>
           <div>
-            <p className="detail-label">생성일</p>
+            <p className="detail-label">{t("expertReviewDetail.createdDate")}</p>
             <p className="detail-value">{new Date(request.created_at).toLocaleDateString("ko-KR")}</p>
           </div>
         </div>
@@ -189,7 +192,7 @@ export default function ExpertReviewDetailPage() {
       {/* Cases with File Downloads */}
       {cases.length > 0 && (
         <div className="panel">
-          <h3 className="panel-title-mb">케이스 및 파일</h3>
+          <h3 className="panel-title-mb">{t("expertReviewDetail.casesAndFiles")}</h3>
           <div className="stack-sm">
             {cases.map((c: any, i: number) => (
               <CaseFileList
@@ -205,7 +208,7 @@ export default function ExpertReviewDetailPage() {
       {/* Run Results */}
       {runs.length > 0 && (
         <div className="panel">
-          <h3 className="panel-title-mb">실행 결과</h3>
+          <h3 className="panel-title-mb">{t("expertReviewDetail.runResults")}</h3>
           <div className="stack-sm">
             {runs.map((run: any, i: number) => (
               <div key={run.id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}>
@@ -220,7 +223,7 @@ export default function ExpertReviewDetailPage() {
       {/* Reports */}
       {reports.length > 0 && (
         <div className="panel">
-          <h3 className="panel-title-mb">보고서</h3>
+          <h3 className="panel-title-mb">{t("expertReviewDetail.reports")}</h3>
           <div className="stack-sm">
             {reports.map((report: any, i: number) => (
               <div key={report.id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}>
@@ -235,13 +238,13 @@ export default function ExpertReviewDetailPage() {
       {/* Previous QC Decisions */}
       {qc_decisions.length > 0 && (
         <div className="panel">
-          <h3 className="panel-title-mb">이전 결정 이력</h3>
+          <h3 className="panel-title-mb">{t("expertReviewDetail.previousDecisions")}</h3>
           <div className="stack-md">
             {qc_decisions.map((qc: any, i: number) => (
               <div key={qc.id || i} className="activity-item" style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>
-                    {qc.decision === "APPROVE" ? "승인" : qc.decision === "REJECT" ? "반려" : "재분석 요청"}
+                    {qc.decision === "APPROVE" ? t("expertReviewDetail.decisionApprove") : qc.decision === "REJECT" ? t("expertReviewDetail.decisionReject") : t("expertReviewDetail.decisionRerun")}
                   </p>
                   {qc.comments && <p className="muted-text" style={{ fontSize: 12, margin: "4px 0 0" }}>{qc.comments}</p>}
                   {qc.created_at && <p className="muted-text" style={{ fontSize: 11, margin: "2px 0 0" }}>{new Date(qc.created_at).toLocaleString("ko-KR")}</p>}
@@ -255,46 +258,46 @@ export default function ExpertReviewDetailPage() {
       {/* QC Decision Panel */}
       {isQC && (
         <div className="panel">
-          <h3 className="panel-title-mb">QC 결정</h3>
+          <h3 className="panel-title-mb">{t("expertReviewDetail.qcDecision")}</h3>
           <div className="review-action-grid">
             <button
               className={`review-action-card ${qcForm.values.decision === "APPROVE" ? "approve" : ""}`}
               onClick={() => qcForm.setField("decision", "APPROVE")}
             >
               <div className="review-action-icon" style={{ color: "var(--success)" }}><CheckCircle size={28} /></div>
-              <div className="review-action-label">승인</div>
+              <div className="review-action-label">{t("expertReviewDetail.decisionApprove")}</div>
             </button>
             <button
               className={`review-action-card ${qcForm.values.decision === "REJECT" ? "reject" : ""}`}
               onClick={() => qcForm.setField("decision", "REJECT")}
             >
               <div className="review-action-icon" style={{ color: "var(--danger)" }}><XCircle size={28} /></div>
-              <div className="review-action-label">반려</div>
+              <div className="review-action-label">{t("expertReviewDetail.decisionReject")}</div>
             </button>
             <button
               className={`review-action-card ${qcForm.values.decision === "RERUN" ? "rerun" : ""}`}
               onClick={() => qcForm.setField("decision", "RERUN")}
             >
               <div className="review-action-icon" style={{ color: "var(--warning)" }}><ArrowsClockwise size={28} /></div>
-              <div className="review-action-label">재분석 요청</div>
+              <div className="review-action-label">{t("expertReviewDetail.decisionRerun")}</div>
             </button>
           </div>
 
           <div className="stack-md" style={{ marginTop: 16 }}>
             <label className="field">
-              코멘트
+              {t("expertReviewDetail.comments")}
               <textarea
                 className="textarea"
                 value={qcForm.values.comments ?? ""}
                 onChange={(e) => qcForm.setField("comments", e.target.value)}
-                placeholder="리뷰 의견을 입력하세요"
+                placeholder={t("expertReviewDetail.commentPlaceholder")}
                 rows={3}
               />
               {qcForm.errors.comments && <span className="error-text">{qcForm.errors.comments}</span>}
             </label>
             {qcMut.isError && <p className="error-text">{(qcMut.error as Error).message}</p>}
             <button className="btn btn-primary" onClick={() => qcMut.mutate()} disabled={qcMut.isPending}>
-              {qcMut.isPending ? <span className="spinner" /> : <>결정 제출 <Check size={16} /></>}
+              {qcMut.isPending ? <span className="spinner" /> : <>{t("expertReviewDetail.submitDecision")} <Check size={16} /></>}
             </button>
           </div>
         </div>
@@ -303,39 +306,39 @@ export default function ExpertReviewDetailPage() {
       {/* Report Review Panel */}
       {isExpertReview && (
         <div className="panel">
-          <h3 className="panel-title-mb">보고서 검토</h3>
+          <h3 className="panel-title-mb">{t("expertReviewDetail.reportReview")}</h3>
           <div className="review-action-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
             <button
               className={`review-action-card ${reportForm.values.decision === "APPROVE" ? "approve" : ""}`}
               onClick={() => reportForm.setField("decision", "APPROVE")}
             >
               <div className="review-action-icon" style={{ color: "var(--success)" }}><CheckCircle size={28} /></div>
-              <div className="review-action-label">승인</div>
+              <div className="review-action-label">{t("expertReviewDetail.decisionApprove")}</div>
             </button>
             <button
               className={`review-action-card ${reportForm.values.decision === "REVISION_NEEDED" ? "rerun" : ""}`}
               onClick={() => reportForm.setField("decision", "REVISION_NEEDED")}
             >
               <div className="review-action-icon" style={{ color: "var(--warning)" }}><ArrowsClockwise size={28} /></div>
-              <div className="review-action-label">수정 요청</div>
+              <div className="review-action-label">{t("expertReviewDetail.requestRevision")}</div>
             </button>
           </div>
 
           <div className="stack-md" style={{ marginTop: 16 }}>
             <label className="field">
-              코멘트
+              {t("expertReviewDetail.comments")}
               <textarea
                 className="textarea"
                 value={reportForm.values.comments ?? ""}
                 onChange={(e) => reportForm.setField("comments", e.target.value)}
-                placeholder="검토 의견을 입력하세요"
+                placeholder={t("expertReviewDetail.reviewCommentPlaceholder")}
                 rows={3}
               />
               {reportForm.errors.comments && <span className="error-text">{reportForm.errors.comments}</span>}
             </label>
             {reportMut.isError && <p className="error-text">{(reportMut.error as Error).message}</p>}
             <button className="btn btn-primary" onClick={() => reportMut.mutate()} disabled={reportMut.isPending}>
-              {reportMut.isPending ? <span className="spinner" /> : <>결정 제출 <Check size={16} /></>}
+              {reportMut.isPending ? <span className="spinner" /> : <>{t("expertReviewDetail.submitDecision")} <Check size={16} /></>}
             </button>
           </div>
         </div>

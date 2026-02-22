@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { Spinner, CheckCircle, XCircle, PlusCircle } from "phosphor-react";
 import { listRequests } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import { MetricCard } from "@/components/metric-card";
 import { RequestCard } from "@/components/request-card";
 
 export default function UserDashboard() {
   const router = useRouter();
   const { user } = useAuth();
+  const t = useT();
   const { data } = useQuery({ queryKey: ["requests"], queryFn: listRequests });
 
   const requests = data?.items ?? [];
@@ -22,28 +24,28 @@ export default function UserDashboard() {
   return (
     <div className="stack-lg">
       <div>
-        <h1 className="greeting">안녕하세요, {user?.displayName || "사용자"}님</h1>
-        <p className="greeting-sub">의료 AI 분석 현황을 확인하세요</p>
+        <h1 className="greeting">{t("userDashboard.greeting").replace("{name}", user?.displayName || "사용자")}</h1>
+        <p className="greeting-sub">{t("userDashboard.subtitle")}</p>
       </div>
 
       <div className="grid-3">
         <MetricCard
           icon={<Spinner size={20} />}
-          label="진행 중"
+          label={t("userDashboard.inProgress")}
           value={inProgress}
           iconBg="var(--primary-light)"
           iconColor="var(--primary)"
         />
         <MetricCard
           icon={<CheckCircle size={20} />}
-          label="완료"
+          label={t("userDashboard.completed")}
           value={completed}
           iconBg="var(--success-light)"
           iconColor="var(--success)"
         />
         <MetricCard
           icon={<XCircle size={20} />}
-          label="실패"
+          label={t("userDashboard.failed")}
           value={failed}
           iconBg="var(--danger-light)"
           iconColor="var(--danger)"
@@ -52,20 +54,20 @@ export default function UserDashboard() {
 
       <div className="cta-card" onClick={() => router.push("/user/new-request")}>
         <div className="cta-card-icon"><PlusCircle size={32} /></div>
-        <p className="cta-card-title">새 요청 만들기</p>
-        <p className="cta-card-desc">의료 데이터를 제출하고 AI 분석을 시작하세요</p>
+        <p className="cta-card-title">{t("userDashboard.ctaNewRequest")}</p>
+        <p className="cta-card-desc">{t("userDashboard.ctaNewRequestDesc")}</p>
       </div>
 
       <div className="panel">
         <div className="panel-header-row" style={{ marginBottom: 16 }}>
-          <h2 className="panel-title">최근 요청</h2>
+          <h2 className="panel-title">{t("userDashboard.recentRequests")}</h2>
           <button className="btn btn-secondary btn-sm" onClick={() => router.push("/user/requests")}>
-            전체 보기
+            {t("common.viewAll")}
           </button>
         </div>
         {recent.length === 0 ? (
           <div className="empty-state">
-            <p className="empty-state-text">아직 요청이 없습니다. 새 요청을 만들어보세요.</p>
+            <p className="empty-state-text">{t("userDashboard.emptyRequests")}</p>
           </div>
         ) : (
           <div className="stack-md">

@@ -6,8 +6,10 @@ import { Key, Copy, Check, Trash } from "phosphor-react";
 import { listApiKeys, createApiKey, revokeApiKey, type ApiKeyRead } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useT } from "@/lib/i18n";
 
 export default function AdminApiKeysPage() {
+  const t = useT();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const orgId = user?.institutionId;
@@ -52,25 +54,25 @@ export default function AdminApiKeysPage() {
     <div className="stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">API 키 관리</h1>
-          <p className="page-subtitle">B2B 연동을 위한 API 키를 관리합니다</p>
+          <h1 className="page-title">{t("adminApiKeys.title")}</h1>
+          <p className="page-subtitle">{t("adminApiKeys.subtitle")}</p>
         </div>
         <div className="page-header-actions">
           <Dialog.Root open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) setNewKey(null); }}>
             <Dialog.Trigger asChild>
               <button className="btn btn-primary">
-                <Key size={16} /> 새 키 생성
+                <Key size={16} /> {t("adminApiKeys.generateNew")}
               </button>
             </Dialog.Trigger>
             <Dialog.Portal>
               <Dialog.Overlay className="dialog-overlay" />
               <Dialog.Content className="dialog-content">
-                <Dialog.Title className="dialog-title">새 API 키 생성</Dialog.Title>
+                <Dialog.Title className="dialog-title">{t("adminApiKeys.newKeyTitle")}</Dialog.Title>
 
                 {newKey ? (
                   <div className="stack-md">
                     <div className="banner banner-warning">
-                      이 키는 한 번만 표시됩니다. 안전한 곳에 저장하세요.
+                      {t("adminApiKeys.keyWarning")}
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <input className="input mono-field" value={newKey} readOnly style={{ flex: 1, fontSize: 12 }} />
@@ -79,25 +81,25 @@ export default function AdminApiKeysPage() {
                       </button>
                     </div>
                     <button className="btn btn-primary" onClick={() => { setShowCreate(false); setNewKey(null); }}>
-                      확인
+                      {t("common.confirm")}
                     </button>
                   </div>
                 ) : (
                   <div className="stack-md">
                     <label className="field">
-                      키 이름
-                      <input className="input" value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="예: 연동 서버 A" />
+                      {t("adminApiKeys.keyName")}
+                      <input className="input" value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder={t("adminApiKeys.keyNamePlaceholder")} />
                     </label>
                     <label className="field">
-                      만료 기간 (일)
+                      {t("adminApiKeys.expiryDays")}
                       <input className="input" type="number" value={expiryDays} onChange={(e) => setExpiryDays(Number(e.target.value))} min={1} max={365} />
                     </label>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <Dialog.Close asChild>
-                        <button className="btn btn-secondary">취소</button>
+                        <button className="btn btn-secondary">{t("common.cancel")}</button>
                       </Dialog.Close>
                       <button className="btn btn-primary" onClick={() => createMut.mutate()} disabled={!keyName.trim() || createMut.isPending}>
-                        {createMut.isPending ? <span className="spinner" /> : "생성"}
+                        {createMut.isPending ? <span className="spinner" /> : t("common.generate")}
                       </button>
                     </div>
                   </div>
@@ -116,12 +118,12 @@ export default function AdminApiKeysPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>이름</th>
-                  <th>접두사</th>
-                  <th>상태</th>
-                  <th>만료일</th>
-                  <th>마지막 사용</th>
-                  <th>생성일</th>
+                  <th>{t("adminApiKeys.tableName")}</th>
+                  <th>{t("adminApiKeys.tablePrefix")}</th>
+                  <th>{t("adminApiKeys.tableStatus")}</th>
+                  <th>{t("adminApiKeys.tableExpiry")}</th>
+                  <th>{t("adminApiKeys.tableLastUsed")}</th>
+                  <th>{t("adminApiKeys.tableCreatedDate")}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -132,7 +134,7 @@ export default function AdminApiKeysPage() {
                     <td className="mono-cell">{k.key_prefix}...</td>
                     <td>
                       <span className={`status-chip ${k.status === "ACTIVE" ? "status-final" : "status-cancelled"}`}>
-                        {k.status === "ACTIVE" ? "활성" : "폐기"}
+                        {k.status === "ACTIVE" ? t("common.active") : t("adminApiKeys.revoked")}
                       </span>
                     </td>
                     <td>{k.expires_at ? new Date(k.expires_at).toLocaleDateString("ko-KR") : "-"}</td>
@@ -145,7 +147,7 @@ export default function AdminApiKeysPage() {
                           onClick={() => revokeMut.mutate(k.id)}
                           disabled={revokeMut.isPending}
                         >
-                          <Trash size={14} /> 폐기
+                          <Trash size={14} /> {t("common.revoke")}
                         </button>
                       )}
                     </td>
@@ -154,7 +156,7 @@ export default function AdminApiKeysPage() {
                 {keys.length === 0 && (
                   <tr>
                     <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
-                      등록된 API 키가 없습니다.
+                      {t("adminApiKeys.noKeys")}
                     </td>
                   </tr>
                 )}

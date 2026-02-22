@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Plus, Trash } from "phosphor-react";
+import { useT } from "@/lib/i18n";
 import type { WizardCaseInput } from "./types";
 
 interface StepCaseInputProps {
@@ -11,6 +12,8 @@ interface StepCaseInputProps {
 }
 
 export function StepCaseInput({ cases, onChange, onNext, onPrev }: StepCaseInputProps) {
+  const t = useT();
+
   function updatePatientRef(idx: number, val: string) {
     const next = [...cases];
     if (next[idx]) next[idx] = { ...next[idx], patient_ref: val };
@@ -29,7 +32,7 @@ export function StepCaseInput({ cases, onChange, onNext, onPrev }: StepCaseInput
 
   return (
     <div className="stack-lg">
-      <p className="muted-text">환자 케이스 정보를 입력하세요</p>
+      <p className="muted-text">{t("wizard.enterCases")}</p>
       <div className="stack-md">
         {cases.map((c, idx) => (
           <div
@@ -42,13 +45,13 @@ export function StepCaseInput({ cases, onChange, onNext, onPrev }: StepCaseInput
             </span>
             <input
               className="input"
-              placeholder="환자 참조 ID"
+              placeholder={t("wizard.patientRefPlaceholder")}
               value={c.patient_ref}
               onChange={(e) => updatePatientRef(idx, e.target.value)}
               style={{ flex: 1 }}
             />
             {cases.length > 1 && (
-              <button className="btn btn-danger btn-sm" onClick={() => removeCase(idx)} title="삭제">
+              <button className="btn btn-danger btn-sm" onClick={() => removeCase(idx)} title={t("common.delete")}>
                 <Trash size={14} />
               </button>
             )}
@@ -56,14 +59,14 @@ export function StepCaseInput({ cases, onChange, onNext, onPrev }: StepCaseInput
         ))}
       </div>
       <button className="btn btn-secondary btn-sm" onClick={addCase}>
-        <Plus size={14} /> 케이스 추가
+        <Plus size={14} /> {t("wizard.addCase")}
       </button>
       <div className="nav-buttons">
         <button className="btn btn-secondary" onClick={onPrev}>
-          <ArrowLeft size={16} /> 이전
+          <ArrowLeft size={16} /> {t("common.prev")}
         </button>
         <button className="btn btn-primary" disabled={!hasValidCase} onClick={onNext}>
-          다음 <ArrowRight size={16} />
+          {t("common.next")} <ArrowRight size={16} />
         </button>
       </div>
     </div>

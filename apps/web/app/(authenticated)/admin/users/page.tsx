@@ -5,28 +5,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { listUsers, approveExpert, rejectExpert, type UserRead } from "@/lib/api";
 import { CaretLeft, CaretRight } from "phosphor-react";
+import { useT } from "@/lib/i18n";
 
 type FilterTab = "all" | "SERVICE_USER" | "EXPERT" | "ADMIN" | "PENDING";
 const PAGE_SIZE = 20;
 
-const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
-  { key: "all", label: "전체" },
-  { key: "SERVICE_USER", label: "서비스 사용자" },
-  { key: "EXPERT", label: "전문가" },
-  { key: "ADMIN", label: "관리자" },
-  { key: "PENDING", label: "승인 대기" },
-];
-
-const USER_TYPE_LABELS: Record<string, string> = {
-  SERVICE_USER: "서비스 사용자",
-  EXPERT: "전문가",
-  ADMIN: "관리자",
-};
-
 export default function AdminUsersPage() {
+  const t = useT();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [page, setPage] = useState(0);
   const router = useRouter();
+
+  const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
+    { key: "all", label: t("adminUsers.filterAll") },
+    { key: "SERVICE_USER", label: t("adminUsers.filterServiceUser") },
+    { key: "EXPERT", label: t("adminUsers.filterExpert") },
+    { key: "ADMIN", label: t("adminUsers.filterAdmin") },
+    { key: "PENDING", label: t("adminUsers.filterPending") },
+  ];
   const queryClient = useQueryClient();
 
   const params = filter === "PENDING"
@@ -63,8 +59,8 @@ export default function AdminUsersPage() {
     <div className="stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">사용자 관리</h1>
-          <p className="page-subtitle">시스템 사용자를 관리합니다 ({data?.total ?? 0}명)</p>
+          <h1 className="page-title">{t("adminUsers.title")}</h1>
+          <p className="page-subtitle">{t("adminUsers.subtitle").replace("{count}", String(data?.total ?? 0))}</p>
         </div>
       </div>
 
@@ -84,13 +80,13 @@ export default function AdminUsersPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>이름</th>
-                  <th>이메일</th>
-                  <th>유형</th>
-                  <th>상태</th>
-                  <th>기관</th>
-                  <th>가입일</th>
-                  <th>작업</th>
+                  <th>{t("adminUsers.tableName")}</th>
+                  <th>{t("adminUsers.tableEmail")}</th>
+                  <th>{t("adminUsers.tableType")}</th>
+                  <th>{t("adminUsers.tableStatus")}</th>
+                  <th>{t("adminUsers.tableOrg")}</th>
+                  <th>{t("adminUsers.tableSignupDate")}</th>
+                  <th>{t("adminUsers.tableActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,21 +97,21 @@ export default function AdminUsersPage() {
                     <td>
                       {u.user_type && (
                         <span className={`user-type-chip user-type-${u.user_type === "SERVICE_USER" ? "service" : u.user_type === "EXPERT" ? "expert" : "admin"}`}>
-                          {USER_TYPE_LABELS[u.user_type] || u.user_type}
+                          {t(`userType.${u.user_type}` as any) || u.user_type}
                         </span>
                       )}
                     </td>
                     <td>
                       {u.user_type === "EXPERT" && u.expert_status === "PENDING_APPROVAL" && (
-                        <span className="status-chip status-qc">승인 대기</span>
+                        <span className="status-chip status-qc">{t("adminUsers.statusPending")}</span>
                       )}
                       {u.user_type === "EXPERT" && u.expert_status === "APPROVED" && (
-                        <span className="status-chip status-final">승인됨</span>
+                        <span className="status-chip status-final">{t("adminUsers.statusApproved")}</span>
                       )}
                       {u.user_type === "EXPERT" && u.expert_status === "REJECTED" && (
-                        <span className="status-chip status-failed">거부됨</span>
+                        <span className="status-chip status-failed">{t("adminUsers.statusRejected")}</span>
                       )}
-                      {!u.is_active && <span className="status-chip status-cancelled">비활성</span>}
+                      {!u.is_active && <span className="status-chip status-cancelled">{t("common.inactive")}</span>}
                     </td>
                     <td>{u.institution_name || "-"}</td>
                     <td>{u.created_at ? new Date(u.created_at).toLocaleDateString("ko-KR") : "-"}</td>
@@ -124,10 +120,10 @@ export default function AdminUsersPage() {
                         {u.user_type === "EXPERT" && u.expert_status === "PENDING_APPROVAL" && (
                           <>
                             <button className="btn btn-sm btn-primary" onClick={() => approveMut.mutate(u.id)} disabled={approveMut.isPending}>
-                              승인
+                              {t("common.approve")}
                             </button>
                             <button className="btn btn-sm btn-danger" onClick={() => rejectMut.mutate(u.id)} disabled={rejectMut.isPending}>
-                              거부
+                              {t("common.reject")}
                             </button>
                           </>
                         )}
@@ -136,7 +132,7 @@ export default function AdminUsersPage() {
                   </tr>
                 ))}
                 {users.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>사용자가 없습니다.</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>{t("adminUsers.noUsers")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -145,11 +141,11 @@ export default function AdminUsersPage() {
           {totalPages > 1 && (
             <div className="pagination" style={{ marginTop: 16 }}>
               <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                <CaretLeft size={14} /> 이전
+                <CaretLeft size={14} /> {t("common.paginationPrev")}
               </button>
               <span className="pagination-info">{page + 1} / {totalPages}</span>
               <button className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-                다음 <CaretRight size={14} />
+                {t("common.paginationNext")} <CaretRight size={14} />
               </button>
             </div>
           )}

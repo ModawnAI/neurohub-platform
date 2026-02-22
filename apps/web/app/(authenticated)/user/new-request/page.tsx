@@ -12,18 +12,18 @@ import { StepCaseInput } from "@/components/wizard/step-case-input";
 import { StepFileUpload } from "@/components/wizard/step-file-upload";
 import { StepReviewSubmit } from "@/components/wizard/step-review-submit";
 import { EMPTY_DRAFT, type WizardDraft } from "@/components/wizard/types";
-
-const STEPS = ["서비스 선택", "케이스 입력", "파일 업로드", "확인 및 제출"];
+import { useT } from "@/lib/i18n";
 const DRAFT_KEY = "neurohub-new-request-draft";
 
 export default function UserNewRequestPage() {
   const router = useRouter();
+  const t = useT();
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState<string | null>(null);
   const [caseIds, setCaseIds] = useState<string[]>([]);
 
   const { step, draft, setDraft, next, prev, goTo, clearDraft, hasSavedDraft, isLast } = useWizard<WizardDraft>({
-    totalSteps: STEPS.length,
+    totalSteps: 4,
     draftKey: DRAFT_KEY,
     initialDraft: EMPTY_DRAFT,
     canAdvance: (s, d) => {
@@ -67,13 +67,13 @@ export default function UserNewRequestPage() {
         }
       }
     },
-    onError: (err: any) => setError(err?.message || "요청 생성에 실패했습니다."),
+    onError: (err: any) => setError(err?.message || t("wizard.errorCreateRequest")),
   });
 
   // Submit (confirm + submit) the request on final step
   const submitMut = useMutation({
     mutationFn: async () => {
-      if (!requestId) throw new Error("요청이 생성되지 않았습니다.");
+      if (!requestId) throw new Error(t("wizard.errorNoRequestId"));
       await confirmRequest(requestId);
       return submitRequest(requestId);
     },
@@ -81,7 +81,7 @@ export default function UserNewRequestPage() {
       clearDraft();
       router.push("/user/requests");
     },
-    onError: (err: any) => setError(err?.message || "요청 제출에 실패했습니다."),
+    onError: (err: any) => setError(err?.message || t("wizard.errorSubmitRequest")),
   });
 
   const handleAdvanceToUpload = useCallback(async () => {
@@ -105,26 +105,26 @@ export default function UserNewRequestPage() {
   return (
     <div className="stack-lg">
       <button className="back-link" onClick={() => router.push("/user/requests")}>
-        <ArrowLeft size={16} /> 돌아가기
+        <ArrowLeft size={16} /> {t("wizard.back")}
       </button>
 
-      <h1 className="page-title">새 요청 만들기</h1>
+      <h1 className="page-title">{t("wizard.title")}</h1>
 
       {hasSavedDraft && step === 1 && (
         <div className="draft-banner">
-          이전에 작성 중인 요청이 있습니다.
+          {t("wizard.draftBanner")}
           <div className="draft-banner-actions">
             <button className="btn btn-sm btn-secondary" onClick={clearDraft}>
-              삭제
+              {t("wizard.deleteDraft")}
             </button>
             <button className="btn btn-sm btn-primary" onClick={() => goTo(2)}>
-              이어서 작성
+              {t("wizard.continueDraft")}
             </button>
           </div>
         </div>
       )}
 
-      <StepIndicator steps={STEPS} current={step} />
+      <StepIndicator steps={[t("wizard.stepServiceSelect"), t("wizard.stepCaseInput"), t("wizard.stepFileUpload"), t("wizard.stepReviewSubmit")]} current={step} />
 
       {step === 1 && (
         <StepServiceSelect

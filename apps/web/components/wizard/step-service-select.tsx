@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "phosphor-react";
 import type { ServiceRead } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface StepServiceSelectProps {
   services: ServiceRead[];
@@ -11,12 +12,14 @@ interface StepServiceSelectProps {
 }
 
 export function StepServiceSelect({ services, selectedId, onSelect, onNext }: StepServiceSelectProps) {
+  const t = useT();
+
   return (
     <div className="stack-lg">
-      <p className="muted-text">분석할 서비스를 선택하세요</p>
+      <p className="muted-text">{t("wizard.selectService")}</p>
       {services.length === 0 ? (
         <div className="empty-state">
-          <p className="empty-state-text">사용 가능한 서비스가 없습니다.</p>
+          <p className="empty-state-text">{t("wizard.noServicesAvailable")}</p>
         </div>
       ) : (
         <div className="grid-2">
@@ -37,7 +40,7 @@ export function StepServiceSelect({ services, selectedId, onSelect, onNext }: St
       )}
       <div className="nav-buttons-end">
         <button className="btn btn-primary" disabled={!selectedId} onClick={onNext}>
-          다음 <ArrowRight size={16} />
+          {t("common.next")} <ArrowRight size={16} />
         </button>
       </div>
     </div>

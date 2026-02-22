@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Brain, EnvelopeSimple } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { useT } from "@/lib/i18n";
 
 export default function RegisterPage() {
+  const t = useT();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,11 +25,11 @@ export default function RegisterPage() {
     setError("");
 
     if (password.length < 8) {
-      setError("비밀번호는 8자 이상이어야 합니다.");
+      setError(t("auth.errorPasswordMinLength"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("비밀번호가 일치하지 않습니다.");
+      setError(t("auth.errorPasswordMismatch"));
       return;
     }
 
@@ -37,7 +39,7 @@ export default function RegisterPage() {
       await signUp(email, password);
       setRegistered(true);
     } catch (err: any) {
-      setError(err?.message || "회원가입에 실패했습니다.");
+      setError(err?.message || t("auth.errorSignUpFailed"));
     } finally {
       setLoading(false);
     }
@@ -80,13 +82,13 @@ export default function RegisterPage() {
           </div>
 
           <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0 0 0.5rem" }}>
-            이메일을 확인해 주세요
+            {t("auth.verificationTitle")}
           </h1>
 
           <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1.5rem" }}>
-            <strong>{email}</strong>로 인증 메일을 보냈습니다.
+            <strong>{email}</strong>{t("auth.verificationMessage")}
             <br />
-            메일함을 확인하고 인증 링크를 클릭하세요.
+            {t("auth.verificationInstruction")}
           </p>
 
           <div
@@ -100,7 +102,7 @@ export default function RegisterPage() {
               marginBottom: "1.5rem",
             }}
           >
-            메일이 보이지 않으면 스팸 폴더를 확인해 주세요.
+            {t("auth.verificationSpamWarning")}
           </div>
 
           <button
@@ -109,11 +111,11 @@ export default function RegisterPage() {
             disabled={resending || resent}
             style={{ width: "100%", justifyContent: "center", marginBottom: "0.75rem" }}
           >
-            {resent ? "인증 메일을 다시 보냈습니다" : resending ? "발송 중..." : "인증 메일 재발송"}
+            {resent ? t("auth.resentEmail") : resending ? t("auth.sendingEmail") : t("auth.resendEmail")}
           </button>
 
           <p className="auth-footer">
-            <Link href="/login">로그인 페이지로 돌아가기</Link>
+            <Link href="/login">{t("auth.backToLogin")}</Link>
           </p>
         </div>
       </div>
@@ -129,23 +131,23 @@ export default function RegisterPage() {
           </div>
           <span className="auth-brand-text">NeuroHub</span>
         </div>
-        <p className="auth-subtitle">새 계정을 만들고 의료 AI 분석을 시작하세요</p>
+        <p className="auth-subtitle">{t("auth.signUpSubtitle")}</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="field">
-            이름
+            {t("auth.name")}
             <input
               className="input"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="홍길동"
+              placeholder={t("auth.namePlaceholder")}
               required
             />
           </label>
 
           <label className="field">
-            이메일
+            {t("auth.email")}
             <input
               className="input"
               type="email"
@@ -158,13 +160,13 @@ export default function RegisterPage() {
           </label>
 
           <label className="field">
-            비밀번호
+            {t("auth.password")}
             <input
               className="input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="8자 이상"
+              placeholder={t("auth.passwordMinHint")}
               required
               minLength={8}
               autoComplete="new-password"
@@ -172,13 +174,13 @@ export default function RegisterPage() {
           </label>
 
           <label className="field">
-            비밀번호 확인
+            {t("auth.confirmPassword")}
             <input
               className="input"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="비밀번호를 다시 입력하세요"
+              placeholder={t("auth.confirmPasswordPlaceholder")}
               required
               autoComplete="new-password"
             />
@@ -187,12 +189,12 @@ export default function RegisterPage() {
           {error && <p className="error-text">{error}</p>}
 
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
-            {loading ? <span className="spinner" /> : "회원가입"}
+            {loading ? <span className="spinner" /> : t("auth.signUp")}
           </button>
         </form>
 
         <p className="auth-footer">
-          이미 계정이 있으신가요? <Link href="/login">로그인</Link>
+          {t("auth.alreadyHaveAccount")} <Link href="/login">{t("auth.login")}</Link>
         </p>
       </div>
     </div>

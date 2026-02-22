@@ -8,30 +8,10 @@ import { completeOnboarding } from "@/lib/api";
 import { useAuth, getRoleHomePath } from "@/lib/auth";
 import { useZodForm } from "@/lib/use-zod-form";
 import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas";
+import { useT } from "@/lib/i18n";
 
 type UserType = "SERVICE_USER" | "EXPERT" | "ADMIN";
 type OrgType = "individual" | "hospital";
-
-const USER_TYPE_OPTIONS = [
-  {
-    value: "SERVICE_USER" as UserType,
-    icon: <User size={24} weight="bold" />,
-    title: "서비스 사용자",
-    description: "의료 데이터를 AI 분석에 제출하고 결과를 확인합니다",
-  },
-  {
-    value: "EXPERT" as UserType,
-    icon: <MagnifyingGlass size={24} weight="bold" />,
-    title: "전문가 리뷰어",
-    description: "AI 분석 결과를 검토하고 품질을 검증합니다",
-  },
-  {
-    value: "ADMIN" as UserType,
-    icon: <GearSix size={24} weight="bold" />,
-    title: "관리자",
-    description: "시스템을 관리하고 사용자와 서비스를 운영합니다",
-  },
-];
 
 const INITIAL: OnboardingFormValues = {
   user_type: "SERVICE_USER",
@@ -45,7 +25,29 @@ const INITIAL: OnboardingFormValues = {
 };
 
 export default function OnboardingPage() {
+  const t = useT();
   const [step, setStep] = useState(1);
+
+  const USER_TYPE_OPTIONS = [
+    {
+      value: "SERVICE_USER" as UserType,
+      icon: <User size={24} weight="bold" />,
+      title: t("userType.SERVICE_USER"),
+      description: t("onboarding.serviceUserDesc"),
+    },
+    {
+      value: "EXPERT" as UserType,
+      icon: <MagnifyingGlass size={24} weight="bold" />,
+      title: t("userType.EXPERT"),
+      description: t("onboarding.expertDesc"),
+    },
+    {
+      value: "ADMIN" as UserType,
+      icon: <GearSix size={24} weight="bold" />,
+      title: t("userType.ADMIN"),
+      description: t("onboarding.adminDesc"),
+    },
+  ];
   const [orgType, setOrgType] = useState<OrgType>("individual");
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,7 +95,7 @@ export default function OnboardingPage() {
       await refreshUser();
       router.push(getRoleHomePath(userType));
     } catch (err: any) {
-      setApiError(err?.message || "온보딩에 실패했습니다.");
+      setApiError(err?.message || t("onboarding.errorFailed"));
       setLoading(false);
     }
   }
@@ -115,7 +117,7 @@ export default function OnboardingPage() {
               {i > 0 && <div className="step-indicator-line" />}
               <div className={`step-indicator-item ${step === s ? "active" : step > s ? "done" : ""}`}>
                 <div className="step-indicator-dot">{step > s ? <Check size={12} /> : s}</div>
-                <span>{s === 1 ? "유형 선택" : s === 2 ? "프로필" : "완료"}</span>
+                <span>{s === 1 ? t("onboarding.stepTypeSelection") : s === 2 ? t("onboarding.stepProfile") : t("onboarding.stepCompletion")}</span>
               </div>
             </div>
           ))}
@@ -125,8 +127,8 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="stack-lg">
             <div style={{ textAlign: "center" }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>어떤 역할로 사용하시겠어요?</h2>
-              <p className="muted-text">사용 목적에 맞는 유형을 선택하세요</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>{t("onboarding.titleStep1")}</h2>
+              <p className="muted-text">{t("onboarding.subtitleStep1")}</p>
             </div>
             <TypeSelector
               options={USER_TYPE_OPTIONS}
@@ -135,7 +137,7 @@ export default function OnboardingPage() {
             />
             <div className="nav-buttons-end">
               <button className="btn btn-primary" disabled={!canProceedStep1()} onClick={() => setStep(2)}>
-                다음 <ArrowRight size={16} />
+                {t("common.next")} <ArrowRight size={16} />
               </button>
             </div>
           </div>
@@ -145,50 +147,50 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="stack-lg">
             <div style={{ textAlign: "center" }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>프로필을 설정하세요</h2>
-              <p className="muted-text">기본 정보를 입력해주세요</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>{t("onboarding.titleStep2")}</h2>
+              <p className="muted-text">{t("onboarding.subtitleStep2")}</p>
             </div>
 
             <div className="auth-form">
               <label className="field">
-                표시 이름
+                {t("onboarding.displayName")}
                 <input
                   className="input"
                   value={values.display_name}
                   onChange={(e) => setField("display_name", e.target.value)}
-                  placeholder="홍길동"
+                  placeholder={t("onboarding.namePlaceholder")}
                 />
                 {errors.display_name && <span className="error-text">{errors.display_name}</span>}
               </label>
 
               <label className="field">
-                연락처 (선택)
+                {t("onboarding.phoneOptional")}
                 <input
                   className="input"
                   value={values.phone ?? ""}
                   onChange={(e) => setField("phone", e.target.value)}
-                  placeholder="010-0000-0000"
+                  placeholder={t("onboarding.phonePlaceholder")}
                 />
               </label>
 
               {userType === "EXPERT" && (
                 <>
                   <label className="field">
-                    전문 분야
+                    {t("onboarding.specialization")}
                     <input
                       className="input"
                       value={values.specialization ?? ""}
                       onChange={(e) => setField("specialization", e.target.value)}
-                      placeholder="예: 신경영상, 뇌 MRI 분석"
+                      placeholder={t("onboarding.specializationPlaceholder")}
                     />
                   </label>
                   <label className="field">
-                    소개 (선택)
+                    {t("onboarding.bioOptional")}
                     <textarea
                       className="textarea"
                       value={values.bio ?? ""}
                       onChange={(e) => setField("bio", e.target.value)}
-                      placeholder="간단한 자기 소개를 입력하세요"
+                      placeholder={t("onboarding.bioPlaceholder")}
                       rows={3}
                     />
                   </label>
@@ -197,7 +199,7 @@ export default function OnboardingPage() {
 
               {userType === "SERVICE_USER" && (
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>소속 유형</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>{t("onboarding.orgType")}</p>
                   <div className="grid-2">
                     <button
                       type="button"
@@ -205,8 +207,8 @@ export default function OnboardingPage() {
                       onClick={() => setOrgType("individual")}
                       style={{ padding: 16 }}
                     >
-                      <p className="type-selector-title" style={{ fontSize: 14 }}>개인 사용</p>
-                      <p className="type-selector-desc">개인적으로 서비스를 이용합니다</p>
+                      <p className="type-selector-title" style={{ fontSize: 14 }}>{t("onboarding.orgTypeIndividual")}</p>
+                      <p className="type-selector-desc">{t("onboarding.orgTypeIndividualDesc")}</p>
                     </button>
                     <button
                       type="button"
@@ -214,8 +216,8 @@ export default function OnboardingPage() {
                       onClick={() => setOrgType("hospital")}
                       style={{ padding: 16 }}
                     >
-                      <p className="type-selector-title" style={{ fontSize: 14 }}>병원/의원 소속</p>
-                      <p className="type-selector-desc">소속 기관에서 서비스를 이용합니다</p>
+                      <p className="type-selector-title" style={{ fontSize: 14 }}>{t("onboarding.orgTypeHospital")}</p>
+                      <p className="type-selector-desc">{t("onboarding.orgTypeHospitalDesc")}</p>
                     </button>
                   </div>
                 </div>
@@ -224,22 +226,22 @@ export default function OnboardingPage() {
               {(orgType === "hospital" || userType === "ADMIN") && (
                 <>
                   <label className="field">
-                    기관명
+                    {t("onboarding.orgName")}
                     <input
                       className="input"
                       value={values.organization_name ?? ""}
                       onChange={(e) => setField("organization_name", e.target.value)}
-                      placeholder="OO 병원"
+                      placeholder={t("onboarding.orgNamePlaceholder")}
                     />
                     {errors.organization_name && <span className="error-text">{errors.organization_name}</span>}
                   </label>
                   <label className="field">
-                    기관 코드 (선택)
+                    {t("onboarding.orgCodeOptional")}
                     <input
                       className="input"
                       value={values.organization_code ?? ""}
                       onChange={(e) => setField("organization_code", e.target.value)}
-                      placeholder="영문/숫자 조합 (예: hospital-01)"
+                      placeholder={t("onboarding.orgCodePlaceholder")}
                     />
                   </label>
                 </>
@@ -248,10 +250,10 @@ export default function OnboardingPage() {
 
             <div className="nav-buttons">
               <button className="btn btn-secondary" onClick={() => setStep(1)}>
-                <ArrowLeft size={16} /> 이전
+                <ArrowLeft size={16} /> {t("common.prev")}
               </button>
               <button className="btn btn-primary" disabled={!canProceedStep2()} onClick={handleNextToStep3}>
-                다음 <ArrowRight size={16} />
+                {t("common.next")} <ArrowRight size={16} />
               </button>
             </div>
           </div>
@@ -261,37 +263,37 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="stack-lg">
             <div style={{ textAlign: "center" }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>설정을 확인하세요</h2>
-              <p className="muted-text">모든 정보가 올바른지 확인한 후 시작하세요</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px" }}>{t("onboarding.titleStep3")}</h2>
+              <p className="muted-text">{t("onboarding.subtitleStep3")}</p>
             </div>
 
             <div className="panel" style={{ padding: 20 }}>
               <div className="stack-md">
                 <div>
-                  <p className="detail-label">사용자 유형</p>
+                  <p className="detail-label">{t("onboarding.summaryUserType")}</p>
                   <p className="detail-value">
-                    {userType === "SERVICE_USER" ? "서비스 사용자" : userType === "EXPERT" ? "전문가 리뷰어" : "관리자"}
+                    {t(`userType.${userType}` as any)}
                   </p>
                 </div>
                 <div>
-                  <p className="detail-label">이름</p>
+                  <p className="detail-label">{t("onboarding.summaryName")}</p>
                   <p className="detail-value">{values.display_name}</p>
                 </div>
                 {values.phone && (
                   <div>
-                    <p className="detail-label">연락처</p>
+                    <p className="detail-label">{t("onboarding.summaryPhone")}</p>
                     <p className="detail-value">{values.phone}</p>
                   </div>
                 )}
                 {userType === "EXPERT" && values.specialization && (
                   <div>
-                    <p className="detail-label">전문 분야</p>
+                    <p className="detail-label">{t("onboarding.summarySpecialization")}</p>
                     <p className="detail-value">{values.specialization}</p>
                   </div>
                 )}
                 {(orgType === "hospital" || userType === "ADMIN") && values.organization_name && (
                   <div>
-                    <p className="detail-label">소속 기관</p>
+                    <p className="detail-label">{t("onboarding.summaryOrg")}</p>
                     <p className="detail-value">{values.organization_name}</p>
                   </div>
                 )}
@@ -300,7 +302,7 @@ export default function OnboardingPage() {
 
             {userType === "EXPERT" && (
               <div className="banner banner-info">
-                전문가 계정은 관리자 승인 후 리뷰 기능이 활성화됩니다.
+                {t("onboarding.expertAccountNote")}
               </div>
             )}
 
@@ -308,10 +310,10 @@ export default function OnboardingPage() {
 
             <div className="nav-buttons">
               <button className="btn btn-secondary" onClick={() => setStep(2)}>
-                <ArrowLeft size={16} /> 이전
+                <ArrowLeft size={16} /> {t("common.prev")}
               </button>
               <button className="btn btn-primary" onClick={handleComplete} disabled={loading}>
-                {loading ? <span className="spinner" /> : <>시작하기 <ArrowRight size={16} /></>}
+                {loading ? <span className="spinner" /> : <>{t("onboarding.startNow")} <ArrowRight size={16} /></>}
               </button>
             </div>
           </div>

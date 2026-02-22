@@ -1,4 +1,5 @@
 import { Providers } from "@/components/providers";
+import { SkipNav } from "@/components/skip-nav";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <a href="#main-content" className="skip-nav">메인 콘텐츠로 건너뛰기</a>
+        <SkipNav />
         <Providers>{children}</Providers>
         <div aria-live="polite" aria-atomic="true" className="status-announcer" id="status-announcer" />
       </body>

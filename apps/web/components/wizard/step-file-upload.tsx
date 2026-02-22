@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { ArrowLeft, ArrowRight } from "phosphor-react";
+import { useT } from "@/lib/i18n";
 import { FileDropZone } from "./file-drop-zone";
 import { UploadProgress, type UploadFileState } from "./upload-progress";
 import { initiateUpload, uploadFileToStorage, completeUpload } from "@/lib/api";
@@ -26,6 +27,7 @@ export function StepFileUpload({
   onNext,
   onPrev,
 }: StepFileUploadProps) {
+  const t = useT();
   const [activeCaseIndex, setActiveCaseIndex] = useState(0);
   const [fileStates, setFileStates] = useState<Record<number, UploadFileState[]>>({});
 
@@ -90,7 +92,7 @@ export function StepFileUpload({
             return { ...prev, [caseIndex]: arr };
           });
         } catch (err: unknown) {
-          const errorMsg = err instanceof Error ? err.message : "업로드 실패";
+          const errorMsg = err instanceof Error ? err.message : t("wizard.uploadFailed");
           setFileStates((prev) => {
             const arr = [...(prev[caseIndex] ?? [])];
             if (arr[stateIdx])
@@ -104,14 +106,14 @@ export function StepFileUpload({
         onFilesUploaded(caseIndex, [...(uploadedFiles[caseIndex] ?? []), ...completedFileIds]);
       }
     },
-    [requestId, caseIds, fileStates, uploadedFiles, onFilesUploaded],
+    [requestId, caseIds, fileStates, uploadedFiles, onFilesUploaded, t],
   );
 
   const validCases = cases.filter((c) => c.patient_ref.trim());
 
   return (
     <div className="stack-lg">
-      <p className="muted-text">각 케이스에 파일을 업로드하세요</p>
+      <p className="muted-text">{t("wizard.uploadFiles")}</p>
 
       {/* Case tabs */}
       <div className="filter-tabs">
@@ -151,16 +153,16 @@ export function StepFileUpload({
 
       {!requestId && (
         <div className="banner banner-warning">
-          파일을 업로드하려면 먼저 요청을 생성해야 합니다. 이 단계에서 요청이 자동 생성됩니다.
+          {t("wizard.warningCreateFirst")}
         </div>
       )}
 
       <div className="nav-buttons">
         <button className="btn btn-secondary" onClick={onPrev}>
-          <ArrowLeft size={16} /> 이전
+          <ArrowLeft size={16} /> {t("common.prev")}
         </button>
         <button className="btn btn-primary" onClick={onNext}>
-          다음 <ArrowRight size={16} />
+          {t("common.next")} <ArrowRight size={16} />
         </button>
       </div>
     </div>

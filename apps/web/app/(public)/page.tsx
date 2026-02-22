@@ -1,12 +1,5 @@
-import {
-  FeatureCards,
-  WorkflowSteps,
-  AudienceCards,
-  VisionarySection,
-  LandingNav,
-} from "@/components/landing-sections";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LandingPageContent } from "@/components/landing-page-content";
 
 export const metadata: Metadata = {
   title: "NeuroHub — 의료 영상 AI 분석, 안전하고 체계적으로",
@@ -15,93 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return (
-    <div>
-      {/* 상단 네비게이션 */}
-      <LandingNav />
-
-      <div className="container">
-        {/* 히어로 */}
-        <section className="landing-hero">
-          <span className="hero-badge">의료 AI 워크플로우 플랫폼</span>
-          <h1 className="landing-hero-title">
-            의료 영상 AI 분석,
-            <br />
-            안전하고 체계적으로
-          </h1>
-          <p className="landing-hero-subtitle">
-            NeuroHub는 의료 AI 파이프라인의 요청 접수부터 분석, 품질 검증, 보고서 생성까지 전 과정을
-            자동화하고 추적하는 오케스트레이션 플랫폼입니다.
-          </p>
-          <div className="hero-actions">
-            <Link className="btn btn-primary" href="/register">
-              무료로 시작하기
-            </Link>
-            <Link className="btn btn-secondary" href="/login">
-              로그인
-            </Link>
-          </div>
-        </section>
-
-        {/* 핵심 장점 */}
-        <section className="landing-section">
-          <h2 className="landing-section-title">왜 NeuroHub인가?</h2>
-          <p className="landing-section-subtitle">
-            의료 AI 워크플로우에 필요한 핵심 요소를 하나의 플랫폼에서 제공합니다.
-          </p>
-          <FeatureCards />
-        </section>
-
-        {/* 처리 과정 */}
-        <section className="landing-section">
-          <h2 className="landing-section-title">처리 과정</h2>
-          <p className="landing-section-subtitle">
-            요청 생성부터 최종 보고서까지, 5단계로 체계적으로 처리됩니다.
-          </p>
-          <WorkflowSteps />
-        </section>
-
-        {/* 대상 사용자 */}
-        <section className="landing-section">
-          <h2 className="landing-section-title">누구를 위한 플랫폼인가?</h2>
-          <p className="landing-section-subtitle">
-            역할에 따라 최적화된 경험을 제공합니다.
-          </p>
-          <AudienceCards />
-        </section>
-
-        {/* Visionary */}
-        <section className="landing-section">
-          <h2 className="landing-section-title">Visionary</h2>
-          <p className="landing-section-subtitle">
-            NeuroHub의 비전을 이끄는 연구자를 소개합니다.
-          </p>
-          <VisionarySection />
-        </section>
-
-        {/* 하단 CTA */}
-        <section className="footer-cta">
-          <h2 className="footer-cta-title">NeuroHub로 의료 AI 워크플로우를 시작하세요</h2>
-          <p className="footer-cta-subtitle">
-            안정적인 실행, 완전한 감사 추적, 비용 관리까지 — 지금 바로 경험해 보세요.
-          </p>
-          <div className="hero-actions">
-            <Link className="btn btn-primary" href="/register">
-              무료로 시작하기
-            </Link>
-            <Link className="btn btn-secondary" href="/login">
-              로그인
-            </Link>
-          </div>
-        </section>
-      </div>
-
-      {/* Copyright footer */}
-      <footer className="landing-footer">
-        <p className="landing-footer-text">
-          &copy; 2026 NeuroHub. All rights reserved.
-        </p>
-      </footer>
-    </div>
-  );
+  return <LandingPageContent />;
 }

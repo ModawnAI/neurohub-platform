@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Brain } from "phosphor-react";
 import { useAuth, getRoleHomePath } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 
 export default function LoginPage() {
+  const t = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -46,11 +48,11 @@ export default function LoginPage() {
           </div>
           <span className="auth-brand-text">NeuroHub</span>
         </div>
-        <p className="auth-subtitle">의료 AI 워크플로우 플랫폼에 로그인하세요</p>
+        <p className="auth-subtitle">{t("auth.loginSubtitle")}</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="field">
-            이메일
+            {t("auth.email")}
             <input
               className="input"
               type="email"
@@ -63,13 +65,13 @@ export default function LoginPage() {
           </label>
 
           <label className="field">
-            비밀번호
+            {t("auth.password")}
             <input
               className="input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t("auth.passwordPlaceholder")}
               required
               autoComplete="current-password"
             />
@@ -78,12 +80,12 @@ export default function LoginPage() {
           {error && <p className="error-text">{error}</p>}
 
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
-            {loading ? <span className="spinner" /> : "로그인"}
+            {loading ? <span className="spinner" /> : t("auth.login")}
           </button>
         </form>
 
         <p className="auth-footer">
-          계정이 없으신가요? <Link href="/register">회원가입</Link>
+          {t("auth.noAccount")} <Link href="/register">{t("auth.signUp")}</Link>
         </p>
       </div>
     </div>

@@ -15,6 +15,7 @@ import {
   type CaseFileRead,
 } from "@/lib/api";
 import { Timeline } from "@/components/timeline";
+import { useT } from "@/lib/i18n";
 
 const TRANSITIONS: Record<string, string[]> = {
   CREATED: ["RECEIVING"],
@@ -27,12 +28,6 @@ const TRANSITIONS: Record<string, string[]> = {
   EXPERT_REVIEW: ["FINAL", "REPORTING"],
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  CREATED: "생성됨", RECEIVING: "데이터 수신 중", STAGING: "검증 중",
-  READY_TO_COMPUTE: "분석 대기", COMPUTING: "분석 중", QC: "품질 검증",
-  REPORTING: "보고서 생성", EXPERT_REVIEW: "전문가 검토", FINAL: "완료",
-  FAILED: "실패", CANCELLED: "취소됨",
-};
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "—";
@@ -42,6 +37,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const { data: filesData, isLoading } = useQuery({
     queryKey: ["case-files", requestId, caseItem.id],
@@ -54,7 +50,7 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
       const { download_url } = await getDownloadUrl(requestId, caseItem.id, file.id);
       window.open(download_url, "_blank");
     } catch {
-      alert("다운로드에 실패했습니다.");
+      alert(t("adminRequests.errorDownloadFailed"));
     }
   };
 
@@ -67,12 +63,12 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
         style={{ background: "none", border: "none", cursor: "pointer", width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", fontSize: 14 }}
       >
         <span><strong>{caseItem.patient_ref}</strong> <span className="muted-text" style={{ fontSize: 12 }}>({caseItem.status})</span></span>
-        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? "접기" : "파일 보기"}</span>
+        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? t("common.collapse") : t("common.viewFiles")}</span>
       </button>
       {expanded && (
         <div style={{ paddingLeft: 16, marginTop: 8 }}>
           {isLoading ? <span className="spinner" /> : files.length === 0 ? (
-            <p className="muted-text" style={{ fontSize: 13 }}>파일 없음</p>
+            <p className="muted-text" style={{ fontSize: 13 }}>{t("common.noFiles")}</p>
           ) : (
             <div className="stack-sm">
               {files.map((file) => (
@@ -98,6 +94,7 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
 }
 
 export default function AdminRequestDetailPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -122,7 +119,7 @@ export default function AdminRequestDetailPage() {
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
-  if (!request) return <div className="banner banner-warning">요청을 찾을 수 없습니다.</div>;
+  if (!request) return <div className="banner banner-warning">{t("requestDetail.notFound")}</div>;
 
   const possibleTransitions = TRANSITIONS[request.status] || [];
   const serviceSnapshot = (request as any).service_snapshot;
@@ -131,37 +128,37 @@ export default function AdminRequestDetailPage() {
   return (
     <div className="stack-lg">
       <button className="back-link" onClick={() => router.push("/admin/requests")}>
-        <ArrowLeft size={16} /> 요청 목록으로
+        <ArrowLeft size={16} /> {t("adminRequests.backToList")}
       </button>
 
       <div className="page-header">
         <div>
-          <h1 className="page-title">요청 상세</h1>
+          <h1 className="page-title">{t("adminRequests.requestDetail")}</h1>
           <p className="page-subtitle">#{id.slice(0, 8)}</p>
         </div>
         <span className={`status-chip status-${request.status.toLowerCase()}`}>
-          {STATUS_LABELS[request.status] || request.status}
+          {t(`status.${request.status}` as any) || request.status}
         </span>
       </div>
 
       <div className="detail-grid">
         <div className="stack-md">
           <div className="panel">
-            <h2 className="panel-title-mb">요청 정보</h2>
+            <h2 className="panel-title-mb">{t("requestDetail.requestInfo")}</h2>
             <div className="stack-md">
-              <div><p className="detail-label">요청 ID</p><p className="detail-value" style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{request.id}</p></div>
-              <div><p className="detail-label">서비스</p><p className="detail-value">{serviceSnapshot?.display_name || "-"}</p></div>
-              <div><p className="detail-label">케이스 수</p><p className="detail-value">{request.case_count}건</p></div>
-              <div><p className="detail-label">우선순위</p><p className="detail-value">{request.priority}</p></div>
-              <div><p className="detail-label">생성일</p><p className="detail-value">{new Date(request.created_at).toLocaleString("ko-KR")}</p></div>
-              {request.updated_at && <div><p className="detail-label">최종 수정</p><p className="detail-value">{new Date(request.updated_at).toLocaleString("ko-KR")}</p></div>}
+              <div><p className="detail-label">{t("adminRequests.requestId")}</p><p className="detail-value" style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{request.id}</p></div>
+              <div><p className="detail-label">{t("requestDetail.service")}</p><p className="detail-value">{serviceSnapshot?.display_name || "-"}</p></div>
+              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}건</p></div>
+              <div><p className="detail-label">{t("adminRequests.priority")}</p><p className="detail-value">{request.priority}</p></div>
+              <div><p className="detail-label">{t("requestDetail.createdDate")}</p><p className="detail-value">{new Date(request.created_at).toLocaleString("ko-KR")}</p></div>
+              {request.updated_at && <div><p className="detail-label">{t("adminRequests.lastModified")}</p><p className="detail-value">{new Date(request.updated_at).toLocaleString("ko-KR")}</p></div>}
             </div>
           </div>
 
           {/* Case Files */}
           {cases.length > 0 && (
             <div className="panel">
-              <h2 className="panel-title-mb">케이스 및 파일</h2>
+              <h2 className="panel-title-mb">{t("requestDetail.casesAndFiles")}</h2>
               <div className="stack-sm">
                 {cases.map((c) => (
                   <AdminCaseFiles key={c.id} requestId={id} caseItem={c} />
@@ -172,7 +169,7 @@ export default function AdminRequestDetailPage() {
 
           {possibleTransitions.length > 0 && (
             <div className="panel">
-              <h2 className="panel-title-mb">상태 전이</h2>
+              <h2 className="panel-title-mb">{t("adminRequests.stateTransitions")}</h2>
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 {possibleTransitions.map((target) => (
                   <button
@@ -181,7 +178,7 @@ export default function AdminRequestDetailPage() {
                     onClick={() => transitionMut.mutate(target)}
                     disabled={transitionMut.isPending}
                   >
-                    → {STATUS_LABELS[target] || target}
+                    → {t(`status.${target}` as any) || target}
                   </button>
                 ))}
               </div>
@@ -192,7 +189,7 @@ export default function AdminRequestDetailPage() {
 
         <div>
           <div className="panel">
-            <h2 className="panel-title-mb">진행 상태</h2>
+            <h2 className="panel-title-mb">{t("requestDetail.progressStatus")}</h2>
             <Timeline currentStatus={request.status as RequestStatus} createdAt={request.created_at} updatedAt={request.updated_at ?? undefined} />
           </div>
         </div>

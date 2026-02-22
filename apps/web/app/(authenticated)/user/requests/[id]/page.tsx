@@ -15,13 +15,7 @@ import {
   type CaseFileRead,
 } from "@/lib/api";
 import { Timeline } from "@/components/timeline";
-
-const STATUS_LABELS: Record<RequestStatus, string> = {
-  CREATED: "생성됨", RECEIVING: "수신 중", STAGING: "준비 중",
-  READY_TO_COMPUTE: "분석 대기", COMPUTING: "분석 중", QC: "품질 검증",
-  REPORTING: "보고서 생성", EXPERT_REVIEW: "전문가 검토", FINAL: "완료",
-  FAILED: "실패", CANCELLED: "취소됨",
-};
+import { useT } from "@/lib/i18n";
 
 const CANCELLABLE: RequestStatus[] = ["CREATED", "RECEIVING", "STAGING", "READY_TO_COMPUTE"];
 
@@ -33,6 +27,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   const { data: filesData, isLoading } = useQuery({
@@ -46,7 +41,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
       const { download_url } = await getDownloadUrl(requestId, caseItem.id, file.id);
       window.open(download_url, "_blank");
     } catch {
-      alert("다운로드 URL을 가져올 수 없습니다.");
+      alert(t("requestDetail.errorDownloadUrl"));
     }
   };
 
@@ -66,7 +61,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
           <strong>케이스:</strong> {caseItem.patient_ref}{" "}
           <span className="muted-text" style={{ fontSize: 12 }}>({caseItem.status})</span>
         </span>
-        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? "접기" : "파일 보기"}</span>
+        <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? t("common.collapse") : t("common.viewFiles")}</span>
       </button>
 
       {expanded && (
@@ -74,7 +69,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
           {isLoading ? (
             <span className="spinner" />
           ) : files.length === 0 ? (
-            <p className="muted-text" style={{ fontSize: 13 }}>업로드된 파일이 없습니다.</p>
+            <p className="muted-text" style={{ fontSize: 13 }}>{t("requestDetail.noFilesUploaded")}</p>
           ) : (
             <div className="stack-sm">
               {files.map((file) => (
@@ -106,6 +101,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
 export default function UserRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
@@ -131,7 +127,7 @@ export default function UserRequestDetailPage() {
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
-  if (!request) return <div className="empty-state"><p className="empty-state-text">요청을 찾을 수 없습니다.</p></div>;
+  if (!request) return <div className="empty-state"><p className="empty-state-text">{t("requestDetail.notFound")}</p></div>;
 
   const serviceSnapshot = (request as any).service_snapshot;
   const canCancel = CANCELLABLE.includes(request.status);
@@ -140,50 +136,50 @@ export default function UserRequestDetailPage() {
   const handleViewReport = () => {
     // Reports are accessible through the request's report endpoint
     // For now, open the download flow for report files
-    alert("보고서 다운로드 기능이 곧 제공됩니다.");
+    alert(t("requestDetail.reportSoon"));
   };
 
   return (
     <div className="stack-lg">
       <button className="back-link" onClick={() => router.push("/user/requests")}>
-        <ArrowLeft size={16} /> 내 요청으로 돌아가기
+        <ArrowLeft size={16} /> {t("requestDetail.backToRequests")}
       </button>
 
       <div className="page-header">
         <div>
-          <h1 className="page-title">{serviceSnapshot?.display_name || "AI 분석 요청"}</h1>
+          <h1 className="page-title">{serviceSnapshot?.display_name || t("requestDetail.analysisRequest")}</h1>
           <p className="page-subtitle">요청 #{id.slice(0, 8)}</p>
         </div>
         <span className={`status-chip status-${request.status.toLowerCase()}`}>
-          {STATUS_LABELS[request.status]}
+          {t(`status.${request.status}`)}
         </span>
       </div>
 
       <div className="detail-grid">
         <div className="panel">
-          <h3 className="panel-title-mb">진행 상태</h3>
+          <h3 className="panel-title-mb">{t("requestDetail.progressStatus")}</h3>
           <Timeline currentStatus={request.status} createdAt={request.created_at} updatedAt={request.updated_at} />
         </div>
 
         <div className="stack-md">
           <div className="panel">
-            <h3 className="panel-title-mb">요청 정보</h3>
+            <h3 className="panel-title-mb">{t("requestDetail.requestInfo")}</h3>
             <div className="stack-md">
               <div>
-                <p className="detail-label">서비스</p>
+                <p className="detail-label">{t("requestDetail.service")}</p>
                 <p className="detail-value">{serviceSnapshot?.display_name || "-"}</p>
               </div>
               <div>
-                <p className="detail-label">케이스 수</p>
+                <p className="detail-label">{t("requestDetail.caseCount")}</p>
                 <p className="detail-value">{request.case_count}건</p>
               </div>
               <div>
-                <p className="detail-label">생성일</p>
+                <p className="detail-label">{t("requestDetail.createdDate")}</p>
                 <p className="detail-value">{new Date(request.created_at).toLocaleString("ko-KR")}</p>
               </div>
               {request.cancel_reason && (
                 <div>
-                  <p className="detail-label">취소 사유</p>
+                  <p className="detail-label">{t("requestDetail.cancelReason")}</p>
                   <p className="detail-value">{request.cancel_reason}</p>
                 </div>
               )}
@@ -193,7 +189,7 @@ export default function UserRequestDetailPage() {
           {/* Case Files Section */}
           {cases.length > 0 && (
             <div className="panel">
-              <h3 className="panel-title-mb">케이스 및 파일</h3>
+              <h3 className="panel-title-mb">{t("requestDetail.casesAndFiles")}</h3>
               <div className="stack-sm">
                 {cases.map((c) => (
                   <CaseFilesSection key={c.id} requestId={id} caseItem={c} />
@@ -204,37 +200,37 @@ export default function UserRequestDetailPage() {
 
           {request.status === "FINAL" && (
             <div className="panel" style={{ background: "var(--success-light)", borderColor: "#86efac" }}>
-              <h3 className="panel-title" style={{ marginBottom: 8, color: "var(--success)" }}>분석 완료</h3>
-              <p className="muted-text">AI 분석이 완료되었습니다. 보고서를 확인하세요.</p>
+              <h3 className="panel-title" style={{ marginBottom: 8, color: "var(--success)" }}>{t("requestDetail.analysisComplete")}</h3>
+              <p className="muted-text">{t("requestDetail.analysisCompleteMsg")}</p>
               <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleViewReport}>
-                <FileText size={16} /> 보고서 보기
+                <FileText size={16} /> {t("requestDetail.viewReport")}
               </button>
             </div>
           )}
 
           {canCancel && !showCancel && (
             <button className="btn btn-danger" onClick={() => setShowCancel(true)}>
-              요청 취소
+              {t("requestDetail.cancelRequest")}
             </button>
           )}
 
           {showCancel && (
             <div className="panel">
               <label className="field">
-                취소 사유
+                {t("requestDetail.cancelReasonLabel")}
                 <textarea
                   className="textarea"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="취소 사유를 입력하세요"
+                  placeholder={t("requestDetail.cancelReasonPlaceholder")}
                   rows={3}
                 />
               </label>
               <div className="action-row" style={{ marginTop: 12 }}>
                 <button className="btn btn-danger btn-sm" onClick={() => cancelMut.mutate()} disabled={cancelMut.isPending}>
-                  {cancelMut.isPending ? <span className="spinner" /> : "취소 확인"}
+                  {cancelMut.isPending ? <span className="spinner" /> : t("requestDetail.confirmCancel")}
                 </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => setShowCancel(false)}>닫기</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowCancel(false)}>{t("common.close")}</button>
               </div>
             </div>
           )}

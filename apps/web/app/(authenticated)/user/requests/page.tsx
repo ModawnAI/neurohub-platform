@@ -6,16 +6,10 @@ import { useRouter } from "next/navigation";
 import { listRequests, type RequestStatus } from "@/lib/api";
 import { RequestCard } from "@/components/request-card";
 import { CaretLeft, CaretRight } from "phosphor-react";
+import { useT } from "@/lib/i18n";
 
 type FilterTab = "all" | "in_progress" | "completed" | "failed";
 const PAGE_SIZE = 10;
-
-const FILTER_TABS: Array<{ key: FilterTab; label: string }> = [
-  { key: "all", label: "전체" },
-  { key: "in_progress", label: "진행 중" },
-  { key: "completed", label: "완료" },
-  { key: "failed", label: "실패/취소" },
-];
 
 function matchFilter(status: RequestStatus, filter: FilterTab): boolean {
   if (filter === "all") return true;
@@ -28,6 +22,7 @@ export default function UserRequestsPage() {
   const [filter, setFilter] = useState<FilterTab>("all");
   const [page, setPage] = useState(0);
   const router = useRouter();
+  const t = useT();
   const { data, isLoading } = useQuery({ queryKey: ["requests"], queryFn: listRequests });
 
   const allFiltered = (data?.items ?? []).filter((r) => matchFilter(r.status, filter));
@@ -43,16 +38,21 @@ export default function UserRequestsPage() {
     <div className="stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">내 요청</h1>
-          <p className="page-subtitle">제출한 AI 분석 요청 목록입니다</p>
+          <h1 className="page-title">{t("userRequests.title")}</h1>
+          <p className="page-subtitle">{t("userRequests.subtitle")}</p>
         </div>
         <button className="btn btn-primary" onClick={() => router.push("/user/new-request")}>
-          새 요청
+          {t("userRequests.newRequest")}
         </button>
       </div>
 
       <div className="filter-tabs">
-        {FILTER_TABS.map((tab) => (
+        {([
+          { key: "all" as FilterTab, label: t("userRequests.filterAll") },
+          { key: "in_progress" as FilterTab, label: t("userRequests.filterInProgress") },
+          { key: "completed" as FilterTab, label: t("userRequests.filterCompleted") },
+          { key: "failed" as FilterTab, label: t("userRequests.filterFailedCanceled") },
+        ]).map((tab) => (
           <button
             key={tab.key}
             className={`filter-tab ${filter === tab.key ? "active" : ""}`}
@@ -68,7 +68,7 @@ export default function UserRequestsPage() {
       ) : requests.length === 0 ? (
         <div className="empty-state">
           <p className="empty-state-text">
-            {filter === "all" ? "아직 요청이 없습니다." : "해당 상태의 요청이 없습니다."}
+            {filter === "all" ? t("userRequests.emptyAll") : t("userRequests.emptyFiltered")}
           </p>
         </div>
       ) : (
@@ -86,7 +86,7 @@ export default function UserRequestsPage() {
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
               >
-                <CaretLeft size={14} /> 이전
+                <CaretLeft size={14} /> {t("common.paginationPrev")}
               </button>
               <span className="pagination-info">{page + 1} / {totalPages}</span>
               <button
@@ -94,7 +94,7 @@ export default function UserRequestsPage() {
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
               >
-                다음 <CaretRight size={14} />
+                {t("common.paginationNext")} <CaretRight size={14} />
               </button>
             </div>
           )}

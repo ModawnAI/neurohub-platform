@@ -5,16 +5,18 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { createOrganization, joinOrganization, listOrgMembers, inviteMember, type MemberRead } from "@/lib/api";
 import { UserCircle, Copy, Check } from "phosphor-react";
-
-const ROLE_LABELS: Record<string, string> = {
-  PHYSICIAN: "의사",
-  TECHNICIAN: "기사",
-  REVIEWER: "리뷰어",
-  SYSTEM_ADMIN: "관리자",
-};
+import { useT } from "@/lib/i18n";
 
 export default function OrganizationSettingsPage() {
   const { user, refreshUser } = useAuth();
+  const t = useT();
+
+  const ROLE_LABELS: Record<string, string> = {
+    PHYSICIAN: t("userOrgSettings.rolePhysician"),
+    TECHNICIAN: t("userOrgSettings.roleTechnician"),
+    REVIEWER: t("userOrgSettings.roleReviewer"),
+    SYSTEM_ADMIN: t("userOrgSettings.roleAdmin"),
+  };
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<"view" | "create" | "join">("view");
   const [name, setName] = useState("");
@@ -45,11 +47,11 @@ export default function OrganizationSettingsPage() {
     setLoading(true);
     try {
       await createOrganization({ name, institution_type: "HOSPITAL", contact_email: contactEmail || undefined });
-      setSuccess("기관이 생성되었습니다.");
+      setSuccess(t("userOrgSettings.orgCreated"));
       setMode("view");
       await refreshUser();
     } catch (e: any) {
-      setError(e.message || "기관 생성에 실패했습니다.");
+      setError(e.message || t("userOrgSettings.errorCreateFailed"));
     } finally {
       setLoading(false);
     }
@@ -61,11 +63,11 @@ export default function OrganizationSettingsPage() {
     setLoading(true);
     try {
       await joinOrganization(inviteCode);
-      setSuccess("기관에 참여했습니다.");
+      setSuccess(t("userOrgSettings.orgJoined"));
       setMode("view");
       await refreshUser();
     } catch (e: any) {
-      setError(e.message || "참여에 실패했습니다.");
+      setError(e.message || t("userOrgSettings.errorJoinFailed"));
     } finally {
       setLoading(false);
     }
@@ -80,7 +82,7 @@ export default function OrganizationSettingsPage() {
       setInviteEmail("");
       queryClient.invalidateQueries({ queryKey: ["org-members", orgId] });
     } catch (e: any) {
-      setError(e.message || "초대에 실패했습니다.");
+      setError(e.message || t("userOrgSettings.errorInviteFailed"));
     } finally {
       setInviteLoading(false);
     }
@@ -95,14 +97,14 @@ export default function OrganizationSettingsPage() {
 
   return (
     <div className="stack-lg">
-      <h1 className="page-title">기관 설정</h1>
+      <h1 className="page-title">{t("userOrgSettings.title")}</h1>
 
       {error && <div className="banner banner-warning">{error}</div>}
       {success && <div className="banner banner-success">{success}</div>}
 
       {user?.institutionName && (
         <div className="panel">
-          <p className="detail-label">현재 소속 기관</p>
+          <p className="detail-label">{t("userOrgSettings.currentOrg")}</p>
           <p className="section-title" style={{ marginBottom: 0 }}>{user.institutionName}</p>
         </div>
       )}
@@ -110,7 +112,7 @@ export default function OrganizationSettingsPage() {
       {/* Member List */}
       {orgId && members && members.length > 0 && (
         <div className="panel">
-          <h2 className="panel-title-mb">구성원 ({members.length}명)</h2>
+          <h2 className="panel-title-mb">{t("userOrgSettings.membersCount").replace("{count}", String(members.length))}</h2>
           <div className="stack-sm">
             {members.map((m: MemberRead) => (
               <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
@@ -131,30 +133,30 @@ export default function OrganizationSettingsPage() {
       {/* Invite Member */}
       {orgId && (
         <div className="panel">
-          <h2 className="panel-title-mb">구성원 초대</h2>
+          <h2 className="panel-title-mb">{t("userOrgSettings.inviteMembers")}</h2>
           {inviteToken && (
             <div className="banner banner-success" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ flex: 1, wordBreak: "break-all", fontSize: 13 }}>초대 코드: <strong>{inviteToken}</strong></span>
+              <span style={{ flex: 1, wordBreak: "break-all", fontSize: 13 }}>{t("userOrgSettings.inviteCode").replace("{token}", inviteToken)}</span>
               <button className="btn btn-sm btn-secondary" onClick={handleCopy}>
-                {copied ? <><Check size={14} /> 복사됨</> : <><Copy size={14} /> 복사</>}
+                {copied ? <><Check size={14} /> {t("common.copied")}</> : <><Copy size={14} /> {t("common.copy")}</>}
               </button>
             </div>
           )}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "end" }}>
             <label className="field" style={{ flex: 1, minWidth: 200 }}>
-              이메일
+              {t("userOrgSettings.emailLabel")}
               <input className="input" type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="user@example.com" />
             </label>
             <label className="field" style={{ width: 140 }}>
-              역할
+              {t("userOrgSettings.roleLabel")}
               <select className="input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
-                <option value="PHYSICIAN">의사</option>
-                <option value="TECHNICIAN">기사</option>
-                <option value="REVIEWER">리뷰어</option>
+                <option value="PHYSICIAN">{t("userOrgSettings.rolePhysician")}</option>
+                <option value="TECHNICIAN">{t("userOrgSettings.roleTechnician")}</option>
+                <option value="REVIEWER">{t("userOrgSettings.roleReviewer")}</option>
               </select>
             </label>
             <button className="btn btn-primary" onClick={handleInvite} disabled={!inviteEmail.trim() || inviteLoading} style={{ height: 40 }}>
-              {inviteLoading ? "초대 중..." : "초대"}
+              {inviteLoading ? t("userOrgSettings.inviting") : t("userOrgSettings.invite")}
             </button>
           </div>
         </div>
@@ -164,15 +166,15 @@ export default function OrganizationSettingsPage() {
       {!orgId && mode === "view" && (
         <div className="grid-2">
           <button className="type-selector-card" onClick={() => setMode("create")}>
-            <p style={{ fontWeight: 600 }}>새 기관 만들기</p>
+            <p style={{ fontWeight: 600 }}>{t("userOrgSettings.createNewOrg")}</p>
             <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-              병원이나 의원을 새로 등록합니다.
+              {t("userOrgSettings.createNewOrgDesc")}
             </p>
           </button>
           <button className="type-selector-card" onClick={() => setMode("join")}>
-            <p style={{ fontWeight: 600 }}>초대 코드로 참여</p>
+            <p style={{ fontWeight: 600 }}>{t("userOrgSettings.joinByCode")}</p>
             <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-              기존 기관의 초대 코드를 입력합니다.
+              {t("userOrgSettings.joinByCodeDesc")}
             </p>
           </button>
         </div>
@@ -180,36 +182,36 @@ export default function OrganizationSettingsPage() {
 
       {mode === "create" && (
         <div className="panel" style={{ maxWidth: "min(480px, 100%)" }}>
-          <h2 className="section-title">새 기관 만들기</h2>
+          <h2 className="section-title">{t("userOrgSettings.createOrgTitle")}</h2>
           <label className="field">
-            기관명
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 서울대학교병원" />
+            {t("userOrgSettings.orgNameLabel")}
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("userOrgSettings.orgNamePlaceholder")} />
           </label>
           <label className="field">
-            연락처 이메일 (선택)
-            <input className="input" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="contact@hospital.kr" />
+            {t("userOrgSettings.contactEmailOptional")}
+            <input className="input" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder={t("userOrgSettings.contactEmailPlaceholder")} />
           </label>
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1rem" }}>
             <button className="btn btn-primary" onClick={handleCreate} disabled={!name.trim() || loading}>
-              {loading ? "생성 중..." : "기관 생성"}
+              {loading ? t("common.loading") : t("userOrgSettings.createOrgButton")}
             </button>
-            <button className="btn btn-secondary" onClick={() => setMode("view")}>취소</button>
+            <button className="btn btn-secondary" onClick={() => setMode("view")}>{t("common.cancel")}</button>
           </div>
         </div>
       )}
 
       {mode === "join" && (
         <div className="panel" style={{ maxWidth: "min(480px, 100%)" }}>
-          <h2 className="section-title">초대 코드로 참여</h2>
+          <h2 className="section-title">{t("userOrgSettings.joinOrgTitle")}</h2>
           <label className="field">
-            초대 코드
-            <input className="input" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="초대 코드를 입력하세요" />
+            {t("userOrgSettings.inviteCodeLabel")}
+            <input className="input" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder={t("userOrgSettings.inviteCodePlaceholder")} />
           </label>
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1rem" }}>
             <button className="btn btn-primary" onClick={handleJoin} disabled={!inviteCode.trim() || loading}>
-              {loading ? "참여 중..." : "참여하기"}
+              {loading ? t("common.loading") : t("userOrgSettings.joinOrgButton")}
             </button>
-            <button className="btn btn-secondary" onClick={() => setMode("view")}>취소</button>
+            <button className="btn btn-secondary" onClick={() => setMode("view")}>{t("common.cancel")}</button>
           </div>
         </div>
       )}

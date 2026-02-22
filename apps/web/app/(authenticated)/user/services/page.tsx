@@ -5,9 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { MagnifyingGlass, Cube, ArrowRight } from "phosphor-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useT } from "@/lib/i18n";
 
 export default function ServiceCatalogPage() {
   const router = useRouter();
+  const t = useT();
   const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["services"],
@@ -30,9 +32,9 @@ export default function ServiceCatalogPage() {
     <div className="page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">서비스 카탈로그</h1>
+          <h1 className="page-title">{t("serviceCatalog.title")}</h1>
           <p className="page-subtitle">
-            이용 가능한 AI 분석 서비스 목록입니다
+            {t("serviceCatalog.subtitle")}
           </p>
         </div>
       </header>
@@ -44,7 +46,7 @@ export default function ServiceCatalogPage() {
         />
         <input
           type="text"
-          placeholder="서비스 검색..."
+          placeholder={t("serviceCatalog.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="input"
@@ -53,11 +55,11 @@ export default function ServiceCatalogPage() {
       </div>
 
       {isLoading ? (
-        <p style={{ color: "var(--muted)" }}>불러오는 중...</p>
+        <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <Cube size={48} />
-          <p>이용 가능한 서비스가 없습니다</p>
+          <p>{t("serviceCatalog.noServices")}</p>
         </div>
       ) : (
         <div
@@ -98,18 +100,18 @@ export default function ServiceCatalogPage() {
                     color: "var(--success)",
                   }}
                 >
-                  활성
+                  {t("common.active")}
                 </span>
               </div>
 
               {svc.department && (
                 <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>
-                  부서: {svc.department}
+                  {t("serviceCatalog.department")} {svc.department}
                 </p>
               )}
 
               <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
-                등록일: {new Date(svc.created_at).toLocaleDateString("ko-KR")}
+                {t("serviceCatalog.createdDate")} {new Date(svc.created_at).toLocaleDateString("ko-KR")}
               </p>
 
               <button
@@ -117,7 +119,7 @@ export default function ServiceCatalogPage() {
                 style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                 onClick={() => router.push("/user/new-request")}
               >
-                분석 요청
+                {t("serviceCatalog.requestAnalysis")}
                 <ArrowRight size={16} />
               </button>
             </div>
