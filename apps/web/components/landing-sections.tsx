@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useT } from "@/lib/i18n";
+import { useLocale } from "@/lib/i18n";
 import {
   ShieldCheck,
   CurrencyKrw,
@@ -15,11 +16,15 @@ import {
   Brain,
   List,
   X,
+  Globe,
 } from "phosphor-react";
 
 export function LandingNav() {
   const t = useT();
+  const { locale, setLocale } = useLocale();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const toggleLocale = () => setLocale(locale === "ko" ? "en" : "ko");
 
   return (
     <nav className="lnav">
@@ -34,6 +39,14 @@ export function LandingNav() {
 
         {/* Desktop actions */}
         <div className="lnav-actions">
+          <button
+            onClick={toggleLocale}
+            className="lnav-lang-btn"
+            title={locale === "ko" ? t("sidebar.switchToEn") : t("sidebar.switchToKo")}
+          >
+            <Globe size={16} />
+            {locale === "ko" ? "EN" : "KO"}
+          </button>
           <Link href="/login" className="lnav-link">
             {t("landing.ctaLogin")}
           </Link>
@@ -57,6 +70,10 @@ export function LandingNav() {
       {menuOpen && (
         <div className="lnav-mobile">
           <div className="lnav-mobile-inner container">
+            <button onClick={toggleLocale} className="lnav-mobile-lang">
+              <Globe size={16} />
+              {locale === "ko" ? "English" : "한국어"}
+            </button>
             <Link href="/login" className="lnav-mobile-link" onClick={() => setMenuOpen(false)}>
               {t("landing.ctaLogin")}
             </Link>

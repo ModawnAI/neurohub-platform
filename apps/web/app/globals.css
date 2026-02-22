@@ -154,6 +154,26 @@ a {
   gap: 8px;
 }
 
+.lnav-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lnav-lang-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
 .lnav-link {
   padding: 8px 16px;
   font-size: 14px;
@@ -251,6 +271,26 @@ a {
 
 .lnav-mobile-cta:hover {
   background: var(--primary-hover);
+}
+
+.lnav-mobile-lang {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lnav-mobile-lang:hover {
+  background: var(--surface-3);
 }
 
 .nav-link {
@@ -1323,10 +1363,34 @@ a {
 /* ── Auth pages ── */
 
 .auth-page {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 100vh;
   padding: 24px;
+}
+
+.auth-lang-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.auth-lang-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .auth-card {

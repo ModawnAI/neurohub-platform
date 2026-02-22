@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Brain, EnvelopeSimple } from "phosphor-react";
+import { Brain, EnvelopeSimple, Globe } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { useT } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n";
 
 export default function RegisterPage() {
   const t = useT();
+  const { locale, setLocale } = useLocale();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -124,6 +125,13 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-page">
+      <button
+        onClick={() => setLocale(locale === "ko" ? "en" : "ko")}
+        className="auth-lang-btn"
+      >
+        <Globe size={16} />
+        {locale === "ko" ? "EN" : "KO"}
+      </button>
       <div className="auth-card">
         <div className="auth-brand">
           <div className="auth-brand-icon">

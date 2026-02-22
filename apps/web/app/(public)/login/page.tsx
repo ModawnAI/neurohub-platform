@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Brain } from "phosphor-react";
+import { Brain, Globe } from "phosphor-react";
 import { useAuth, getRoleHomePath } from "@/lib/auth";
-import { useT } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n";
 
 export default function LoginPage() {
   const t = useT();
+  const { locale, setLocale } = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -41,6 +42,13 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
+      <button
+        onClick={() => setLocale(locale === "ko" ? "en" : "ko")}
+        className="auth-lang-btn"
+      >
+        <Globe size={16} />
+        {locale === "ko" ? "EN" : "KO"}
+      </button>
       <div className="auth-card">
         <div className="auth-brand">
           <div className="auth-brand-icon">
