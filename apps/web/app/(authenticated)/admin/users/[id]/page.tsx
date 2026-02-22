@@ -6,12 +6,15 @@ import { getUser, approveExpert, rejectExpert } from "@/lib/api";
 import { UserTypeChip } from "@/components/user-type-chip";
 import { ArrowLeft } from "phosphor-react";
 import Link from "next/link";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 export default function AdminUserDetailPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["admin-user", id],
@@ -21,12 +24,20 @@ export default function AdminUserDetailPage() {
 
   const approveMut = useMutation({
     mutationFn: () => approveExpert(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-user", id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user", id] });
+      addToast("success", t("toast.approveSuccess"));
+    },
+    onError: () => addToast("error", t("toast.genericError")),
   });
 
   const rejectMut = useMutation({
     mutationFn: () => rejectExpert(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-user", id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-user", id] });
+      addToast("success", t("toast.rejectSuccess"));
+    },
+    onError: () => addToast("error", t("toast.genericError")),
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
@@ -57,8 +68,8 @@ export default function AdminUserDetailPage() {
               <div><p className="detail-label">{t("adminUsers.fieldOrg")}</p><p className="detail-value">{user.institution_name || "—"}</p></div>
               <div><p className="detail-label">{t("adminUsers.fieldActiveStatus")}</p><p className="detail-value">{user.is_active ? t("common.active") : t("common.inactive")}</p></div>
               <div><p className="detail-label">{t("adminUsers.fieldOnboarding")}</p><p className="detail-value">{user.onboarding_completed ? t("common.completed") : t("common.incomplete")}</p></div>
-              <div><p className="detail-label">{t("adminUsers.tableSignupDate")}</p><p className="detail-value">{user.created_at ? new Date(user.created_at).toLocaleString("ko-KR") : "—"}</p></div>
-              {user.last_login_at && <div><p className="detail-label">{t("adminUsers.fieldLastLogin")}</p><p className="detail-value">{new Date(user.last_login_at).toLocaleString("ko-KR")}</p></div>}
+              <div><p className="detail-label">{t("adminUsers.tableSignupDate")}</p><p className="detail-value">{user.created_at ? new Date(user.created_at).toLocaleString(dateLocale) : "—"}</p></div>
+              {user.last_login_at && <div><p className="detail-label">{t("adminUsers.fieldLastLogin")}</p><p className="detail-value">{new Date(user.last_login_at).toLocaleString(dateLocale)}</p></div>}
             </div>
           </div>
 
@@ -77,10 +88,10 @@ export default function AdminUserDetailPage() {
 
               {user.expert_status === "PENDING_APPROVAL" && (
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1.5rem" }}>
-                  <button className="btn btn-primary" onClick={() => approveMut.mutate()} disabled={actionPending}>
+                  <button className="btn btn-primary" onClick={() => { if (confirm(t("confirmDialog.approveExpertTitle"))) approveMut.mutate(); }} disabled={actionPending}>
                     {approveMut.isPending ? t("common.loading") : t("adminUsers.approveExpert")}
                   </button>
-                  <button className="btn btn-danger" onClick={() => rejectMut.mutate()} disabled={actionPending}>
+                  <button className="btn btn-danger" onClick={() => { if (confirm(t("confirmDialog.rejectExpertTitle"))) rejectMut.mutate(); }} disabled={actionPending}>
                     {rejectMut.isPending ? t("common.loading") : t("adminUsers.rejectExpert")}
                   </button>
                 </div>

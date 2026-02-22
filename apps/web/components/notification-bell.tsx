@@ -3,15 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, CheckCircle } from "phosphor-react";
 import { useNotifications } from "@/lib/use-notifications";
-import { useT, useLocale } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 import type { NotificationRead } from "@/lib/api";
 
 export function NotificationBell() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const t = useT();
-  const { locale } = useLocale();
+  const { t, locale } = useTranslation();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

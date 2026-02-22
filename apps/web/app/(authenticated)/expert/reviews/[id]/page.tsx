@@ -14,7 +14,8 @@ import {
 } from "@/lib/api";
 import { useZodForm } from "@/lib/use-zod-form";
 import { qcDecisionSchema, reportReviewSchema, type QCDecisionValues, type ReportReviewValues } from "@/lib/schemas";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "—";
@@ -24,7 +25,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { id: string; patient_ref: string; status: string } }) {
-  const t = useT();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const { data: filesData, isLoading } = useQuery({
@@ -77,7 +78,7 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
                     <p className="file-info-card-meta">{file.slot} &middot; {formatBytes(file.size_bytes)}</p>
                   </div>
                   {file.status === "COMPLETED" && (
-                    <button className="btn btn-sm btn-secondary" onClick={() => handleDownload(file)} title="다운로드">
+                    <button className="btn btn-sm btn-secondary" onClick={() => handleDownload(file)} title={t("requestDetail.download")}>
                       <DownloadSimple size={14} />
                     </button>
                   )}
@@ -92,10 +93,11 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
 }
 
 export default function ExpertReviewDetailPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   const qcForm = useZodForm<QCDecisionValues>(qcDecisionSchema, {
     decision: "APPROVE",
@@ -126,8 +128,10 @@ export default function ExpertReviewDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["review-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["review-queue"] });
+      addToast("success", t("toast.transitionSuccess"));
       router.push("/expert/reviews");
     },
+    onError: () => addToast("error", t("toast.genericError")),
   });
 
   const reportMut = useMutation({
@@ -142,8 +146,10 @@ export default function ExpertReviewDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["review-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["review-queue"] });
+      addToast("success", t("toast.transitionSuccess"));
       router.push("/expert/reviews");
     },
+    onError: () => addToast("error", t("toast.genericError")),
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
@@ -163,7 +169,7 @@ export default function ExpertReviewDetailPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{serviceSnapshot?.display_name || t("expertReviewDetail.defaultServiceName")}</h1>
-          <p className="page-subtitle">요청 #{id.slice(0, 8)}</p>
+          <p className="page-subtitle">{t("requestDetail.requestNumber")}{id.slice(0, 8)}</p>
         </div>
         <span className={`status-chip status-${request.status.toLowerCase()}`}>
           {isQC ? t("status.QC") : t("status.EXPERT_REVIEW")}
@@ -176,7 +182,7 @@ export default function ExpertReviewDetailPage() {
         <div className="grid-3">
           <div>
             <p className="detail-label">{t("expertReviewDetail.caseCount")}</p>
-            <p className="detail-value">{request.case_count}건</p>
+            <p className="detail-value">{request.case_count}{locale === "ko" ? "건" : ` ${request.case_count === 1 ? "case" : "cases"}`}</p>
           </div>
           <div>
             <p className="detail-label">{t("expertReviewDetail.priority")}</p>
@@ -184,7 +190,7 @@ export default function ExpertReviewDetailPage() {
           </div>
           <div>
             <p className="detail-label">{t("expertReviewDetail.createdDate")}</p>
-            <p className="detail-value">{new Date(request.created_at).toLocaleDateString("ko-KR")}</p>
+            <p className="detail-value">{new Date(request.created_at).toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US")}</p>
           </div>
         </div>
       </div>
@@ -227,7 +233,7 @@ export default function ExpertReviewDetailPage() {
           <div className="stack-sm">
             {reports.map((report: any, i: number) => (
               <div key={report.id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}>
-                <span>보고서 #{i + 1} — {report.report_type || "일반"}</span>
+                <span>{t("expertReviewDetail.reports")} #{i + 1} — {report.report_type || (locale === "ko" ? "일반" : "General")}</span>
                 <span className={`status-chip status-${(report.status || "").toLowerCase()}`}>{report.status}</span>
               </div>
             ))}
@@ -247,7 +253,7 @@ export default function ExpertReviewDetailPage() {
                     {qc.decision === "APPROVE" ? t("expertReviewDetail.decisionApprove") : qc.decision === "REJECT" ? t("expertReviewDetail.decisionReject") : t("expertReviewDetail.decisionRerun")}
                   </p>
                   {qc.comments && <p className="muted-text" style={{ fontSize: 12, margin: "4px 0 0" }}>{qc.comments}</p>}
-                  {qc.created_at && <p className="muted-text" style={{ fontSize: 11, margin: "2px 0 0" }}>{new Date(qc.created_at).toLocaleString("ko-KR")}</p>}
+                  {qc.created_at && <p className="muted-text" style={{ fontSize: 11, margin: "2px 0 0" }}>{new Date(qc.created_at).toLocaleString(locale === "ko" ? "ko-KR" : "en-US")}</p>}
                 </div>
               </div>
             ))}
@@ -284,6 +290,20 @@ export default function ExpertReviewDetailPage() {
           </div>
 
           <div className="stack-md" style={{ marginTop: 16 }}>
+            <label className="field">
+              {t("qcScore.label")}
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={100}
+                value={qcForm.values.qc_score ?? ""}
+                onChange={(e) => qcForm.setField("qc_score", e.target.value ? Number(e.target.value) : undefined)}
+                placeholder={t("qcScore.placeholder")}
+                style={{ maxWidth: 160 }}
+              />
+              {qcForm.errors.qc_score && <span className="error-text">{qcForm.errors.qc_score}</span>}
+            </label>
             <label className="field">
               {t("expertReviewDetail.comments")}
               <textarea

@@ -11,10 +11,10 @@ import {
   type MemberRead,
 } from "@/lib/api";
 import { X, UserCircle, Copy, Check } from "phosphor-react";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 function OrgDetailPanel({ org, onClose }: { org: OrgRead; onClose: () => void }) {
-  const t = useT();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("PHYSICIAN");
@@ -152,7 +152,8 @@ function OrgDetailPanel({ org, onClose }: { org: OrgRead; onClose: () => void })
 }
 
 export default function AdminOrganizationsPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [selectedOrg, setSelectedOrg] = useState<OrgRead | null>(null);
   const { data, isLoading } = useQuery({ queryKey: ["admin-orgs"], queryFn: listOrganizations });
   const orgs = data?.items ?? [];
@@ -192,7 +193,7 @@ export default function AdminOrganizationsPage() {
                     <td>{org.institution_type === "HOSPITAL" ? t("adminOrgs.typeHospital") : org.institution_type === "CLINIC" ? t("adminOrgs.typeClinic") : org.institution_type === "INDIVIDUAL" ? t("adminOrgs.typeIndividual") : org.institution_type}</td>
                     <td>{t("adminOrgs.memberCountFormat").replace("{count}", String(org.member_count))}</td>
                     <td><span className={`status-chip ${org.status === "ACTIVE" ? "status-final" : "status-cancelled"}`}>{org.status === "ACTIVE" ? t("common.active") : t("common.inactive")}</span></td>
-                    <td>{org.created_at ? new Date(org.created_at).toLocaleDateString("ko-KR") : "-"}</td>
+                    <td>{org.created_at ? new Date(org.created_at).toLocaleDateString(dateLocale) : "-"}</td>
                   </tr>
                 ))}
                 {orgs.length === 0 && (

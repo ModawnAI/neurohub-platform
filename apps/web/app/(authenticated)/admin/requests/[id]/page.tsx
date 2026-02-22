@@ -15,7 +15,8 @@ import {
   type CaseFileRead,
 } from "@/lib/api";
 import { Timeline } from "@/components/timeline";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 const TRANSITIONS: Record<string, string[]> = {
   CREATED: ["RECEIVING"],
@@ -37,7 +38,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
-  const t = useT();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const { data: filesData, isLoading } = useQuery({
     queryKey: ["case-files", requestId, caseItem.id],
@@ -79,7 +80,7 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
                     <p className="file-info-card-meta">{file.slot} &middot; {formatBytes(file.size_bytes)}</p>
                   </div>
                   {file.status === "COMPLETED" && (
-                    <button className="btn btn-sm btn-secondary" onClick={() => handleDownload(file)} title="다운로드">
+                    <button className="btn btn-sm btn-secondary" onClick={() => handleDownload(file)} title={t("common.download")}>
                       <DownloadSimple size={14} />
                     </button>
                   )}
@@ -94,10 +95,12 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
 }
 
 export default function AdminRequestDetailPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   const { data: request, isLoading } = useQuery({
     queryKey: ["admin-request", id],
@@ -115,7 +118,9 @@ export default function AdminRequestDetailPage() {
     mutationFn: (targetStatus: string) => advanceRequest(id, targetStatus),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-request", id] });
+      addToast("success", t("toast.transitionSuccess"));
     },
+    onError: () => addToast("error", t("toast.transitionError")),
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
@@ -148,10 +153,10 @@ export default function AdminRequestDetailPage() {
             <div className="stack-md">
               <div><p className="detail-label">{t("adminRequests.requestId")}</p><p className="detail-value" style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{request.id}</p></div>
               <div><p className="detail-label">{t("requestDetail.service")}</p><p className="detail-value">{serviceSnapshot?.display_name || "-"}</p></div>
-              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}건</p></div>
+              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}{t("common.unitCount")}</p></div>
               <div><p className="detail-label">{t("adminRequests.priority")}</p><p className="detail-value">{request.priority}</p></div>
-              <div><p className="detail-label">{t("requestDetail.createdDate")}</p><p className="detail-value">{new Date(request.created_at).toLocaleString("ko-KR")}</p></div>
-              {request.updated_at && <div><p className="detail-label">{t("adminRequests.lastModified")}</p><p className="detail-value">{new Date(request.updated_at).toLocaleString("ko-KR")}</p></div>}
+              <div><p className="detail-label">{t("requestDetail.createdDate")}</p><p className="detail-value">{new Date(request.created_at).toLocaleString(dateLocale)}</p></div>
+              {request.updated_at && <div><p className="detail-label">{t("adminRequests.lastModified")}</p><p className="detail-value">{new Date(request.updated_at).toLocaleString(dateLocale)}</p></div>}
             </div>
           </div>
 

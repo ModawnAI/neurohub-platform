@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DbSession, require_roles
+from app.services.notification_service import create_notification
 from app.models.qc_decision import QCDecision
 from app.models.report import Report, ReportReview
 from app.models.request import Case, Request
@@ -236,6 +237,21 @@ async def submit_qc_decision(
     elif body.decision == "RERUN":
         req.status = "COMPUTING"
 
+    # Notify the request owner about the QC decision
+    decision_labels = {"APPROVE": "승인", "REJECT": "거절", "RERUN": "재분석"}
+    if req.requested_by:
+        await create_notification(
+            db,
+            institution_id=req.institution_id,
+            user_id=req.requested_by,
+            event_type=f"QC_{body.decision}",
+            title=f"QC 결정: {decision_labels.get(body.decision, body.decision)}",
+            body=body.comments,
+            entity_type="request",
+            entity_id=req.id,
+            metadata={"status": req.status, "decision": body.decision},
+        )
+
     await db.flush()
     return {"status": req.status, "decision": body.decision}
 
@@ -282,6 +298,21 @@ async def submit_report_review(
         req.status = to_state.value
     elif body.decision == "REVISION_NEEDED":
         req.status = "COMPUTING"
+
+    # Notify the request owner about the report review
+    review_labels = {"APPROVE": "최종 승인", "REVISION_NEEDED": "수정 필요"}
+    if req.requested_by:
+        await create_notification(
+            db,
+            institution_id=req.institution_id,
+            user_id=req.requested_by,
+            event_type=f"REPORT_REVIEW_{body.decision}",
+            title=f"보고서 검토: {review_labels.get(body.decision, body.decision)}",
+            body=body.comments,
+            entity_type="request",
+            entity_id=req.id,
+            metadata={"status": req.status, "decision": body.decision},
+        )
 
     await db.flush()
     return {"status": req.status, "decision": body.decision}

@@ -1,6 +1,15 @@
 import { supabase } from "@/lib/supabase";
+import { t as translate, type Locale } from "@/lib/i18n";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
+
+function getLocale(): Locale {
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem("neurohub-locale");
+    if (stored === "ko" || stored === "en") return stored;
+  }
+  return "ko";
+}
 
 // ── Typed API Error ──
 
@@ -114,18 +123,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       detail = "";
     }
 
+    const locale = getLocale();
     if (response.status === 409 && errorCode === "IDEMPOTENCY_CONFLICT") {
-      throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "동일한 요청 키로 다른 내용이 전송되었습니다.", detail);
+      throw new ApiError(409, "IDEMPOTENCY_CONFLICT", translate("apiError.idempotencyConflict", locale), detail);
     }
     if (response.status === 409) {
-      throw new ApiError(409, "CONFLICT", detail || "상태 충돌이 발생했습니다. 현재 상태를 확인해 주세요.", detail);
+      throw new ApiError(409, "CONFLICT", detail || translate("apiError.statusConflict", locale), detail);
     }
     if (response.status === 401) {
       if (typeof window !== "undefined") window.location.href = "/login";
-      throw new ApiError(401, "UNAUTHORIZED", "인증이 필요합니다.", detail);
+      throw new ApiError(401, "UNAUTHORIZED", translate("apiError.unauthorized", locale), detail);
     }
     if (response.status === 403) {
-      throw new ApiError(403, "FORBIDDEN", "접근 권한이 없습니다.", detail);
+      throw new ApiError(403, "FORBIDDEN", translate("apiError.forbidden", locale), detail);
     }
 
     const message = detail || `API ${response.status}: ${response.statusText}`;
@@ -166,7 +176,7 @@ export async function transitionRequest(requestId: string, targetStatus: Request
 export async function confirmRequest(requestId: string) {
   return apiFetch<RequestRead>(`/requests/${requestId}/confirm`, {
     method: "POST",
-    body: JSON.stringify({ confirm_note: "웹에서 확인 완료" }),
+    body: JSON.stringify({ confirm_note: translate("apiError.confirmedFromWeb", getLocale()) }),
   });
 }
 

@@ -6,10 +6,20 @@ import { ClockCounterClockwise, CheckCircle, CalendarBlank } from "phosphor-reac
 import { listReviewQueue } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { MetricCard } from "@/components/metric-card";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+
+function getWeekStart(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(diff);
+  return monday;
+}
 
 export default function ExpertDashboard() {
-  const t = useT();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
   const { data: queueData } = useQuery({ queryKey: ["review-queue"], queryFn: () => listReviewQueue() });
@@ -17,6 +27,15 @@ export default function ExpertDashboard() {
 
   const pendingCount = queueData?.total ?? 0;
   const completedCount = completedData?.total ?? 0;
+
+  const thisWeekCount = (() => {
+    const weekStart = getWeekStart();
+    const items = completedData?.items ?? [];
+    return items.filter((item) => {
+      const updated = item.updated_at ? new Date(item.updated_at) : null;
+      return updated && updated >= weekStart;
+    }).length;
+  })();
 
   return (
     <div className="stack-lg">
@@ -43,7 +62,7 @@ export default function ExpertDashboard() {
         <MetricCard
           icon={<CalendarBlank size={20} />}
           label={t("expertDashboard.thisWeekReviews")}
-          value={0}
+          value={thisWeekCount}
           iconBg="var(--primary-light)"
           iconColor="var(--primary)"
         />

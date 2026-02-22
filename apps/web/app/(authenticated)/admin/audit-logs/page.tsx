@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listAuditLogs, type AuditLogRead } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AdminAuditLogsPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [action, setAction] = useState("");
   const [entityType, setEntityType] = useState("");
   const [page, setPage] = useState(0);
@@ -54,7 +55,7 @@ export default function AdminAuditLogsPage() {
             style={{ width: 200 }}
           />
           <span className="muted-text" style={{ fontSize: 12 }}>
-            {t("common.total")} {total}건
+            {t("common.total")} {total}{t("common.unitCount")}
           </span>
         </div>
       </div>
@@ -78,7 +79,7 @@ export default function AdminAuditLogsPage() {
                 {logs.map((log: AuditLogRead) => (
                   <tr key={log.id}>
                     <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-                      {new Date(log.created_at).toLocaleString("ko-KR")}
+                      {new Date(log.created_at).toLocaleString(dateLocale)}
                     </td>
                     <td><span className="status-chip status-computing">{log.action}</span></td>
                     <td>{log.entity_type}</td>

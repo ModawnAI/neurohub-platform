@@ -5,13 +5,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { listUsers, approveExpert, rejectExpert, type UserRead } from "@/lib/api";
 import { CaretLeft, CaretRight } from "phosphor-react";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 type FilterTab = "all" | "SERVICE_USER" | "EXPERT" | "ADMIN" | "PENDING";
 const PAGE_SIZE = 20;
 
 export default function AdminUsersPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [filter, setFilter] = useState<FilterTab>("all");
   const [page, setPage] = useState(0);
   const router = useRouter();
@@ -114,7 +115,7 @@ export default function AdminUsersPage() {
                       {!u.is_active && <span className="status-chip status-cancelled">{t("common.inactive")}</span>}
                     </td>
                     <td>{u.institution_name || "-"}</td>
-                    <td>{u.created_at ? new Date(u.created_at).toLocaleDateString("ko-KR") : "-"}</td>
+                    <td>{u.created_at ? new Date(u.created_at).toLocaleDateString(dateLocale) : "-"}</td>
                     <td>
                       <div className="action-row" onClick={(e) => e.stopPropagation()}>
                         {u.user_type === "EXPERT" && u.expert_status === "PENDING_APPROVAL" && (

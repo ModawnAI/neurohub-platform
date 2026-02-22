@@ -5,11 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { MagnifyingGlass, Cube, ArrowRight } from "phosphor-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 export default function ServiceCatalogPage() {
   const router = useRouter();
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["services"],
@@ -111,7 +112,7 @@ export default function ServiceCatalogPage() {
               )}
 
               <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
-                {t("serviceCatalog.createdDate")} {new Date(svc.created_at).toLocaleDateString("ko-KR")}
+                {t("serviceCatalog.createdDate")} {new Date(svc.created_at).toLocaleDateString(dateLocale)}
               </p>
 
               <button

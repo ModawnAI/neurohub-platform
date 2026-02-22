@@ -6,11 +6,14 @@ import { Key, Copy, Check, Trash } from "phosphor-react";
 import { listApiKeys, createApiKey, revokeApiKey, type ApiKeyRead } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 export default function AdminApiKeysPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const { user } = useAuth();
+  const { addToast } = useToast();
   const queryClient = useQueryClient();
   const orgId = user?.institutionId;
 
@@ -37,7 +40,11 @@ export default function AdminApiKeysPage() {
 
   const revokeMut = useMutation({
     mutationFn: (keyId: string) => revokeApiKey(orgId!, keyId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-keys", orgId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-keys", orgId] });
+      addToast("success", t("toast.revokeSuccess"));
+    },
+    onError: () => addToast("error", t("toast.genericError")),
   });
 
   function handleCopy() {
@@ -137,14 +144,14 @@ export default function AdminApiKeysPage() {
                         {k.status === "ACTIVE" ? t("common.active") : t("adminApiKeys.revoked")}
                       </span>
                     </td>
-                    <td>{k.expires_at ? new Date(k.expires_at).toLocaleDateString("ko-KR") : "-"}</td>
-                    <td>{k.last_used_at ? new Date(k.last_used_at).toLocaleString("ko-KR") : "-"}</td>
-                    <td>{new Date(k.created_at).toLocaleDateString("ko-KR")}</td>
+                    <td>{k.expires_at ? new Date(k.expires_at).toLocaleDateString(dateLocale) : "-"}</td>
+                    <td>{k.last_used_at ? new Date(k.last_used_at).toLocaleString(dateLocale) : "-"}</td>
+                    <td>{new Date(k.created_at).toLocaleDateString(dateLocale)}</td>
                     <td>
                       {k.status === "ACTIVE" && (
                         <button
                           className="btn btn-danger btn-sm"
-                          onClick={() => revokeMut.mutate(k.id)}
+                          onClick={() => { if (confirm(t("confirmDialog.revokeKeyTitle"))) revokeMut.mutate(k.id); }}
                           disabled={revokeMut.isPending}
                         >
                           <Trash size={14} /> {t("common.revoke")}

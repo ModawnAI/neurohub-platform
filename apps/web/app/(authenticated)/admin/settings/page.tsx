@@ -4,24 +4,25 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { getUsage, getAdminStats, type UsageEntry } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
-function getMonthRange(monthsAgo = 0) {
+function getMonthRange(monthsAgo = 0, dateLocale = "ko-KR") {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
   const end = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 0);
   return {
     start: start.toISOString().split("T")[0]!,
     end: end.toISOString().split("T")[0]!,
-    label: start.toLocaleDateString("ko-KR", { year: "numeric", month: "long" }),
+    label: start.toLocaleDateString(dateLocale, { year: "numeric", month: "long" }),
   };
 }
 
 export default function AdminSettingsPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const { user } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(0);
-  const monthRange = getMonthRange(selectedMonth);
+  const monthRange = getMonthRange(selectedMonth, dateLocale);
 
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
@@ -72,19 +73,19 @@ export default function AdminSettingsPage() {
             <>
               <div>
                 <p className="detail-label">{t("adminSettings.totalRequests")}</p>
-                <p className="detail-value">{stats.total_requests}건</p>
+                <p className="detail-value">{stats.total_requests}{t("common.unitCount")}</p>
               </div>
               <div>
                 <p className="detail-label">{t("adminSettings.activeUsers")}</p>
-                <p className="detail-value">{stats.active_users}명</p>
+                <p className="detail-value">{stats.active_users}{t("common.unitPeople")}</p>
               </div>
               <div>
                 <p className="detail-label">{t("adminSettings.registeredServices")}</p>
-                <p className="detail-value">{stats.total_services}개</p>
+                <p className="detail-value">{stats.total_services}{t("common.unitItems")}</p>
               </div>
               <div>
                 <p className="detail-label">{t("adminSettings.registeredOrgs")}</p>
-                <p className="detail-value">{stats.total_organizations}개</p>
+                <p className="detail-value">{stats.total_organizations}{t("common.unitItems")}</p>
               </div>
             </>
           )}
@@ -96,7 +97,7 @@ export default function AdminSettingsPage() {
           <h2 className="panel-title" style={{ margin: 0 }}>{t("adminSettings.usage")}</h2>
           <div style={{ display: "flex", gap: 8 }}>
             {[0, 1, 2].map((m) => {
-              const mr = getMonthRange(m);
+              const mr = getMonthRange(m, dateLocale);
               return (
                 <button
                   key={m}
@@ -130,8 +131,8 @@ export default function AdminSettingsPage() {
                   <tr key={i}>
                     <td>{item.service_name}</td>
                     <td>{item.charge_type}</td>
-                    <td>{item.count}건</td>
-                    <td style={{ fontWeight: 600 }}>{t("adminSettings.currencyFormat").replace("{amount}", item.total_amount.toLocaleString("ko-KR"))}</td>
+                    <td>{item.count}{t("common.unitCount")}</td>
+                    <td style={{ fontWeight: 600 }}>{t("adminSettings.currencyFormat").replace("{amount}", item.total_amount.toLocaleString(dateLocale))}</td>
                   </tr>
                 ))}
               </tbody>

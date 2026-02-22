@@ -8,6 +8,7 @@ to the appropriate Celery queues. Also performs:
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, select
@@ -18,6 +19,8 @@ from app.models.billing import UsageLedger
 from app.models.outbox import MAX_RETRIES, OutboxEvent
 from app.models.request import Request
 from app.models.run import Run
+from app.models.webhook import Webhook
+from app.services.webhook_service import WebhookDelivery, build_webhook_payload
 from app.worker.celery_app import celery_app
 
 logger = logging.getLogger("neurohub.reconciler")
@@ -78,6 +81,53 @@ def _dispatch(event: OutboxEvent) -> None:
         logger.warning("Unknown event type %s (id=%s), marking as processed", event.event_type, event.id)
 
 
+async def _deliver_webhooks(event: OutboxEvent) -> None:
+    """Deliver webhook notifications for an outbox event to matching subscriptions."""
+    institution_id = None
+    if event.payload:
+        request_id = event.payload.get("request_id")
+        if request_id:
+            async with async_session_factory() as session:
+                req = await session.execute(
+                    select(Request).where(Request.id == uuid.UUID(request_id))
+                )
+                request = req.scalar_one_or_none()
+                if request:
+                    institution_id = request.institution_id
+
+    if not institution_id:
+        return
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(Webhook).where(
+                Webhook.institution_id == institution_id,
+                Webhook.status == "ACTIVE",
+            )
+        )
+        webhooks = result.scalars().all()
+
+        for wh in webhooks:
+            # Check if this webhook subscribes to this event type
+            subscribed_events = wh.events or []
+            if subscribed_events and event.event_type not in subscribed_events:
+                continue
+
+            payload = build_webhook_payload(event.event_type, event.payload or {})
+            delivery = WebhookDelivery(
+                webhook_url=wh.url,
+                payload=payload,
+                secret=wh.secret_hash,
+            )
+            success = delivery.deliver()
+            if success:
+                wh.last_delivered_at = datetime.now(timezone.utc)
+                wh.failure_count = 0
+            else:
+                wh.failure_count = (wh.failure_count or 0) + 1
+            await session.commit()
+
+
 # ---------------------------------------------------------------------------
 # Core outbox reconciler loop
 # ---------------------------------------------------------------------------
@@ -104,6 +154,11 @@ async def run_once() -> int:
                 event.status = "PROCESSED"
                 event.processed_at = datetime.now(timezone.utc)
                 dispatched += 1
+                # Deliver webhooks for this event (non-blocking best-effort)
+                try:
+                    await _deliver_webhooks(event)
+                except Exception as wh_exc:
+                    logger.warning("Webhook delivery failed for event %s: %s", event.id, wh_exc)
             except Exception as exc:
                 event.retry_count += 1
                 event.error_detail = str(exc)[:2000]

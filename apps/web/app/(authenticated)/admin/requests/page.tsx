@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { listAllRequests, transitionRequest, confirmRequest, submitRequest, type RequestStatus } from "@/lib/api";
 import { CaretLeft, CaretRight } from "phosphor-react";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 const PAGE_SIZE = 20;
 
@@ -17,7 +17,8 @@ const NEXT_STATUS: Partial<Record<RequestStatus, { target: RequestStatus; labelK
 };
 
 export default function AdminRequestsPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const router = useRouter();
@@ -99,7 +100,7 @@ export default function AdminRequestsPage() {
                       <td>{snapshot?.display_name || "-"}</td>
                       <td><span className={`status-chip status-${req.status.toLowerCase()}`}>{t(`status.${req.status}` as any)}</span></td>
                       <td>{req.case_count}</td>
-                      <td>{new Date(req.created_at).toLocaleDateString("ko-KR")}</td>
+                      <td>{new Date(req.created_at).toLocaleDateString(dateLocale)}</td>
                       <td>
                         <div className="action-row" onClick={(e) => e.stopPropagation()}>
                           {next && (

@@ -12,11 +12,38 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.database import sync_session_factory
+from app.models.notification import Notification
 from app.models.outbox import OutboxEvent
 from app.models.report import Report
 from app.models.request import Request
 from app.models.run import Run, RunStep
 from app.worker.celery_app import celery_app
+
+
+def _create_sync_notification(
+    session,
+    institution_id,
+    user_id,
+    event_type: str,
+    title: str,
+    body: str | None = None,
+    entity_type: str | None = None,
+    entity_id=None,
+    metadata: dict | None = None,
+) -> None:
+    """Create a notification in sync session context (for Celery tasks)."""
+    if not user_id:
+        return
+    session.add(Notification(
+        institution_id=institution_id,
+        user_id=user_id,
+        event_type=event_type,
+        title=title,
+        body=body,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        metadata_=metadata or {},
+    ))
 
 logger = logging.getLogger("neurohub.worker")
 
@@ -165,6 +192,17 @@ def execute_run(self, run_id: str):
                         aggregate_id=request_id,
                         payload={"request_id": str(request_id)},
                     ))
+                    _create_sync_notification(
+                        session,
+                        institution_id=request.institution_id,
+                        user_id=request.requested_by,
+                        event_type="COMPUTING_COMPLETE",
+                        title="AI 분석 완료",
+                        body="모든 분석이 완료되었습니다. 품질 검증 단계로 이동합니다.",
+                        entity_type="request",
+                        entity_id=request.id,
+                        metadata={"status": "QC"},
+                    )
                     session.commit()
                     logger.info("All runs succeeded for request %s, moved to QC", request_id)
 
@@ -175,6 +213,17 @@ def execute_run(self, run_id: str):
                 if request.status == "COMPUTING":
                     request.status = "FAILED"
                     request.error_detail = "One or more runs failed"
+                    _create_sync_notification(
+                        session,
+                        institution_id=request.institution_id,
+                        user_id=request.requested_by,
+                        event_type="COMPUTING_FAILED",
+                        title="분석 실패",
+                        body="하나 이상의 분석 작업이 실패했습니다.",
+                        entity_type="request",
+                        entity_id=request.id,
+                        metadata={"status": "FAILED"},
+                    )
                     session.commit()
 
         logger.info("Run %s completed successfully", run_id)
@@ -332,6 +381,33 @@ def generate_report(self, request_id: str):
                 "status": request.status,
             },
         ))
+
+        # Notify the request owner
+        if request.status == "FINAL":
+            _create_sync_notification(
+                session,
+                institution_id=request.institution_id,
+                user_id=request.requested_by,
+                event_type="REPORT_GENERATED",
+                title="보고서 생성 완료",
+                body="분석 보고서가 생성되었습니다. 결과를 확인하세요.",
+                entity_type="request",
+                entity_id=request.id,
+                metadata={"status": "FINAL", "report_id": str(report.id) if report.id else None},
+            )
+        elif request.status == "EXPERT_REVIEW":
+            _create_sync_notification(
+                session,
+                institution_id=request.institution_id,
+                user_id=request.requested_by,
+                event_type="EXPERT_REVIEW_NEEDED",
+                title="전문가 검토 대기",
+                body="보고서가 전문가 검토 단계로 이동했습니다.",
+                entity_type="request",
+                entity_id=request.id,
+                metadata={"status": "EXPERT_REVIEW"},
+            )
+
         session.commit()
 
         logger.info("Report generated for request %s (status: %s)", request_id, request.status)

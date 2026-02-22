@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -27,6 +28,7 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const { t } = useTranslation();
 
   const addToast = useCallback((type: ToastType, title: string, description?: string) => {
     const id = crypto.randomUUID();
@@ -44,7 +46,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
       {children}
-      <div className="toast-container" aria-live="polite" aria-label="알림">
+      <div className="toast-container" aria-live="polite" aria-label={t("aria.notification")}>
         {toasts.map((toast) => (
           <div key={toast.id} className={`toast toast-${toast.type}`} role="alert">
             <div className="toast-content">
@@ -54,7 +56,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <button
               className="toast-close"
               onClick={() => removeToast(toast.id)}
-              aria-label="알림 닫기"
+              aria-label={t("aria.closeNotification")}
               type="button"
             >
               ×

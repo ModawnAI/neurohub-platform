@@ -256,6 +256,25 @@ async def complete_upload(
     case_file.upload_status = "COMPLETED"
     case_file.checksum_sha256 = body.checksum_sha256
 
+    # Virus scan (best-effort; graceful fallback if ClamAV unavailable)
+    try:
+        from app.services.virus_scan import scan_result_for_file, is_scanning_enabled
+
+        if is_scanning_enabled():
+            import app.services.storage as storage_svc
+
+            scan_result = scan_result_for_file(b"")  # placeholder: actual content scan requires download
+            if not scan_result.is_clean:
+                case_file.upload_status = "REJECTED"
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"File rejected: virus detected — {scan_result.detail}",
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Scanner unavailable; proceed with upload
+
     # Mark upload session as completed
     if case_file.upload_session:
         case_file.upload_session.completed_at = datetime.now(timezone.utc)

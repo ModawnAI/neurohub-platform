@@ -5,11 +5,13 @@ import { useAuth } from "@/lib/auth";
 import { updateProfile } from "@/lib/api";
 import { useZodForm } from "@/lib/use-zod-form";
 import { profileUpdateSchema, type ProfileUpdateValues } from "@/lib/schemas";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 export default function UserSettingsPage() {
   const { user, refreshUser } = useAuth();
-  const t = useT();
+  const { t } = useTranslation();
+  const { addToast } = useToast();
 
   const { values, errors, setField, validate } = useZodForm<ProfileUpdateValues>(profileUpdateSchema, {
     display_name: user?.displayName || "",
@@ -19,12 +21,14 @@ export default function UserSettingsPage() {
   const updateMut = useMutation({
     mutationFn: () => {
       const data = validate();
-      if (!data) throw new Error("입력값을 확인하세요");
+      if (!data) throw new Error(t("common.validationError"));
       return updateProfile({ display_name: data.display_name, phone: data.phone || undefined });
     },
     onSuccess: () => {
       refreshUser();
+      addToast("success", t("toast.saveSuccess"));
     },
+    onError: () => addToast("error", t("toast.saveError")),
   });
 
   return (

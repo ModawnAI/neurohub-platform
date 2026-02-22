@@ -15,7 +15,8 @@ import {
   type CaseFileRead,
 } from "@/lib/api";
 import { Timeline } from "@/components/timeline";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 const CANCELLABLE: RequestStatus[] = ["CREATED", "RECEIVING", "STAGING", "READY_TO_COMPUTE"];
 
@@ -27,7 +28,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
-  const t = useT();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const { data: filesData, isLoading } = useQuery({
@@ -58,7 +59,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
         }}
       >
         <span>
-          <strong>케이스:</strong> {caseItem.patient_ref}{" "}
+          <strong>{t("requestDetail.caseLabel")}</strong> {caseItem.patient_ref}{" "}
           <span className="muted-text" style={{ fontSize: 12 }}>({caseItem.status})</span>
         </span>
         <span style={{ fontSize: 12, color: "var(--primary)" }}>{expanded ? t("common.collapse") : t("common.viewFiles")}</span>
@@ -83,7 +84,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
                     <button
                       className="btn btn-sm btn-secondary"
                       onClick={() => handleDownload(file)}
-                      title="다운로드"
+                      title={t("requestDetail.download")}
                     >
                       <DownloadSimple size={14} />
                     </button>
@@ -101,8 +102,9 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
 export default function UserRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const t = useT();
+  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
 
@@ -119,24 +121,32 @@ export default function UserRequestDetailPage() {
   });
 
   const cancelMut = useMutation({
-    mutationFn: () => cancelRequest(id, cancelReason || "사용자 취소"),
+    mutationFn: () => cancelRequest(id, cancelReason || t("apiError.confirmedFromWeb")),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["request", id] });
       setShowCancel(false);
+      addToast("success", t("toast.transitionSuccess"));
     },
+    onError: () => addToast("error", t("toast.genericError")),
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
   if (!request) return <div className="empty-state"><p className="empty-state-text">{t("requestDetail.notFound")}</p></div>;
 
   const serviceSnapshot = (request as any).service_snapshot;
+  const reportData = (request as any).report;
   const canCancel = CANCELLABLE.includes(request.status);
   const cases: CaseRead[] = casesData?.items ?? [];
 
-  const handleViewReport = () => {
-    // Reports are accessible through the request's report endpoint
-    // For now, open the download flow for report files
-    alert(t("requestDetail.reportSoon"));
+  const handleDownloadReport = () => {
+    if (!reportData) return;
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report-${id.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -148,7 +158,7 @@ export default function UserRequestDetailPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{serviceSnapshot?.display_name || t("requestDetail.analysisRequest")}</h1>
-          <p className="page-subtitle">요청 #{id.slice(0, 8)}</p>
+          <p className="page-subtitle">{t("requestDetail.requestNumber")}{id.slice(0, 8)}</p>
         </div>
         <span className={`status-chip status-${request.status.toLowerCase()}`}>
           {t(`status.${request.status}`)}
@@ -171,11 +181,11 @@ export default function UserRequestDetailPage() {
               </div>
               <div>
                 <p className="detail-label">{t("requestDetail.caseCount")}</p>
-                <p className="detail-value">{request.case_count}건</p>
+                <p className="detail-value">{request.case_count}{locale === "ko" ? "건" : ` ${request.case_count === 1 ? "case" : "cases"}`}</p>
               </div>
               <div>
                 <p className="detail-label">{t("requestDetail.createdDate")}</p>
-                <p className="detail-value">{new Date(request.created_at).toLocaleString("ko-KR")}</p>
+                <p className="detail-value">{new Date(request.created_at).toLocaleString(locale === "ko" ? "ko-KR" : "en-US")}</p>
               </div>
               {request.cancel_reason && (
                 <div>
@@ -202,9 +212,35 @@ export default function UserRequestDetailPage() {
             <div className="panel" style={{ background: "var(--success-light)", borderColor: "#86efac" }}>
               <h3 className="panel-title" style={{ marginBottom: 8, color: "var(--success)" }}>{t("requestDetail.analysisComplete")}</h3>
               <p className="muted-text">{t("requestDetail.analysisCompleteMsg")}</p>
-              <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleViewReport}>
-                <FileText size={16} /> {t("requestDetail.viewReport")}
-              </button>
+              {reportData ? (
+                <div style={{ marginTop: 12 }}>
+                  <div className="stack-sm" style={{ fontSize: 13, marginBottom: 12 }}>
+                    {reportData.summary && (
+                      <div>
+                        <p className="detail-label">{t("report.summary")}</p>
+                        <p className="detail-value">{typeof reportData.summary === "string" ? reportData.summary : JSON.stringify(reportData.summary)}</p>
+                      </div>
+                    )}
+                    {reportData.generated_at && (
+                      <div>
+                        <p className="detail-label">{t("report.generatedAt")}</p>
+                        <p className="detail-value">{new Date(reportData.generated_at).toLocaleString(locale === "ko" ? "ko-KR" : "en-US")}</p>
+                      </div>
+                    )}
+                    {reportData.conclusions && (
+                      <div>
+                        <p className="detail-label">{t("report.conclusions")}</p>
+                        <p className="detail-value">{typeof reportData.conclusions === "string" ? reportData.conclusions : JSON.stringify(reportData.conclusions)}</p>
+                      </div>
+                    )}
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={handleDownloadReport}>
+                    <DownloadSimple size={16} /> {t("report.downloadJson")}
+                  </button>
+                </div>
+              ) : (
+                <p className="muted-text" style={{ marginTop: 8 }}>{t("report.noReport")}</p>
+              )}
             </div>
           )}
 

@@ -88,6 +88,19 @@ export function useT() {
   );
 }
 
+/** Convenience hook returning both `t` and `locale` */
+export function useTranslation() {
+  const { locale } = useContext(LocaleContext);
+  const translate = useCallback(
+    (key: TranslationKey): string => {
+      const translations = TRANSLATIONS[locale] ?? ko;
+      return getNestedValue(translations as unknown as Record<string, unknown>, key);
+    },
+    [locale],
+  );
+  return { t: translate, locale };
+}
+
 /** Non-hook translation for use outside React components */
 export function t(key: TranslationKey, locale: Locale = "ko"): string {
   const translations = TRANSLATIONS[locale] ?? ko;

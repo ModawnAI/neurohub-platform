@@ -7,7 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { listServices, createService, updateService, type ServiceRead } from "@/lib/api";
 import { useZodForm } from "@/lib/use-zod-form";
 import { serviceCreateSchema, type ServiceCreateValues } from "@/lib/schemas";
-import { useT } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 const INITIAL_CREATE: ServiceCreateValues = {
   name: "",
@@ -18,7 +18,8 @@ const INITIAL_CREATE: ServiceCreateValues = {
 };
 
 export default function AdminServicesPage() {
-  const t = useT();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["services"], queryFn: listServices });
   const services = data?.items ?? [];
@@ -32,7 +33,7 @@ export default function AdminServicesPage() {
   const createMut = useMutation({
     mutationFn: () => {
       const data = createForm.validate();
-      if (!data) throw new Error("입력값을 확인하세요");
+      if (!data) throw new Error(t("common.validationError"));
       return createService({
         name: data.name,
         display_name: data.display_name,
@@ -165,7 +166,7 @@ export default function AdminServicesPage() {
                         {svc.status === "ACTIVE" ? t("common.active") : t("common.inactive")}
                       </span>
                     </td>
-                    <td>{new Date(svc.created_at).toLocaleDateString("ko-KR")}</td>
+                    <td>{new Date(svc.created_at).toLocaleDateString(dateLocale)}</td>
                     <td>
                       <div className="action-row">
                         <button className="btn btn-sm btn-secondary" onClick={() => openEdit(svc)}>

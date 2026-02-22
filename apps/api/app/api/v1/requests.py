@@ -24,6 +24,7 @@ from app.schemas.request import (
     RequestStatus,
     TransitionRequest,
 )
+from app.services.notification_service import create_notification
 from app.services.state_machine import RequestStatus as SMStatus
 from app.services.state_machine import validate_transition
 
@@ -145,6 +146,29 @@ def _add_audit(
             after_state=after_state,
             ip_address=ip,
         )
+    )
+
+
+async def _notify_request_owner(
+    db: DbSession,
+    req: Request,
+    event_type: str,
+    title: str,
+    body: str | None = None,
+) -> None:
+    """Send a notification to the request owner about a status change."""
+    if not req.requested_by:
+        return
+    await create_notification(
+        db,
+        institution_id=req.institution_id,
+        user_id=req.requested_by,
+        event_type=event_type,
+        title=title,
+        body=body,
+        entity_type="request",
+        entity_id=req.id,
+        metadata={"status": req.status},
     )
 
 
@@ -350,6 +374,12 @@ async def transition_request(
         after_state={"status": req.status, "note": body.note},
         ip=_client_ip(http_request),
     )
+    await _notify_request_owner(
+        db, req,
+        event_type=f"REQUEST_{to_state.value}",
+        title=f"요청 상태 변경: {to_state.value}",
+        body=f"요청이 {from_state.value}에서 {to_state.value}(으)로 전환되었습니다.",
+    )
     await db.flush()
     await db.refresh(req)
     return _to_read(req)
@@ -389,6 +419,12 @@ async def confirm_request(
         after_state={"status": req.status, "confirm_note": body.confirm_note},
         ip=_client_ip(http_request),
     )
+    await _notify_request_owner(
+        db, req,
+        event_type="REQUEST_CONFIRMED",
+        title="요청 확인 완료",
+        body="요청이 확인되었습니다. 분석 제출이 가능합니다.",
+    )
     await db.flush()
     await db.refresh(req)
     return _to_read(req)
@@ -420,6 +456,12 @@ async def cancel_request(
         before_state=before,
         after_state={"status": req.status, "reason": body.reason},
         ip=_client_ip(http_request),
+    )
+    await _notify_request_owner(
+        db, req,
+        event_type="REQUEST_CANCELLED",
+        title="요청 취소됨",
+        body=f"요청이 취소되었습니다. 사유: {body.reason or '없음'}",
     )
     await db.flush()
     await db.refresh(req)
@@ -500,6 +542,12 @@ async def submit_request(
         before_state=before,
         after_state={"status": req.status, "run_ids": run_ids},
         ip=_client_ip(http_request),
+    )
+    await _notify_request_owner(
+        db, req,
+        event_type="REQUEST_COMPUTING",
+        title="AI 분석 시작",
+        body="요청이 제출되어 AI 분석이 시작되었습니다.",
     )
     await db.flush()
     return {"request_id": str(req.id), "status": req.status, "run_ids": run_ids}
