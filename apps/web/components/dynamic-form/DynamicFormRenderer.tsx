@@ -15,7 +15,12 @@ interface DynamicFormRendererProps {
  * Supports text, number, select, date, radio, checkbox, textarea.
  * Handles conditional fields and validation rules.
  */
-export function DynamicFormRenderer({ schema, values, onChange, errors }: DynamicFormRendererProps) {
+export function DynamicFormRenderer({
+  schema,
+  values,
+  onChange,
+  errors,
+}: DynamicFormRendererProps) {
   const handleChange = useCallback(
     (key: string, value: unknown) => {
       onChange({ ...values, [key]: value });
@@ -100,7 +105,8 @@ export function validateDynamicForm(
         errors[field.key] = `최소 ${v.min_length}자`;
       if (v.max_length !== undefined && val.length > v.max_length)
         errors[field.key] = `최대 ${v.max_length}자`;
-      if (v.pattern && !new RegExp(v.pattern).test(val)) errors[field.key] = "형식이 올바르지 않습니다";
+      if (v.pattern && !new RegExp(v.pattern).test(val))
+        errors[field.key] = "형식이 올바르지 않습니다";
     }
   }
   return errors;
@@ -122,7 +128,10 @@ function DynamicField({ field, value, error, onChange }: DynamicFieldProps) {
   const baseStyle = { width: "100%" };
 
   const label = (
-    <label htmlFor={id} style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}>
+    <label
+      htmlFor={id}
+      style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 4 }}
+    >
       {field.label}
       {field.required && <span style={{ color: "var(--danger)" }}> *</span>}
     </label>
@@ -132,9 +141,7 @@ function DynamicField({ field, value, error, onChange }: DynamicFieldProps) {
     <span style={{ fontSize: 12, color: "var(--muted)" }}>{field.help_text}</span>
   );
 
-  const errorEl = error && (
-    <span style={{ fontSize: 12, color: "var(--danger)" }}>{error}</span>
-  );
+  const errorEl = error && <span style={{ fontSize: 12, color: "var(--danger)" }}>{error}</span>;
 
   let input: React.ReactNode;
 
@@ -193,7 +200,10 @@ function DynamicField({ field, value, error, onChange }: DynamicFieldProps) {
       input = (
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           {field.options?.map((opt) => (
-            <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+            <label
+              key={opt.value}
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}
+            >
               <input
                 type="radio"
                 name={field.key}
@@ -211,11 +221,7 @@ function DynamicField({ field, value, error, onChange }: DynamicFieldProps) {
     case "checkbox":
       input = (
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={!!value}
-            onChange={(e) => onChange(e.target.checked)}
-          />
+          <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
           {field.placeholder ?? field.label}
         </label>
       );

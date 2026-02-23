@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import { FileDropZone } from "@/components/wizard/file-drop-zone";
-import { UploadProgress, type UploadFileState } from "@/components/wizard/upload-progress";
+import { type UploadFileState, UploadProgress } from "@/components/wizard/upload-progress";
+import { useCallback, useState } from "react";
 import type { UploadSlot } from "./types";
 
 interface DynamicUploadSlotsProps {
@@ -36,7 +36,8 @@ export function DynamicUploadSlots({
   const currentSlot = slots.find((s) => s.key === activeSlot) ?? slots[0];
   if (!currentSlot) return null;
 
-  const acceptStr = currentSlot.accepted_extensions?.join(", ") ?? currentSlot.accepted_types?.join(", ") ?? "";
+  const acceptStr =
+    currentSlot.accepted_extensions?.join(", ") ?? currentSlot.accepted_types?.join(", ") ?? "";
 
   return (
     <div className="stack-md">
@@ -73,9 +74,7 @@ export function DynamicUploadSlots({
         {currentSlot.description && (
           <p style={{ color: "var(--muted)", margin: "4px 0" }}>{currentSlot.description}</p>
         )}
-        {acceptStr && (
-          <p style={{ color: "var(--muted)", fontSize: 12 }}>허용 형식: {acceptStr}</p>
-        )}
+        {acceptStr && <p style={{ color: "var(--muted)", fontSize: 12 }}>허용 형식: {acceptStr}</p>}
         {currentSlot.help_text && (
           <p style={{ color: "var(--muted)", fontSize: 12 }}>{currentSlot.help_text}</p>
         )}

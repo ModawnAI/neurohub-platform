@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Plus, Trash } from "phosphor-react";
-import { useT } from "@/lib/i18n";
 import { DynamicFormRenderer, validateDynamicForm } from "@/components/dynamic-form";
 import type { InputSchema } from "@/components/dynamic-form";
+import { useT } from "@/lib/i18n";
+import { ArrowLeft, ArrowRight, Plus, Trash } from "phosphor-react";
 import type { WizardCaseInput } from "./types";
 
 interface StepCaseInputProps {
@@ -53,9 +53,7 @@ export function StepCaseInput({
         {cases.map((c, idx) => (
           <div key={idx} className="panel" style={{ padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <span
-                style={{ fontWeight: 700, color: "var(--muted)", fontSize: 13, flexShrink: 0 }}
-              >
+              <span style={{ fontWeight: 700, color: "var(--muted)", fontSize: 13, flexShrink: 0 }}>
                 #{idx + 1}
               </span>
               <input
@@ -67,6 +65,7 @@ export function StepCaseInput({
               />
               {cases.length > 1 && (
                 <button
+                  type="button"
                   className="btn btn-danger btn-sm"
                   onClick={() => removeCase(idx)}
                   title={t("common.delete")}
@@ -87,14 +86,14 @@ export function StepCaseInput({
           </div>
         ))}
       </div>
-      <button className="btn btn-secondary btn-sm" onClick={addCase}>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={addCase}>
         <Plus size={14} /> {t("wizard.addCase")}
       </button>
       <div className="nav-buttons">
-        <button className="btn btn-secondary" onClick={onPrev}>
+        <button type="button" className="btn btn-secondary" onClick={onPrev}>
           <ArrowLeft size={16} /> {t("common.prev")}
         </button>
-        <button className="btn btn-primary" disabled={!hasValidCase} onClick={onNext}>
+        <button type="button" className="btn btn-primary" disabled={!hasValidCase} onClick={onNext}>
           {t("common.next")} <ArrowRight size={16} />
         </button>
       </div>
