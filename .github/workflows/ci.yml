@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Python: lint ──────────────────────────────────────────────
+  api-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('apps/api/pyproject.toml') }}
+          restore-keys: pip-
+      - run: |
+          cd apps/api
+          pip install -e ".[dev]"
+      - run: |
+          cd apps/api
+          ruff check .
+          ruff format --check .
+
+  # ── Python: test ──────────────────────────────────────────────
+  api-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: neurohub_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/neurohub_test
+      REDIS_URL: redis://localhost:6379/0
+      APP_ENV: test
+      ALLOW_DEV_AUTH_FALLBACK: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('apps/api/pyproject.toml') }}
+          restore-keys: pip-
+      - run: |
+          cd apps/api
+          pip install -e ".[dev]"
+      - run: |
+          cd apps/api
+          pytest -v --tb=short --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: apps/api/test-results.xml
+
+  # ── TypeScript: lint + typecheck ──────────────────────────────
+  web-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            apps/web/node_modules
+          key: bun-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-
+      - run: bun install --frozen-lockfile
+      - run: bun run web:lint
+      - run: bun run web:check
+
+  # ── Deploy to Fly.io (main branch only) ──────────────────────
+  deploy-api:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [api-lint, api-test, web-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --config infra/fly/api/fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-worker:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [deploy-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --config infra/fly/worker/fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-reconciler:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [deploy-worker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --config infra/fly/reconciler/fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
