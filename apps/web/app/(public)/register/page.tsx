@@ -194,7 +194,7 @@ export default function RegisterPage() {
             />
           </label>
 
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text" role="alert" aria-live="assertive">{error}</p>}
 
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
             {loading ? <span className="spinner" /> : t("auth.signUp")}
