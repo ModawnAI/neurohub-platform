@@ -70,8 +70,15 @@ export function DicomViewer({ fileUrl, fileName, onClose }: DicomViewerProps) {
             <div className="dicom-placeholder">
               <Eye size={64} weight="light" />
               <h4>DICOM 파일</h4>
-              <p>DICOM 파일은 전문 뷰어에서 확인할 수 있습니다.</p>
-              <a href={fileUrl} download={fileName} className="btn btn-primary">
+              <p>DICOM 뷰어에서 영상을 확인할 수 있습니다.</p>
+              <a
+                href={`/user/viewer?url=${encodeURIComponent(fileUrl)}`}
+                className="btn btn-primary"
+                style={{ marginBottom: 8 }}
+              >
+                DICOM 뷰어에서 열기
+              </a>
+              <a href={fileUrl} download={fileName} className="btn btn-secondary">
                 파일 다운로드
               </a>
               <div className="dicom-meta">

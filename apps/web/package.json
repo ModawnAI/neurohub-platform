@@ -12,16 +12,19 @@
     "format": "biome format --write ."
   },
   "dependencies": {
+    "@cornerstonejs/core": "^4.17.3",
+    "@cornerstonejs/dicom-image-loader": "^4.17.3",
+    "@cornerstonejs/tools": "^4.17.3",
     "@radix-ui/react-dialog": "^1.1.3",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.53.0",
     "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-virtual": "^3.13.6",
     "clsx": "^2.1.1",
     "next": "^16.1.6",
     "phosphor-react": "^1.4.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "@tanstack/react-virtual": "^3.13.6",
     "zod": "^3.24.1"
   },
   "devDependencies": {
