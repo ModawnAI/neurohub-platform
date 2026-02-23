@@ -46,6 +46,10 @@ class ApiKeyRead(BaseModel):
     created_at: datetime
 
 
+class ApiKeyRotateRequest(BaseModel):
+    grace_period_hours: int = Field(default=0, ge=0, le=168, description="Hours to keep old key active (0-168)")
+
+
 class ApiKeyRotateResponse(BaseModel):
     id: uuid.UUID
     key: str  # new full key, shown only once
@@ -54,6 +58,7 @@ class ApiKeyRotateResponse(BaseModel):
     scopes: list[str]
     expires_at: datetime | None
     previous_key_id: uuid.UUID
+    previous_key_expires_at: datetime | None = None
 
 
 @router.post("/organizations/{org_id}/api-keys", response_model=ApiKeyCreateResponse)
@@ -138,11 +143,15 @@ async def rotate_api_key(
     org_id: uuid.UUID,
     key_id: uuid.UUID,
     db: DbSession,
+    body: ApiKeyRotateRequest | None = None,
     user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
 ):
-    """Rotate an API key: revoke the old key and create a new one with the same name and scopes."""
+    """Rotate an API key: create new key, optionally keep old key active during grace period."""
     if org_id != user.institution_id:
         raise HTTPException(status_code=403, detail="Cannot rotate keys for other institutions")
+
+    if body is None:
+        body = ApiKeyRotateRequest()
 
     result = await db.execute(
         select(InstitutionApiKey).where(
@@ -157,8 +166,14 @@ async def rotate_api_key(
     if old_key.status == "REVOKED":
         raise HTTPException(status_code=409, detail="Cannot rotate a revoked key")
 
-    # Revoke old key
-    old_key.status = "REVOKED"
+    # Grace period: keep old key active but set expiration
+    old_key_expires_at = None
+    if body.grace_period_hours > 0:
+        old_key_expires_at = datetime.now(timezone.utc) + timedelta(hours=body.grace_period_hours)
+        old_key.expires_at = old_key_expires_at
+        old_key.status = "ROTATING"  # Mark as rotating (still valid during grace)
+    else:
+        old_key.status = "REVOKED"
 
     # Create new key with same name, scopes, and expiration policy
     raw_key = f"{API_KEY_PREFIX}{secrets.token_urlsafe(32)}"
@@ -187,6 +202,7 @@ async def rotate_api_key(
         scopes=scopes,
         expires_at=new_key.expires_at,
         previous_key_id=old_key.id,
+        previous_key_expires_at=old_key_expires_at,
     )
 
 

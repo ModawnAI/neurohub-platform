@@ -2796,3 +2796,111 @@ a {
   color: white;
   font-size: 1rem;
 }
+
+/* ── Print-friendly layout ── */
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  .no-print,
+  .sidebar,
+  .toast-container,
+  .skip-nav {
+    display: none !important;
+  }
+
+  .app-layout {
+    display: block !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .main-content-inner {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .panel {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-report .page-title {
+    font-size: 18pt;
+  }
+
+  .status-chip {
+    border: 1px solid #999 !important;
+    color: black !important;
+    background: transparent !important;
+  }
+
+  a {
+    color: black !important;
+    text-decoration: none !important;
+  }
+}
+
+/* ── Show/hide for mobile ── */
+
+.show-mobile {
+  display: none !important;
+}
+
+.hide-mobile {
+  display: revert;
+}
+
+@media (max-width: 720px) {
+  .show-mobile {
+    display: flex !important;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* ── Stat card ── */
+
+.stat-card {
+  text-align: center;
+  padding: 1.25rem !important;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 0.25rem;
+}
+
+/* ── Code block ── */
+
+.code-block {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Structured data ── */
+
+.structured-data {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}

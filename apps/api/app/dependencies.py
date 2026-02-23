@@ -118,7 +118,7 @@ async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None
     result = await db.execute(
         select(InstitutionApiKey).where(
             InstitutionApiKey.key_prefix == prefix,
-            InstitutionApiKey.status == "ACTIVE",
+            InstitutionApiKey.status.in_(["ACTIVE", "ROTATING"]),
         )
     )
     key_record = result.scalar_one_or_none()
@@ -135,8 +135,10 @@ async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None
     if key_record.expires_at and key_record.expires_at < datetime.now(timezone.utc):
         return None
 
-    # Update last_used_at
+    # Update usage tracking
     key_record.last_used_at = datetime.now(timezone.utc)
+    if hasattr(key_record, "usage_count"):
+        key_record.usage_count = (key_record.usage_count or 0) + 1
 
     return CurrentUser(
         id=key_record.created_by or uuid.UUID("00000000-0000-0000-0000-000000000000"),

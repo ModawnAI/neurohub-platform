@@ -48,6 +48,222 @@ def _create_sync_notification(
 logger = logging.getLogger("neurohub.worker")
 
 
+# ── Webhook Delivery Task ─────────────────────────────────────────────────
+
+
+@celery_app.task(
+    name="neurohub.tasks.deliver_webhook",
+    bind=True,
+    max_retries=5,
+    default_retry_delay=10,
+    queue="reporting",
+)
+def deliver_webhook(self, webhook_id: str, event_type: str, data: dict):
+    """Deliver a webhook with exponential backoff and delivery logging."""
+    import hashlib
+    import hmac
+    import json
+
+    import httpx
+
+    from app.models.webhook import Webhook, WebhookDeliveryLog
+    from app.services.webhook_service import build_webhook_payload, generate_webhook_signature
+
+    logger.info("Delivering webhook %s event=%s (attempt %d)", webhook_id, event_type, self.request.retries + 1)
+
+    with sync_session_factory() as session:
+        webhook = session.execute(
+            select(Webhook).where(Webhook.id == uuid.UUID(webhook_id))
+        ).scalar_one_or_none()
+
+        if not webhook or webhook.status not in ("ACTIVE",):
+            logger.warning("Webhook %s not active, skipping", webhook_id)
+            return {"webhook_id": webhook_id, "status": "SKIPPED"}
+
+        payload = build_webhook_payload(event_type, data)
+        payload_str = json.dumps(payload, default=str)
+        signature = generate_webhook_signature(payload_str, webhook.secret_hash)
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-NeuroHub-Signature": signature,
+            "X-NeuroHub-Event": event_type,
+            "X-NeuroHub-Delivery": str(uuid.uuid4()),
+        }
+
+        status_code = None
+        response_body = None
+        success = False
+        error_detail = None
+
+        try:
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(webhook.url, content=payload_str, headers=headers)
+                status_code = resp.status_code
+                response_body = resp.text[:2000]
+                success = resp.status_code < 300
+        except Exception as e:
+            error_detail = str(e)[:2000]
+
+        # Log delivery
+        session.add(WebhookDeliveryLog(
+            webhook_id=webhook.id,
+            event_type=event_type,
+            payload=payload,
+            status_code=status_code,
+            response_body=response_body,
+            success=success,
+            attempt=self.request.retries + 1,
+            error_detail=error_detail,
+        ))
+
+        if success:
+            webhook.last_delivered_at = datetime.now(timezone.utc)
+            webhook.failure_count = 0
+            session.commit()
+            return {"webhook_id": webhook_id, "status": "DELIVERED"}
+        else:
+            webhook.failure_count = (webhook.failure_count or 0) + 1
+            # Auto-disable after 10 consecutive failures
+            if webhook.failure_count >= 10:
+                webhook.status = "PAUSED"
+                logger.warning("Webhook %s paused after %d failures", webhook_id, webhook.failure_count)
+            session.commit()
+
+            # Exponential backoff: 10s, 20s, 40s, 80s, 160s
+            raise self.retry(
+                countdown=10 * (2 ** self.request.retries),
+                exc=Exception(error_detail or f"HTTP {status_code}"),
+            )
+
+
+# ── PDF Report Generation Task ────────────────────────────────────────────
+
+
+@celery_app.task(
+    name="neurohub.tasks.generate_pdf_report",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=15,
+    queue="reporting",
+)
+def generate_pdf_report(self, request_id: str):
+    """Generate a PDF report and upload to Supabase Storage."""
+    from app.models.qc_decision import QCDecision
+    from app.services.pdf_report import generate_report_html, render_pdf, upload_pdf_to_storage
+
+    logger.info("Generating PDF report for request: %s", request_id)
+
+    with sync_session_factory() as session:
+        request = session.execute(
+            select(Request).where(Request.id == uuid.UUID(request_id))
+        ).scalar_one_or_none()
+
+        if not request:
+            logger.error("Request %s not found", request_id)
+            return {"request_id": request_id, "status": "NOT_FOUND"}
+
+        # Get report record
+        report = session.execute(
+            select(Report).where(Report.request_id == uuid.UUID(request_id))
+            .order_by(Report.created_at.desc()).limit(1)
+        ).scalar_one_or_none()
+
+        if not report:
+            logger.error("No report record found for request %s", request_id)
+            return {"request_id": request_id, "status": "NO_REPORT"}
+
+        # Gather data for PDF
+        runs = session.execute(
+            select(Run).where(Run.request_id == uuid.UUID(request_id))
+        ).scalars().all()
+
+        qc_decisions = session.execute(
+            select(QCDecision).where(QCDecision.request_id == uuid.UUID(request_id))
+            .order_by(QCDecision.created_at.desc())
+        ).scalars().all()
+
+        from app.models.report import ReportReview
+        reviews = session.execute(
+            select(ReportReview).where(ReportReview.report_id == report.id)
+            .order_by(ReportReview.created_at.desc())
+        ).scalars().all()
+
+        cases_data = []
+        if request.cases:
+            cases_data = [
+                {
+                    "patient_ref": c.patient_ref,
+                    "status": c.status,
+                    "demographics": c.demographics or {},
+                }
+                for c in request.cases
+            ]
+
+        runs_data = [
+            {
+                "run_id": str(r.id),
+                "status": r.status,
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            }
+            for r in runs
+        ]
+
+        qc_data = [
+            {
+                "decision": q.decision,
+                "qc_score": q.qc_score,
+                "comments": q.comments,
+                "created_at": q.created_at.isoformat() if q.created_at else None,
+            }
+            for q in qc_decisions
+        ]
+
+        review_data = [
+            {
+                "decision": rv.decision,
+                "severity": rv.severity,
+                "category": rv.category,
+                "comments": rv.comments,
+                "created_at": rv.created_at.isoformat() if rv.created_at else None,
+            }
+            for rv in reviews
+        ]
+
+        service_name = (request.service_snapshot or {}).get("display_name", "N/A")
+
+        html = generate_report_html(
+            title=report.title or f"분석 보고서 - {service_name}",
+            request_id=str(request.id),
+            service_name=service_name,
+            status=request.status,
+            summary=report.summary or "보고서 요약 없음",
+            cases=cases_data,
+            runs=runs_data,
+            qc_decisions=qc_data,
+            reviews=review_data,
+        )
+
+        try:
+            pdf_bytes = render_pdf(html)
+            storage_path = upload_pdf_to_storage(
+                pdf_bytes,
+                institution_id=str(request.institution_id),
+                request_id=str(request.id),
+                report_id=str(report.id),
+            )
+            report.pdf_storage_path = storage_path
+            session.commit()
+            logger.info("PDF report generated and uploaded for request %s", request_id)
+            return {"request_id": request_id, "status": "COMPLETED", "storage_path": storage_path}
+        except Exception as exc:
+            logger.exception("PDF generation failed for request %s: %s", request_id, exc)
+            report.error_detail = str(exc)[:2000]
+            session.commit()
+            raise self.retry(exc=exc)
+
+
 def _build_report_content(
     request_id: str,
     service_name: str,
