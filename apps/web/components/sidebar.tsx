@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, SignOut } from "phosphor-react";
+import { Brain, SignOut, List, X } from "phosphor-react";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import clsx from "clsx";
@@ -23,13 +24,65 @@ export function Sidebar({ items }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const t = useT();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const initial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || "U";
   const userTypeKey = user?.userType as "SERVICE_USER" | "EXPERT" | "ADMIN" | null;
   const roleLabel = userTypeKey ? t(`userType.${userTypeKey}`) : "";
 
+  // Close on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Close on escape
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") setMobileOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.removeEventListener("keydown", handleKeyDown);
+        document.body.style.overflow = "";
+      };
+    }
+  }, [mobileOpen, handleKeyDown]);
+
   return (
-    <aside className="sidebar" role="navigation" aria-label={t("sidebar.mainNav")}>
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="sidebar-mobile-toggle"
+        onClick={() => setMobileOpen(true)}
+        aria-label={t("sidebar.mainNav")}
+        type="button"
+      >
+        <List size={24} />
+      </button>
+
+      {/* Overlay */}
+      {mobileOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={clsx("sidebar", mobileOpen && "sidebar-open")} role="navigation" aria-label={t("sidebar.mainNav")}>
+      {/* Mobile close button */}
+      <button
+        className="sidebar-close-btn"
+        onClick={() => setMobileOpen(false)}
+        aria-label={t("common.close")}
+        type="button"
+      >
+        <X size={20} />
+      </button>
+
       <Link href="/" className="sidebar-brand" aria-label={t("sidebar.home")}>
         <div className="sidebar-brand-icon">
           <Brain size={20} weight="bold" />
@@ -73,5 +126,6 @@ export function Sidebar({ items }: SidebarProps) {
         </div>
       </div>
     </aside>
+    </>
   );
 }
