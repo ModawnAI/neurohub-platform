@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
 from app.dependencies import AuthenticatedUser, DbSession
-from app.models.audit import AuditLog
+from app.models.audit import AuditLog, PatientAccessLog
 from app.models.idempotency import IdempotencyKey
 from app.models.outbox import OutboxEvent
 from app.models.request import Case, Request
@@ -119,9 +119,34 @@ async def _load_existing_by_idempotency(
     try:
         request_id = uuid.UUID(idem.resource_id)
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail="Invalid idempotency resource reference") from exc
+        raise HTTPException(
+            status_code=409, detail="Invalid idempotency resource reference"
+        ) from exc
 
     return await _load_request_or_404(db, request_id, institution_id)
+
+
+async def _log_patient_access(
+    db: DbSession,
+    user_id: uuid.UUID,
+    institution_id: uuid.UUID,
+    patient_ref: str,
+    access_type: str,
+    resource_type: str,
+    resource_id: uuid.UUID,
+    ip: str | None,
+) -> None:
+    db.add(
+        PatientAccessLog(
+            institution_id=institution_id,
+            user_id=user_id,
+            patient_ref=patient_ref,
+            access_type=access_type,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            ip_address=ip,
+        )
+    )
 
 
 def _add_audit(
@@ -311,7 +336,9 @@ async def list_requests(
     limit: int = Query(default=20, ge=1, le=100),
 ):
     query = select(Request).where(Request.institution_id == user.institution_id)
-    count_query = select(func.count(Request.id)).where(Request.institution_id == user.institution_id)
+    count_query = select(func.count(Request.id)).where(
+        Request.institution_id == user.institution_id
+    )
 
     if status_filter:
         query = query.where(Request.status == status_filter.value)
@@ -336,8 +363,24 @@ async def get_request(
     request_id: uuid.UUID,
     db: DbSession,
     user: AuthenticatedUser,
+    http_request: FastAPIRequest,
 ):
     req = await _load_request_or_404(db, request_id, user.institution_id)
+
+    # Log patient data access for each case
+    for case in req.cases:
+        if case.patient_ref:
+            await _log_patient_access(
+                db=db,
+                user_id=user.id,
+                institution_id=user.institution_id,
+                patient_ref=case.patient_ref,
+                access_type="VIEW",
+                resource_type="request",
+                resource_id=req.id,
+                ip=_client_ip(http_request),
+            )
+
     return _to_read(req)
 
 
@@ -375,7 +418,8 @@ async def transition_request(
         ip=_client_ip(http_request),
     )
     await _notify_request_owner(
-        db, req,
+        db,
+        req,
         event_type=f"REQUEST_{to_state.value}",
         title=f"요청 상태 변경: {to_state.value}",
         body=f"요청이 {from_state.value}에서 {to_state.value}(으)로 전환되었습니다.",
@@ -420,7 +464,8 @@ async def confirm_request(
         ip=_client_ip(http_request),
     )
     await _notify_request_owner(
-        db, req,
+        db,
+        req,
         event_type="REQUEST_CONFIRMED",
         title="요청 확인 완료",
         body="요청이 확인되었습니다. 분석 제출이 가능합니다.",
@@ -458,7 +503,8 @@ async def cancel_request(
         ip=_client_ip(http_request),
     )
     await _notify_request_owner(
-        db, req,
+        db,
+        req,
         event_type="REQUEST_CANCELLED",
         title="요청 취소됨",
         body=f"요청이 취소되었습니다. 사유: {body.reason or '없음'}",
@@ -544,7 +590,8 @@ async def submit_request(
         ip=_client_ip(http_request),
     )
     await _notify_request_owner(
-        db, req,
+        db,
+        req,
         event_type="REQUEST_COMPUTING",
         title="AI 분석 시작",
         body="요청이 제출되어 AI 분석이 시작되었습니다.",
