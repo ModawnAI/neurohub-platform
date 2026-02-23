@@ -45,6 +45,7 @@ def require_roles(*roles: str):
                 detail=f"Required roles: {', '.join(sorted(roles))}",
             )
         return user
+
     return checker
 
 
@@ -176,7 +177,10 @@ async def get_current_user(
             claims = await verify_supabase_jwt(token)
             return _user_from_jwt_claims(claims)
 
-    if not (settings.allow_dev_auth_fallback and (settings.app_debug or settings.app_env == "development")):
+    if not (
+        settings.allow_dev_auth_fallback
+        and (settings.app_debug or settings.app_env == "development")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Bearer token is required",

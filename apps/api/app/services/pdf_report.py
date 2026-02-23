@@ -4,7 +4,6 @@ Generates professional medical PDF reports with Korean-first layout.
 """
 
 import logging
-import uuid
 from datetime import datetime, timezone
 from io import BytesIO
 

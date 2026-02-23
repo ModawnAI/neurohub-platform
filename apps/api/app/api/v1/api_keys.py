@@ -5,11 +5,11 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.dependencies import AuthenticatedUser, CurrentUser, DbSession, require_roles
+from app.dependencies import CurrentUser, DbSession, require_roles
 from app.models.institution import InstitutionApiKey
 
 router = APIRouter(tags=["API Keys"])
@@ -47,7 +47,9 @@ class ApiKeyRead(BaseModel):
 
 
 class ApiKeyRotateRequest(BaseModel):
-    grace_period_hours: int = Field(default=0, ge=0, le=168, description="Hours to keep old key active (0-168)")
+    grace_period_hours: int = Field(
+        default=0, ge=0, le=168, description="Hours to keep old key active (0-168)"
+    )
 
 
 class ApiKeyRotateResponse(BaseModel):
@@ -138,7 +140,9 @@ async def list_api_keys(
     ]
 
 
-@router.post("/organizations/{org_id}/api-keys/{key_id}/rotate", response_model=ApiKeyRotateResponse)
+@router.post(
+    "/organizations/{org_id}/api-keys/{key_id}/rotate", response_model=ApiKeyRotateResponse
+)
 async def rotate_api_key(
     org_id: uuid.UUID,
     key_id: uuid.UUID,

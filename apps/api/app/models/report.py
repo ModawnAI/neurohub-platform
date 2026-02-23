@@ -80,11 +80,12 @@ class ReviewAssignment(UUIDMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
     )
-    status: Mapped[str] = mapped_column(String(20), default="PENDING")  # PENDING, COMPLETED, DECLINED
+    status: Mapped[str] = mapped_column(
+        String(20), default="PENDING"
+    )  # PENDING, COMPLETED, DECLINED
     assigned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-

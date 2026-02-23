@@ -111,7 +111,9 @@ async def list_webhooks(
                 "status": w.status,
                 "description": w.description,
                 "failure_count": w.failure_count,
-                "last_delivered_at": w.last_delivered_at.isoformat() if w.last_delivered_at else None,
+                "last_delivered_at": w.last_delivered_at.isoformat()
+                if w.last_delivered_at
+                else None,
             }
             for w in webhooks
         ]

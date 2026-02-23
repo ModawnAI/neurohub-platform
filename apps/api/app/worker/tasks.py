@@ -16,7 +16,7 @@ from app.models.notification import Notification
 from app.models.outbox import OutboxEvent
 from app.models.report import Report
 from app.models.request import Request
-from app.models.run import Run, RunStep
+from app.models.run import Run
 from app.worker.celery_app import celery_app
 
 
@@ -34,16 +34,19 @@ def _create_sync_notification(
     """Create a notification in sync session context (for Celery tasks)."""
     if not user_id:
         return
-    session.add(Notification(
-        institution_id=institution_id,
-        user_id=user_id,
-        event_type=event_type,
-        title=title,
-        body=body,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        metadata_=metadata or {},
-    ))
+    session.add(
+        Notification(
+            institution_id=institution_id,
+            user_id=user_id,
+            event_type=event_type,
+            title=title,
+            body=body,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            metadata_=metadata or {},
+        )
+    )
+
 
 logger = logging.getLogger("neurohub.worker")
 
@@ -60,8 +63,6 @@ logger = logging.getLogger("neurohub.worker")
 )
 def deliver_webhook(self, webhook_id: str, event_type: str, data: dict):
     """Deliver a webhook with exponential backoff and delivery logging."""
-    import hashlib
-    import hmac
     import json
 
     import httpx
@@ -69,7 +70,12 @@ def deliver_webhook(self, webhook_id: str, event_type: str, data: dict):
     from app.models.webhook import Webhook, WebhookDeliveryLog
     from app.services.webhook_service import build_webhook_payload, generate_webhook_signature
 
-    logger.info("Delivering webhook %s event=%s (attempt %d)", webhook_id, event_type, self.request.retries + 1)
+    logger.info(
+        "Delivering webhook %s event=%s (attempt %d)",
+        webhook_id,
+        event_type,
+        self.request.retries + 1,
+    )
 
     with sync_session_factory() as session:
         webhook = session.execute(
@@ -106,16 +112,18 @@ def deliver_webhook(self, webhook_id: str, event_type: str, data: dict):
             error_detail = str(e)[:2000]
 
         # Log delivery
-        session.add(WebhookDeliveryLog(
-            webhook_id=webhook.id,
-            event_type=event_type,
-            payload=payload,
-            status_code=status_code,
-            response_body=response_body,
-            success=success,
-            attempt=self.request.retries + 1,
-            error_detail=error_detail,
-        ))
+        session.add(
+            WebhookDeliveryLog(
+                webhook_id=webhook.id,
+                event_type=event_type,
+                payload=payload,
+                status_code=status_code,
+                response_body=response_body,
+                success=success,
+                attempt=self.request.retries + 1,
+                error_detail=error_detail,
+            )
+        )
 
         if success:
             webhook.last_delivered_at = datetime.now(timezone.utc)
@@ -127,12 +135,14 @@ def deliver_webhook(self, webhook_id: str, event_type: str, data: dict):
             # Auto-disable after 10 consecutive failures
             if webhook.failure_count >= 10:
                 webhook.status = "PAUSED"
-                logger.warning("Webhook %s paused after %d failures", webhook_id, webhook.failure_count)
+                logger.warning(
+                    "Webhook %s paused after %d failures", webhook_id, webhook.failure_count
+                )
             session.commit()
 
             # Exponential backoff: 10s, 20s, 40s, 80s, 160s
             raise self.retry(
-                countdown=10 * (2 ** self.request.retries),
+                countdown=10 * (2**self.request.retries),
                 exc=Exception(error_detail or f"HTTP {status_code}"),
             )
 
@@ -165,8 +175,10 @@ def generate_pdf_report(self, request_id: str):
 
         # Get report record
         report = session.execute(
-            select(Report).where(Report.request_id == uuid.UUID(request_id))
-            .order_by(Report.created_at.desc()).limit(1)
+            select(Report)
+            .where(Report.request_id == uuid.UUID(request_id))
+            .order_by(Report.created_at.desc())
+            .limit(1)
         ).scalar_one_or_none()
 
         if not report:
@@ -174,20 +186,33 @@ def generate_pdf_report(self, request_id: str):
             return {"request_id": request_id, "status": "NO_REPORT"}
 
         # Gather data for PDF
-        runs = session.execute(
-            select(Run).where(Run.request_id == uuid.UUID(request_id))
-        ).scalars().all()
+        runs = (
+            session.execute(select(Run).where(Run.request_id == uuid.UUID(request_id)))
+            .scalars()
+            .all()
+        )
 
-        qc_decisions = session.execute(
-            select(QCDecision).where(QCDecision.request_id == uuid.UUID(request_id))
-            .order_by(QCDecision.created_at.desc())
-        ).scalars().all()
+        qc_decisions = (
+            session.execute(
+                select(QCDecision)
+                .where(QCDecision.request_id == uuid.UUID(request_id))
+                .order_by(QCDecision.created_at.desc())
+            )
+            .scalars()
+            .all()
+        )
 
         from app.models.report import ReportReview
-        reviews = session.execute(
-            select(ReportReview).where(ReportReview.report_id == report.id)
-            .order_by(ReportReview.created_at.desc())
-        ).scalars().all()
+
+        reviews = (
+            session.execute(
+                select(ReportReview)
+                .where(ReportReview.report_id == report.id)
+                .order_by(ReportReview.created_at.desc())
+            )
+            .scalars()
+            .all()
+        )
 
         cases_data = []
         if request.cases:
@@ -315,9 +340,7 @@ def execute_run(self, run_id: str):
     logger.info("Starting execute_run: %s", run_id)
 
     with sync_session_factory() as session:
-        run = session.execute(
-            select(Run).where(Run.id == uuid.UUID(run_id))
-        ).scalar_one_or_none()
+        run = session.execute(select(Run).where(Run.id == uuid.UUID(run_id))).scalar_one_or_none()
 
         if not run:
             logger.error("Run %s not found", run_id)
@@ -339,9 +362,7 @@ def execute_run(self, run_id: str):
         with sync_session_factory() as session:
             from app.models.billing import UsageLedger
 
-            run = session.execute(
-                select(Run).where(Run.id == uuid.UUID(run_id))
-            ).scalar_one()
+            run = session.execute(select(Run).where(Run.id == uuid.UUID(run_id))).scalar_one()
 
             for step in run.steps:
                 step.status = "RUNNING"
@@ -368,28 +389,34 @@ def execute_run(self, run_id: str):
 
             # Record usage capture in billing ledger
             service_id = run.job_spec.get("service_id") if run.job_spec else None
-            service_version = run.job_spec.get("service_version", "1.0.0") if run.job_spec else "1.0.0"
+            service_version = (
+                run.job_spec.get("service_version", "1.0.0") if run.job_spec else "1.0.0"
+            )
             if service_id:
-                session.add(UsageLedger(
-                    institution_id=run.institution_id,
-                    request_id=run.request_id,
-                    run_id=run.id,
-                    service_id=uuid.UUID(service_id) if isinstance(service_id, str) else service_id,
-                    service_version=service_version,
-                    charge_type="CAPTURE",
-                    units=1,
-                    unit_price=0,
-                    amount=0,
-                    currency="KRW",
-                ))
+                session.add(
+                    UsageLedger(
+                        institution_id=run.institution_id,
+                        request_id=run.request_id,
+                        run_id=run.id,
+                        service_id=uuid.UUID(service_id)
+                        if isinstance(service_id, str)
+                        else service_id,
+                        service_version=service_version,
+                        charge_type="CAPTURE",
+                        units=1,
+                        unit_price=0,
+                        amount=0,
+                        currency="KRW",
+                    )
+                )
 
             session.commit()
 
             # Check if ALL runs for this request are complete
             request_id = run.request_id
-            all_runs = session.execute(
-                select(Run).where(Run.request_id == request_id)
-            ).scalars().all()
+            all_runs = (
+                session.execute(select(Run).where(Run.request_id == request_id)).scalars().all()
+            )
 
             all_succeeded = all(r.status == "SUCCEEDED" for r in all_runs)
             any_failed = any(r.status == "FAILED" for r in all_runs)
@@ -402,12 +429,14 @@ def execute_run(self, run_id: str):
 
                 if request.status == "COMPUTING":
                     request.status = "QC"
-                    session.add(OutboxEvent(
-                        event_type="COMPUTING_COMPLETE",
-                        aggregate_type="request",
-                        aggregate_id=request_id,
-                        payload={"request_id": str(request_id)},
-                    ))
+                    session.add(
+                        OutboxEvent(
+                            event_type="COMPUTING_COMPLETE",
+                            aggregate_type="request",
+                            aggregate_id=request_id,
+                            payload={"request_id": str(request_id)},
+                        )
+                    )
                     _create_sync_notification(
                         session,
                         institution_id=request.institution_id,
@@ -461,20 +490,26 @@ def execute_run(self, run_id: str):
 
                 # Record usage release on failure
                 service_id = run.job_spec.get("service_id") if run.job_spec else None
-                service_version = run.job_spec.get("service_version", "1.0.0") if run.job_spec else "1.0.0"
+                service_version = (
+                    run.job_spec.get("service_version", "1.0.0") if run.job_spec else "1.0.0"
+                )
                 if service_id:
-                    session.add(UsageLedger(
-                        institution_id=run.institution_id,
-                        request_id=run.request_id,
-                        run_id=run.id,
-                        service_id=uuid.UUID(service_id) if isinstance(service_id, str) else service_id,
-                        service_version=service_version,
-                        charge_type="RELEASE",
-                        units=1,
-                        unit_price=0,
-                        amount=0,
-                        currency="KRW",
-                    ))
+                    session.add(
+                        UsageLedger(
+                            institution_id=run.institution_id,
+                            request_id=run.request_id,
+                            run_id=run.id,
+                            service_id=uuid.UUID(service_id)
+                            if isinstance(service_id, str)
+                            else service_id,
+                            service_version=service_version,
+                            charge_type="RELEASE",
+                            units=1,
+                            unit_price=0,
+                            amount=0,
+                            currency="KRW",
+                        )
+                    )
 
                 session.commit()
 
@@ -500,7 +535,7 @@ def generate_report(self, request_id: str):
     logger.info("Starting generate_report for request: %s", request_id)
 
     with sync_session_factory() as session:
-        from app.models.service import ServiceDefinition, PipelineDefinition
+        from app.models.service import PipelineDefinition, ServiceDefinition
 
         request = session.execute(
             select(Request).where(Request.id == uuid.UUID(request_id))
@@ -511,9 +546,11 @@ def generate_report(self, request_id: str):
             return {"request_id": request_id, "status": "NOT_FOUND"}
 
         # Get all runs (not just succeeded) for comprehensive reporting
-        runs = session.execute(
-            select(Run).where(Run.request_id == uuid.UUID(request_id))
-        ).scalars().all()
+        runs = (
+            session.execute(select(Run).where(Run.request_id == uuid.UUID(request_id)))
+            .scalars()
+            .all()
+        )
 
         # Get service/pipeline info for report metadata
         service = session.execute(
@@ -538,12 +575,12 @@ def generate_report(self, request_id: str):
 
         # Use service/pipeline snapshot from request if live lookup fails
         service_name = (
-            service.display_name if service
+            service.display_name
+            if service
             else (request.service_snapshot or {}).get("display_name", "N/A")
         )
         pipeline_name = (
-            pipeline.name if pipeline
-            else (request.pipeline_snapshot or {}).get("name", "N/A")
+            pipeline.name if pipeline else (request.pipeline_snapshot or {}).get("name", "N/A")
         )
 
         # Build structured report content
@@ -562,7 +599,7 @@ def generate_report(self, request_id: str):
             title=f"분석 보고서 - {service_name}",
             content=content,
             summary=f"총 {len(runs)}건의 분석 중 {content['summary']['succeeded']}건 성공, "
-                    f"{content['summary']['failed']}건 실패.",
+            f"{content['summary']['failed']}건 실패.",
             generated_at=datetime.now(timezone.utc),
             celery_task_id=self.request.id,
         )
@@ -570,7 +607,9 @@ def generate_report(self, request_id: str):
 
         # Transition: determine if expert review is needed
         pipeline_snapshot = request.pipeline_snapshot or {}
-        needs_expert_review = pipeline_snapshot.get("qc_rules", {}).get("require_expert_review", False)
+        needs_expert_review = pipeline_snapshot.get("qc_rules", {}).get(
+            "require_expert_review", False
+        )
         any_failed = any(r.status == "FAILED" for r in runs)
 
         if request.status == "REPORTING":
@@ -587,16 +626,18 @@ def generate_report(self, request_id: str):
         else:
             event_type = "REPORT_GENERATED"
 
-        session.add(OutboxEvent(
-            event_type=event_type,
-            aggregate_type="request",
-            aggregate_id=request.id,
-            payload={
-                "request_id": request_id,
-                "report_id": str(report.id) if report.id else None,
-                "status": request.status,
-            },
-        ))
+        session.add(
+            OutboxEvent(
+                event_type=event_type,
+                aggregate_type="request",
+                aggregate_id=request.id,
+                payload={
+                    "request_id": request_id,
+                    "report_id": str(report.id) if report.id else None,
+                    "status": request.status,
+                },
+            )
+        )
 
         # Notify the request owner
         if request.status == "FINAL":

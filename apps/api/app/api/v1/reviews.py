@@ -4,7 +4,6 @@ import uuid
 from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +12,8 @@ from app.models.outbox import OutboxEvent
 from app.models.qc_decision import QCDecision
 from app.models.report import Report, ReportReview, ReviewAssignment
 from app.models.request import Case, Request
-from app.models.run import Run, RunStep
+from app.models.run import Run
+from app.schemas.request import RequestRead
 from app.schemas.review import (
     QCDecisionCreate,
     ReportReviewCreate,
@@ -23,7 +23,6 @@ from app.schemas.review import (
     ReviewQueueItem,
     ReviewQueueResponse,
 )
-from app.schemas.request import RequestRead
 from app.services.notification_service import create_notification
 from app.services.state_machine import RequestStatus as SMStatus
 from app.services.state_machine import validate_transition
@@ -262,7 +261,9 @@ async def assign_reviewer(
         )
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reviewer already assigned")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Reviewer already assigned"
+        )
 
     assignment = ReviewAssignment(
         request_id=request_id,
@@ -483,7 +484,11 @@ async def submit_report_review(
             body=body.comments,
             entity_type="request",
             entity_id=req.id,
-            metadata={"status": req.status, "decision": body.decision, "consensus": consensus_decision},
+            metadata={
+                "status": req.status,
+                "decision": body.decision,
+                "consensus": consensus_decision,
+            },
         )
 
     await db.flush()
@@ -593,9 +598,7 @@ async def get_review_history(
     ]
 
     # Report reviews
-    reports_result = await db.execute(
-        select(Report).where(Report.request_id == request_id)
-    )
+    reports_result = await db.execute(select(Report).where(Report.request_id == request_id))
     report_ids = [r.id for r in reports_result.scalars().all()]
 
     report_reviews = []
@@ -667,9 +670,7 @@ async def trigger_pdf_generation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
 
     # Must have a report record
-    report_result = await db.execute(
-        select(Report).where(Report.request_id == request_id).limit(1)
-    )
+    report_result = await db.execute(select(Report).where(Report.request_id == request_id).limit(1))
     if not report_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

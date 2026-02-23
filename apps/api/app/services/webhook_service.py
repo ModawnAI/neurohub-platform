@@ -5,7 +5,6 @@ Provides HMAC-signed webhook delivery with retry logic and delivery logging.
 
 import hashlib
 import hmac
-import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -41,9 +40,10 @@ def dispatch_webhook_event(
 
     Called from within a sync session context (e.g., Celery tasks or reconciler).
     """
+    from sqlalchemy import select
+
     from app.database import sync_session_factory
     from app.models.webhook import Webhook
-    from sqlalchemy import select
 
     with sync_session_factory() as session:
         result = session.execute(
