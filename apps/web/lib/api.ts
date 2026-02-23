@@ -1,5 +1,5 @@
+import { type Locale, t as translate } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
-import { t as translate, type Locale } from "@/lib/i18n";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
@@ -58,9 +58,22 @@ export interface ServiceRead {
   institution_id: string;
   name: string;
   display_name: string;
-  version: string;
+  description: string | null;
+  version: number;
+  version_label: string;
   status: string;
   department: string | null;
+  category: string | null;
+  input_schema: import("@/components/dynamic-form/types").InputSchema | null;
+  upload_slots: import("@/components/dynamic-form/types").UploadSlot[] | null;
+  options_schema: import("@/components/dynamic-form/types").OptionsSchema | null;
+  pricing: {
+    base_price: number;
+    per_case_price: number;
+    currency: string;
+    volume_discounts: { min_cases: number; discount_percent: number }[];
+  } | null;
+  output_schema: { fields: { key: string; type: string; label: string }[] } | null;
   created_at: string;
 }
 
@@ -112,7 +125,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     let detail = "";
     let errorCode = "";
     try {
-      const body = (await response.json()) as { detail?: string | { error?: string; message?: string } };
+      const body = (await response.json()) as {
+        detail?: string | { error?: string; message?: string };
+      };
       if (typeof body.detail === "string") {
         detail = body.detail;
       } else if (body.detail) {
@@ -125,10 +140,20 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
     const locale = getLocale();
     if (response.status === 409 && errorCode === "IDEMPOTENCY_CONFLICT") {
-      throw new ApiError(409, "IDEMPOTENCY_CONFLICT", translate("apiError.idempotencyConflict", locale), detail);
+      throw new ApiError(
+        409,
+        "IDEMPOTENCY_CONFLICT",
+        translate("apiError.idempotencyConflict", locale),
+        detail,
+      );
     }
     if (response.status === 409) {
-      throw new ApiError(409, "CONFLICT", detail || translate("apiError.statusConflict", locale), detail);
+      throw new ApiError(
+        409,
+        "CONFLICT",
+        detail || translate("apiError.statusConflict", locale),
+        detail,
+      );
     }
     if (response.status === 401) {
       if (typeof window !== "undefined") window.location.href = "/login";
@@ -166,7 +191,11 @@ export async function createRequest(payload: {
   });
 }
 
-export async function transitionRequest(requestId: string, targetStatus: RequestStatus, note?: string) {
+export async function transitionRequest(
+  requestId: string,
+  targetStatus: RequestStatus,
+  note?: string,
+) {
   return apiFetch<RequestRead>(`/requests/${requestId}/transition`, {
     method: "POST",
     body: JSON.stringify({ target_status: targetStatus, note }),
@@ -252,7 +281,9 @@ export async function getMe() {
   return apiFetch<MeResponse>("/auth/me");
 }
 
-export async function updateProfile(payload: Partial<{ display_name: string; phone: string; specialization: string; bio: string }>) {
+export async function updateProfile(
+  payload: Partial<{ display_name: string; phone: string; specialization: string; bio: string }>,
+) {
   return apiFetch<MeResponse>("/auth/me", {
     method: "PATCH",
     body: JSON.stringify(payload),
@@ -290,14 +321,20 @@ export async function getReviewDetail(requestId: string) {
   }>(`/reviews/${requestId}`);
 }
 
-export async function submitQCDecision(requestId: string, payload: { decision: string; qc_score?: number; comments?: string }) {
+export async function submitQCDecision(
+  requestId: string,
+  payload: { decision: string; qc_score?: number; comments?: string },
+) {
   return apiFetch<{ status: string; decision: string }>(`/reviews/${requestId}/qc-decision`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function submitReportReview(requestId: string, payload: { decision: string; comments?: string }) {
+export async function submitReportReview(
+  requestId: string,
+  payload: { decision: string; comments?: string },
+) {
   return apiFetch<{ status: string; decision: string }>(`/reviews/${requestId}/report-review`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -371,7 +408,13 @@ export interface MemberRead {
   created_at: string | null;
 }
 
-export async function createOrganization(payload: { name: string; code?: string; institution_type?: string; contact_email?: string; contact_phone?: string }) {
+export async function createOrganization(payload: {
+  name: string;
+  code?: string;
+  institution_type?: string;
+  contact_email?: string;
+  contact_phone?: string;
+}) {
   return apiFetch<OrgRead>("/organizations", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -464,10 +507,10 @@ export async function completeUpload(
   fileId: string,
   payload: { checksum: string; size_bytes: number },
 ) {
-  return apiFetch<CaseFileRead>(
-    `/requests/${requestId}/cases/${caseId}/files/${fileId}/complete`,
-    { method: "POST", body: JSON.stringify(payload) },
-  );
+  return apiFetch<CaseFileRead>(`/requests/${requestId}/cases/${caseId}/files/${fileId}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function uploadFileToStorage(
@@ -484,7 +527,10 @@ export function uploadFileToStorage(
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
       };
     }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)));
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Upload failed: ${xhr.status}`));
     xhr.onerror = () => reject(new Error("Upload network error"));
     xhr.send(file);
   });
@@ -542,15 +588,23 @@ export async function listApiKeys(orgId: string) {
   return apiFetch<{ items: ApiKeyRead[] }>(`/organizations/${orgId}/api-keys`);
 }
 
-export async function createApiKey(orgId: string, payload: { name: string; expires_in_days?: number }) {
-  return apiFetch<{ id: string; api_key: string; name: string; key_prefix: string; expires_at: string | null }>(
-    `/organizations/${orgId}/api-keys`,
-    { method: "POST", body: JSON.stringify(payload) },
-  );
+export async function createApiKey(
+  orgId: string,
+  payload: { name: string; expires_in_days?: number },
+) {
+  return apiFetch<{
+    id: string;
+    api_key: string;
+    name: string;
+    key_prefix: string;
+    expires_at: string | null;
+  }>(`/organizations/${orgId}/api-keys`, { method: "POST", body: JSON.stringify(payload) });
 }
 
 export async function revokeApiKey(orgId: string, keyId: string) {
-  return apiFetch<{ status: string }>(`/organizations/${orgId}/api-keys/${keyId}`, { method: "DELETE" });
+  return apiFetch<{ status: string }>(`/organizations/${orgId}/api-keys/${keyId}`, {
+    method: "DELETE",
+  });
 }
 
 // ── Billing ──
@@ -563,7 +617,9 @@ export interface UsageEntry {
 }
 
 export async function getUsage(startDate: string, endDate: string) {
-  return apiFetch<{ items: UsageEntry[] }>(`/billing/usage?start_date=${startDate}&end_date=${endDate}`);
+  return apiFetch<{ items: UsageEntry[] }>(
+    `/billing/usage?start_date=${startDate}&end_date=${endDate}`,
+  );
 }
 
 // ── Admin: Audit Logs ──
@@ -578,7 +634,14 @@ export interface AuditLogRead {
   created_at: string;
 }
 
-export async function listAuditLogs(params?: { action?: string; entity_type?: string; from?: string; to?: string; limit?: number; offset?: number }) {
+export async function listAuditLogs(params?: {
+  action?: string;
+  entity_type?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}) {
   const searchParams = new URLSearchParams();
   if (params?.action) searchParams.set("action", params.action);
   if (params?.entity_type) searchParams.set("entity_type", params.entity_type);
@@ -587,25 +650,50 @@ export async function listAuditLogs(params?: { action?: string; entity_type?: st
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));
   const qs = searchParams.toString();
-  return apiFetch<{ items: AuditLogRead[]; total: number }>(`/admin/audit-logs${qs ? `?${qs}` : ""}`);
+  return apiFetch<{ items: AuditLogRead[]; total: number }>(
+    `/admin/audit-logs${qs ? `?${qs}` : ""}`,
+  );
 }
 
 // ── Admin: Service CRUD ──
 
-export async function createService(payload: { name: string; display_name: string; version?: string; department?: string; description?: string }) {
+export async function createService(payload: {
+  name: string;
+  display_name: string;
+  version?: string;
+  department?: string;
+  description?: string;
+}) {
   return apiFetch<ServiceRead>("/services", { method: "POST", body: JSON.stringify(payload) });
 }
 
-export async function updateService(serviceId: string, payload: { display_name?: string; version?: string; department?: string; description?: string; status?: string }) {
-  return apiFetch<ServiceRead>(`/services/${serviceId}`, { method: "PATCH", body: JSON.stringify(payload) });
+export async function updateService(
+  serviceId: string,
+  payload: {
+    display_name?: string;
+    version?: string;
+    department?: string;
+    description?: string;
+    status?: string;
+  },
+) {
+  return apiFetch<ServiceRead>(`/services/${serviceId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ── Admin: Organization Update ──
 
-export async function updateOrganization(orgId: string, payload: { name?: string; contact_email?: string; contact_phone?: string; status?: string }) {
-  return apiFetch<OrgRead>(`/organizations/${orgId}`, { method: "PATCH", body: JSON.stringify(payload) });
+export async function updateOrganization(
+  orgId: string,
+  payload: { name?: string; contact_email?: string; contact_phone?: string; status?: string },
+) {
+  return apiFetch<OrgRead>(`/organizations/${orgId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
-
 
 // ── Transition Record (for enhanced timeline) ──
 
