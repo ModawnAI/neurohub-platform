@@ -6,9 +6,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
       config.resolve = config.resolve ?? {};

@@ -1,10 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { XCircle } from "phosphor-react";
 import { useTranslation } from "@/lib/i18n";
 
-export default function PaymentFailPage() {
+function PaymentFailContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,5 +27,13 @@ export default function PaymentFailPage() {
         {t("payment.retry")}
       </button>
     </div>
+  );
+}
+
+export default function PaymentFailPage() {
+  return (
+    <Suspense fallback={<div style={{ textAlign: "center", paddingTop: 64 }}><span className="spinner" /></div>}>
+      <PaymentFailContent />
+    </Suspense>
   );
 }

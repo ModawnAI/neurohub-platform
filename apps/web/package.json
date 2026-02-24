@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "packageManager": "bun@1.2.2",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "check": "tsc --noEmit",
     "lint": "biome check .",

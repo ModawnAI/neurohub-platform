@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle, ArrowRight } from "phosphor-react";
 import { confirmPayment } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,5 +69,13 @@ export default function PaymentSuccessPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<div style={{ textAlign: "center", paddingTop: 64 }}><span className="spinner" /></div>}>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
