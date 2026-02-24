@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
+from app.api.internal.routes import router as internal_router
 from app.api.v1.router import api_v1_router
 from app.config import settings
 from app.database import engine
@@ -44,6 +45,7 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 app.include_router(api_v1_router)
+app.include_router(internal_router)
 
 # Metrics endpoint (excluded from OpenAPI schema)
 app.get("/metrics", include_in_schema=False)(metrics_endpoint)
