@@ -508,9 +508,9 @@ export async function listCases(requestId: string) {
 export async function initiateUpload(
   requestId: string,
   caseId: string,
-  payload: { filename: string; content_type: string; slot: string },
+  payload: { file_name: string; content_type: string; slot_name: string; file_size: number },
 ) {
-  return apiFetch<{ file_id: string; upload_url: string; upload_session_id: string }>(
+  return apiFetch<{ case_file_id: string; presigned_url: string; expires_at: string }>(
     `/requests/${requestId}/cases/${caseId}/files/presign`,
     { method: "POST", body: JSON.stringify(payload) },
   );
@@ -520,7 +520,7 @@ export async function completeUpload(
   requestId: string,
   caseId: string,
   fileId: string,
-  payload: { checksum: string; size_bytes: number },
+  payload: { checksum_sha256: string },
 ) {
   return apiFetch<CaseFileRead>(`/requests/${requestId}/cases/${caseId}/files/${fileId}/complete`, {
     method: "POST",

@@ -64,13 +64,14 @@ export function StepFileUpload({
 
           // 1. Get presigned URL
           const presign = await initiateUpload(requestId, caseId, {
-            filename: f.name,
+            file_name: f.name,
             content_type: f.type || "application/octet-stream",
-            slot: "primary",
+            slot_name: "primary",
+            file_size: f.size,
           });
 
           // 2. Upload to storage
-          await uploadFileToStorage(presign.upload_url, f, (progress) => {
+          await uploadFileToStorage(presign.presigned_url, f, (progress) => {
             setFileStates((prev) => {
               const arr = [...(prev[caseIndex] ?? [])];
               if (arr[stateIdx]) arr[stateIdx] = { ...arr[stateIdx], progress };
@@ -78,17 +79,20 @@ export function StepFileUpload({
             });
           });
 
-          // 3. Complete upload
-          await completeUpload(requestId, caseId, presign.file_id, {
-            checksum: "client-verified",
-            size_bytes: f.size,
+          // 3. Complete upload (compute SHA-256 checksum)
+          const arrayBuf = await f.arrayBuffer();
+          const hashBuf = await crypto.subtle.digest("SHA-256", arrayBuf);
+          const hashArr = Array.from(new Uint8Array(hashBuf));
+          const checksum = hashArr.map((b) => b.toString(16).padStart(2, "0")).join("");
+          await completeUpload(requestId, caseId, presign.case_file_id, {
+            checksum_sha256: checksum,
           });
 
-          completedFileIds.push(presign.file_id);
+          completedFileIds.push(presign.case_file_id);
           setFileStates((prev) => {
             const arr = [...(prev[caseIndex] ?? [])];
             if (arr[stateIdx])
-              arr[stateIdx] = { ...arr[stateIdx], status: "completed", progress: 100, fileId: presign.file_id };
+              arr[stateIdx] = { ...arr[stateIdx], status: "completed", progress: 100, fileId: presign.case_file_id };
             return { ...prev, [caseIndex]: arr };
           });
         } catch (err: unknown) {
