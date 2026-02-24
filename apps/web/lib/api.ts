@@ -556,7 +556,7 @@ export async function listCaseFiles(requestId: string, caseId: string) {
 }
 
 export async function getDownloadUrl(requestId: string, caseId: string, fileId: string) {
-  return apiFetch<{ download_url: string; expires_in: number }>(
+  return apiFetch<{ url: string; expires_at: string }>(
     `/requests/${requestId}/cases/${caseId}/files/${fileId}/download`,
   );
 }

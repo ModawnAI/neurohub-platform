@@ -31,8 +31,8 @@ function ReportFiles({ requestId, caseItem }: { requestId: string; caseItem: Cas
   });
 
   const handleDownload = async (file: CaseFileRead) => {
-    const { download_url } = await getDownloadUrl(requestId, caseItem.id, file.id);
-    window.open(download_url, "_blank");
+    const { url } = await getDownloadUrl(requestId, caseItem.id, file.id);
+    window.open(url, "_blank");
   };
 
   const files = data?.items ?? [];

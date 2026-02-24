@@ -468,6 +468,13 @@ async def confirm_request(
     http_request: FastAPIRequest,
 ):
     req = await _load_request_or_404(db, request_id, user.institution_id, for_update=True)
+
+    # Auto-advance through intermediate states to STAGING
+    if req.status in (SMStatus.CREATED.value, SMStatus.RECEIVING.value):
+        req.status = SMStatus.STAGING.value
+        for case in req.cases:
+            case.status = "READY"
+
     if req.status != SMStatus.STAGING.value:
         raise HTTPException(
             status_code=409,

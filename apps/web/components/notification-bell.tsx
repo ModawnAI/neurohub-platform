@@ -46,18 +46,17 @@ export function NotificationBell() {
           role="menu"
           aria-label={t("notification.list")}
           style={{
-            position: "absolute",
-            bottom: "100%",
-            left: 0,
-            width: 320,
-            maxHeight: 400,
+            position: "fixed",
+            bottom: 60,
+            left: 72,
+            width: 340,
+            maxHeight: "calc(100vh - 120px)",
             overflowY: "auto",
             background: "var(--surface)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow-lg)",
             zIndex: 50,
-            marginBottom: 4,
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>

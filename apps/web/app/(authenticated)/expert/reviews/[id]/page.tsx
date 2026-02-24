@@ -36,8 +36,8 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
 
   const handleDownload = async (file: CaseFileRead) => {
     try {
-      const { download_url } = await getDownloadUrl(requestId, caseItem.id, file.id);
-      window.open(download_url, "_blank");
+      const { url } = await getDownloadUrl(requestId, caseItem.id, file.id);
+      window.open(url, "_blank");
     } catch {
       alert(t("expertReviewDetail.errorDownloadUrl"));
     }
