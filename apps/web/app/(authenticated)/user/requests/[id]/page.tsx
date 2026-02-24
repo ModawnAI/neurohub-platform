@@ -79,10 +79,10 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
                 <div key={file.id} className="file-info-card">
                   <div className="file-info-card-icon"><File size={20} /></div>
                   <div className="file-info-card-body">
-                    <p className="file-info-card-name">{file.filename}</p>
-                    <p className="file-info-card-meta">{file.slot} &middot; {formatBytes(file.size_bytes)}</p>
+                    <p className="file-info-card-name">{file.file_name}</p>
+                    <p className="file-info-card-meta">{file.slot_name} &middot; {formatBytes(file.file_size)}</p>
                   </div>
-                  {file.status === "COMPLETED" && (
+                  {file.upload_status === "COMPLETED" && (
                     <button
                       className="btn btn-sm btn-secondary"
                       onClick={() => handleDownload(file)}
@@ -135,8 +135,8 @@ export default function UserRequestDetailPage() {
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
   if (!request) return <div className="empty-state"><p className="empty-state-text">{t("requestDetail.notFound")}</p></div>;
 
-  const serviceSnapshot = (request as any).service_snapshot;
-  const reportData = (request as any).report;
+  const serviceSnapshot = request.service_snapshot;
+  const reportData = request.report;
   const canCancel = CANCELLABLE.includes(request.status);
   const cases: CaseRead[] = casesData?.items ?? [];
 

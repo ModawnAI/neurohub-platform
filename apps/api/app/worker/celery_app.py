@@ -16,6 +16,8 @@ celery_app.conf.update(
     task_routes={
         "neurohub.tasks.execute_run": {"queue": "compute"},
         "neurohub.tasks.generate_report": {"queue": "reporting"},
+        "neurohub.tasks.generate_pdf_report": {"queue": "reporting"},
+        "neurohub.tasks.deliver_webhook": {"queue": "reporting"},
         "neurohub.tasks.auto_cancel_stale_requests": {"queue": "compute"},
         "neurohub.tasks.apply_watermark": {"queue": "compute"},
     },
@@ -25,6 +27,6 @@ celery_app.conf.update(
             "schedule": 3600.0,  # every hour
         },
     },
-    # Ensure stale_cleanup task module is discovered
-    include=["app.services.stale_cleanup"],
+    # Ensure all task modules are discovered
+    include=["app.worker.tasks", "app.worker.pipeline", "app.services.stale_cleanup"],
 )

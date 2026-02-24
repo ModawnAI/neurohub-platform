@@ -19,6 +19,8 @@ from app.models.request import Request
 from app.models.run import Run
 from app.worker.celery_app import celery_app
 
+logger = logging.getLogger("neurohub.worker")
+
 
 def _create_sync_notification(
     session,
@@ -48,7 +50,46 @@ def _create_sync_notification(
     )
 
 
-logger = logging.getLogger("neurohub.worker")
+def _notify_service_evaluators(
+    session,
+    service_id,
+    institution_id,
+    event_type: str,
+    title: str,
+    body: str | None = None,
+    entity_type: str | None = None,
+    entity_id=None,
+) -> None:
+    """Notify all active evaluators assigned to a service."""
+    from app.models.evaluation import ServiceEvaluator
+
+    evaluators = (
+        session.execute(
+            select(ServiceEvaluator).where(
+                ServiceEvaluator.service_id == service_id,
+                ServiceEvaluator.institution_id == institution_id,
+                ServiceEvaluator.is_active == True,  # noqa: E712
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for ev in evaluators:
+        _create_sync_notification(
+            session,
+            institution_id=institution_id,
+            user_id=ev.user_id,
+            event_type=event_type,
+            title=title,
+            body=body,
+            entity_type=entity_type,
+            entity_id=entity_id,
+        )
+    logger.info(
+        "Notified %d evaluators for service %s (event: %s)",
+        len(evaluators), service_id, event_type,
+    )
+
 
 
 # ── Webhook Delivery Task ─────────────────────────────────────────────────
@@ -375,8 +416,8 @@ def apply_watermark_task(self, request_id: str, evaluation_id: str):
                 .all()
             )
             for f in files:
-                if f.filename and any(
-                    f.filename.lower().endswith(ext)
+                if f.file_name and any(
+                    f.file_name.lower().endswith(ext)
                     for ext in (".jpg", ".jpeg", ".png")
                 ):
                     image_file = f
@@ -418,7 +459,7 @@ def apply_watermark_task(self, request_id: str, evaluation_id: str):
         # Upload watermarked file
         output_path = (
             f"institutions/{request.institution_id}/requests/{request_id}"
-            f"/watermarked/{image_file.filename or 'output.jpg'}"
+            f"/watermarked/{image_file.file_name or 'output.jpg'}"
         )
         try:
             _upload_to_storage(
@@ -618,6 +659,19 @@ def execute_run(self, run_id: str):
                         entity_id=request.id,
                         metadata={"status": "QC"},
                     )
+
+                    # Notify evaluators assigned to this service
+                    _notify_service_evaluators(
+                        session,
+                        service_id=request.service_id,
+                        institution_id=request.institution_id,
+                        event_type="QC_REVIEW_REQUESTED",
+                        title="평가 요청",
+                        body="새로운 분석 결과가 전문가 평가를 기다리고 있습니다.",
+                        entity_type="request",
+                        entity_id=request.id,
+                    )
+
                     session.commit()
                     logger.info("All runs succeeded for request %s, moved to QC", request_id)
 
@@ -762,6 +816,20 @@ def generate_report(self, request_id: str):
             cases_count=len(request.cases) if request.cases else 0,
         )
 
+        # Look up watermarked path from evaluation
+        from app.models.evaluation import Evaluation
+
+        watermarked_path = None
+        eval_result = session.execute(
+            select(Evaluation)
+            .where(Evaluation.request_id == uuid.UUID(request_id))
+            .order_by(Evaluation.created_at.desc())
+            .limit(1)
+        )
+        evaluation = eval_result.scalar_one_or_none()
+        if evaluation and evaluation.output_storage_path:
+            watermarked_path = evaluation.output_storage_path
+
         report = Report(
             institution_id=request.institution_id,
             request_id=request.id,
@@ -770,6 +838,7 @@ def generate_report(self, request_id: str):
             content=content,
             summary=f"총 {len(runs)}건의 분석 중 {content['summary']['succeeded']}건 성공, "
             f"{content['summary']['failed']}건 실패.",
+            watermarked_storage_path=watermarked_path,
             generated_at=datetime.now(timezone.utc),
             celery_task_id=self.request.id,
         )
@@ -835,7 +904,27 @@ def generate_report(self, request_id: str):
                 metadata={"status": "EXPERT_REVIEW"},
             )
 
+            # Notify evaluators assigned to this service
+            _notify_service_evaluators(
+                session,
+                service_id=request.service_id,
+                institution_id=request.institution_id,
+                event_type="EXPERT_REVIEW_NEEDED",
+                title="전문가 검토 요청",
+                body="보고서가 전문가 검토 단계에 있습니다. 평가를 진행해주세요.",
+                entity_type="request",
+                entity_id=request.id,
+            )
+
         session.commit()
+
+        # Trigger PDF generation as a follow-up task
+        celery_app.send_task(
+            "neurohub.tasks.generate_pdf_report",
+            args=[request_id],
+            queue="reporting",
+        )
+        logger.info("Triggered generate_pdf_report for request %s", request_id)
 
         logger.info("Report generated for request %s (status: %s)", request_id, request.status)
         return {"request_id": request_id, "status": "COMPLETED"}

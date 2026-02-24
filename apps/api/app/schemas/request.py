@@ -41,6 +41,23 @@ class RequestCreate(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=120)
 
 
+class CaseReadBrief(BaseModel):
+    id: uuid.UUID
+    patient_ref: str
+    status: str
+
+
+class ReportSummary(BaseModel):
+    id: uuid.UUID
+    status: str
+    title: str | None = None
+    summary: str | None = None
+    conclusions: str | None = None
+    generated_at: datetime | None = None
+    pdf_storage_path: str | None = None
+    watermarked_storage_path: str | None = None
+
+
 class RequestRead(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -60,6 +77,8 @@ class RequestRead(BaseModel):
     service_snapshot: dict[str, Any] | None = None
     pipeline_snapshot: dict[str, Any] | None = None
     case_count: int = 0
+    cases: list[CaseReadBrief] | None = None
+    report: ReportSummary | None = None
     created_at: datetime
     updated_at: datetime | None = None
 

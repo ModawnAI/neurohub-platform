@@ -76,10 +76,10 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
                 <div key={file.id} className="file-info-card">
                   <div className="file-info-card-icon"><File size={20} /></div>
                   <div className="file-info-card-body">
-                    <p className="file-info-card-name">{file.filename}</p>
-                    <p className="file-info-card-meta">{file.slot} &middot; {formatBytes(file.size_bytes)}</p>
+                    <p className="file-info-card-name">{file.file_name}</p>
+                    <p className="file-info-card-meta">{file.slot_name} &middot; {formatBytes(file.file_size)}</p>
                   </div>
-                  {file.status === "COMPLETED" && (
+                  {file.upload_status === "COMPLETED" && (
                     <button className="btn btn-sm btn-secondary" onClick={() => handleDownload(file)} title={t("common.download")}>
                       <DownloadSimple size={14} />
                     </button>
@@ -127,7 +127,7 @@ export default function AdminRequestDetailPage() {
   if (!request) return <div className="banner banner-warning">{t("requestDetail.notFound")}</div>;
 
   const possibleTransitions = TRANSITIONS[request.status] || [];
-  const serviceSnapshot = (request as any).service_snapshot;
+  const serviceSnapshot = request.service_snapshot;
   const cases: CaseRead[] = casesData?.items ?? [];
 
   return (

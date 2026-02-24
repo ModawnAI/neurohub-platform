@@ -111,6 +111,30 @@ def _user_from_jwt_claims(claims: dict) -> CurrentUser:
     )
 
 
+async def _enrich_user_from_db(user: CurrentUser, db: AsyncSession) -> CurrentUser:
+    """Look up the user's actual role and institution from the DB."""
+    from app.models.institution import InstitutionMember
+    from app.models.user import User
+
+    # Find institution membership
+    result = await db.execute(
+        select(InstitutionMember).where(InstitutionMember.user_id == user.id)
+    )
+    membership = result.scalar_one_or_none()
+    if membership:
+        user.institution_id = membership.institution_id
+        if membership.role_scope:
+            user.roles = [membership.role_scope]
+
+    # Get user_type from users table
+    user_result = await db.execute(select(User).where(User.id == user.id))
+    db_user = user_result.scalar_one_or_none()
+    if db_user:
+        user.user_type = db_user.user_type
+
+    return user
+
+
 async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None:
     """Resolve an API key to a CurrentUser. Returns None if key is invalid."""
     from app.models.institution import InstitutionApiKey
@@ -175,7 +199,10 @@ async def get_current_user(
         token = authorization[7:].strip()
         if token:
             claims = await verify_supabase_jwt(token)
-            return _user_from_jwt_claims(claims)
+            user = _user_from_jwt_claims(claims)
+            # Enrich with DB roles and institution from onboarding
+            user = await _enrich_user_from_db(user, db)
+            return user
 
     if not (
         settings.allow_dev_auth_fallback

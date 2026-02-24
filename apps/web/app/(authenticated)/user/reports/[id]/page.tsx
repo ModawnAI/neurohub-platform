@@ -46,14 +46,14 @@ function ReportFiles({ requestId, caseItem }: { requestId: string; caseItem: Cas
         <div key={file.id} className="file-info-card">
           <div className="file-info-card-icon"><File size={20} /></div>
           <div className="file-info-card-body">
-            <p className="file-info-card-name">{file.filename}</p>
-            <p className="file-info-card-meta">{file.slot} · {formatBytes(file.size_bytes)}</p>
+            <p className="file-info-card-name">{file.file_name}</p>
+            <p className="file-info-card-meta">{file.slot_name} · {formatBytes(file.file_size)}</p>
           </div>
-          {file.status === "COMPLETED" && (
+          {file.upload_status === "COMPLETED" && (
             <button
               className="btn btn-sm btn-secondary"
               onClick={() => handleDownload(file)}
-              aria-label={`${t("common.download")} ${file.filename}`}
+              aria-label={`${t("common.download")} ${file.file_name}`}
             >
               <DownloadSimple size={14} />
             </button>

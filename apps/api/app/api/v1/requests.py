@@ -18,7 +18,9 @@ from app.models.service import PipelineDefinition, ServiceDefinition
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.request import (
     CancelRequest,
+    CaseReadBrief,
     ConfirmRequest,
+    ReportSummary,
     RequestCreate,
     RequestRead,
     RequestStatus,
@@ -44,7 +46,19 @@ def _canonical_payload_hash(body: RequestCreate) -> str:
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
-def _to_read(req: Request) -> RequestRead:
+def _to_read(req: Request, report=None) -> RequestRead:
+    report_summary = None
+    if report:
+        report_summary = ReportSummary(
+            id=report.id,
+            status=report.status,
+            title=report.title,
+            summary=report.summary,
+            conclusions=report.content.get("conclusions") if isinstance(report.content, dict) else None,
+            generated_at=report.generated_at,
+            pdf_storage_path=report.pdf_storage_path,
+            watermarked_storage_path=report.watermarked_storage_path,
+        )
     return RequestRead(
         id=req.id,
         institution_id=req.institution_id,
@@ -62,6 +76,11 @@ def _to_read(req: Request) -> RequestRead:
         service_snapshot=req.service_snapshot,
         pipeline_snapshot=req.pipeline_snapshot,
         case_count=len(req.cases),
+        cases=[
+            CaseReadBrief(id=c.id, patient_ref=c.patient_ref, status=c.status)
+            for c in req.cases
+        ] if req.cases else None,
+        report=report_summary,
         created_at=req.created_at,
         updated_at=req.updated_at,
     )
@@ -365,6 +384,8 @@ async def get_request(
     user: AuthenticatedUser,
     http_request: FastAPIRequest,
 ):
+    from app.models.report import Report
+
     req = await _load_request_or_404(db, request_id, user.institution_id)
 
     # Log patient data access for each case
@@ -381,7 +402,16 @@ async def get_request(
                 ip=_client_ip(http_request),
             )
 
-    return _to_read(req)
+    # Fetch latest report for this request
+    report_result = await db.execute(
+        select(Report)
+        .where(Report.request_id == request_id)
+        .order_by(Report.created_at.desc())
+        .limit(1)
+    )
+    report = report_result.scalar_one_or_none()
+
+    return _to_read(req, report=report)
 
 
 @router.post("/requests/{request_id}/transition", response_model=RequestRead)

@@ -40,6 +40,17 @@ export type RequestStatus =
   | "FAILED"
   | "CANCELLED";
 
+export interface ReportSummary {
+  id: string;
+  status: string;
+  title: string | null;
+  summary: string | null;
+  conclusions: string | null;
+  generated_at: string | null;
+  pdf_storage_path: string | null;
+  watermarked_storage_path: string | null;
+}
+
 export interface RequestRead {
   id: string;
   institution_id: string;
@@ -51,6 +62,8 @@ export interface RequestRead {
   created_at: string;
   updated_at: string | null;
   cancel_reason: string | null;
+  service_snapshot?: Record<string, unknown> | null;
+  report?: ReportSummary | null;
 }
 
 export interface ServiceRead {
@@ -471,12 +484,12 @@ export async function listAllRequests(status?: string) {
 export interface CaseFileRead {
   id: string;
   case_id: string;
-  slot: string;
-  filename: string;
-  content_type: string;
-  size_bytes: number | null;
-  checksum: string | null;
-  status: string;
+  slot_name: string;
+  file_name: string;
+  content_type: string | null;
+  file_size: number | null;
+  checksum_sha256: string | null;
+  upload_status: string;
   created_at: string;
 }
 

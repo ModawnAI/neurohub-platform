@@ -5,11 +5,42 @@ Provides HMAC-signed webhook delivery with retry logic and delivery logging.
 
 import hashlib
 import hmac
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
 
+import httpx
+
 logger = logging.getLogger("neurohub.webhooks")
+
+
+class WebhookDelivery:
+    """Synchronous webhook delivery with HMAC signing."""
+
+    def __init__(self, webhook_url: str, payload: dict, secret: str | None = None):
+        self.webhook_url = webhook_url
+        self.payload = payload
+        self.secret = secret
+
+    def deliver(self) -> bool:
+        """Deliver the webhook payload. Returns True on success."""
+        try:
+            payload_str = json.dumps(self.payload, default=str)
+            headers = {"Content-Type": "application/json"}
+            if self.secret:
+                headers["X-Webhook-Signature"] = generate_webhook_signature(
+                    payload_str, self.secret
+                )
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(self.webhook_url, content=payload_str, headers=headers)
+            if resp.status_code < 400:
+                return True
+            logger.warning("Webhook delivery failed: %s %s", resp.status_code, resp.text[:200])
+            return False
+        except Exception as exc:
+            logger.warning("Webhook delivery error: %s", exc)
+            return False
 
 
 def build_webhook_payload(event_type: str, data: dict) -> dict:

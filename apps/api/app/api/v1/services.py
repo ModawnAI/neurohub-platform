@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.dependencies import AuthenticatedUser, CurrentUser, DbSession, require_roles
@@ -117,6 +118,57 @@ async def list_pipelines(
             )
             for p in pipelines
         ]
+    )
+
+
+class PipelineCreate(BaseModel):
+    name: str
+    version: str = "1.0.0"
+    steps: list[dict] = []
+    qc_rules: dict = {}
+    is_default: bool = True
+
+
+@router.post(
+    "/admin/services/{service_id}/pipelines",
+    response_model=PipelineRead,
+    status_code=201,
+)
+async def create_pipeline(
+    service_id: uuid.UUID,
+    body: PipelineCreate,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Create a pipeline for a service."""
+    svc = await db.execute(
+        select(ServiceDefinition.id).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    if not svc.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    pipeline = PipelineDefinition(
+        service_id=service_id,
+        name=body.name,
+        version=body.version,
+        steps=body.steps,
+        qc_rules=body.qc_rules,
+        is_default=body.is_default,
+    )
+    db.add(pipeline)
+    await db.flush()
+    await db.refresh(pipeline)
+
+    return PipelineRead(
+        id=pipeline.id,
+        service_id=pipeline.service_id,
+        name=pipeline.name,
+        version=pipeline.version,
+        is_default=pipeline.is_default,
+        created_at=pipeline.created_at,
     )
 
 
