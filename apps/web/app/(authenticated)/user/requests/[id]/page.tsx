@@ -10,6 +10,8 @@ import {
   listCases,
   listCaseFiles,
   getDownloadUrl,
+  getReportDownloadUrl,
+  getWatermarkedDownloadUrl,
   type RequestStatus,
   type CaseRead,
   type CaseFileRead,
@@ -234,9 +236,37 @@ export default function UserRequestDetailPage() {
                       </div>
                     )}
                   </div>
-                  <button className="btn btn-primary btn-sm" onClick={handleDownloadReport}>
-                    <DownloadSimple size={16} /> {t("report.downloadJson")}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={async () => {
+                        try {
+                          const { download_url } = await getReportDownloadUrl(id);
+                          window.open(download_url, "_blank");
+                        } catch {
+                          handleDownloadReport();
+                        }
+                      }}
+                    >
+                      <FileText size={16} /> {t("download.reportPdf")}
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={async () => {
+                        try {
+                          const { download_url } = await getWatermarkedDownloadUrl(id);
+                          window.open(download_url, "_blank");
+                        } catch {
+                          addToast("error", t("download.noWatermarked"));
+                        }
+                      }}
+                    >
+                      <DownloadSimple size={16} /> {t("download.watermarkedFile")}
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handleDownloadReport}>
+                      <DownloadSimple size={16} /> {t("report.downloadJson")}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <p className="muted-text" style={{ marginTop: 8 }}>{t("report.noReport")}</p>

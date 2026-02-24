@@ -29,6 +29,7 @@ class Report(UUIDMixin, TimestampMixin, Base):
     summary: Mapped[str | None] = mapped_column(Text)
     pdf_storage_path: Mapped[str | None] = mapped_column(String(1000))
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    watermarked_storage_path: Mapped[str | None] = mapped_column(String(1000))
     celery_task_id: Mapped[str | None] = mapped_column(String(200))
     error_detail: Mapped[str | None] = mapped_column(Text)
 

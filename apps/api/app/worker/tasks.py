@@ -289,6 +289,176 @@ def generate_pdf_report(self, request_id: str):
             raise self.retry(exc=exc)
 
 
+# ── Watermark Task ────────────────────────────────────────────────────────
+
+
+def _supabase_storage_headers() -> dict[str, str]:
+    from app.config import settings
+
+    return {
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "apikey": settings.supabase_anon_key,
+    }
+
+
+def _download_from_storage(bucket: str, path: str) -> bytes:
+    import httpx
+
+    from app.config import settings
+
+    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{path}"
+    with httpx.Client(timeout=30) as client:
+        resp = client.get(url, headers=_supabase_storage_headers())
+    if resp.status_code != 200:
+        raise Exception(f"Storage download failed: {resp.status_code}")
+    return resp.content
+
+
+def _upload_to_storage(bucket: str, path: str, data: bytes, content_type: str) -> str:
+    import httpx
+
+    from app.config import settings
+
+    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{path}"
+    headers = {
+        **_supabase_storage_headers(),
+        "Content-Type": content_type,
+        "x-upsert": "true",
+    }
+    with httpx.Client(timeout=60) as client:
+        resp = client.put(url, content=data, headers=headers)
+    if resp.status_code not in (200, 201):
+        raise Exception(f"Storage upload failed: {resp.status_code} {resp.text[:200]}")
+    return path
+
+
+@celery_app.task(
+    name="neurohub.tasks.apply_watermark",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=10,
+    queue="compute",
+)
+def apply_watermark_task(self, request_id: str, evaluation_id: str):
+    """Download input image, apply watermark, upload result, trigger report."""
+    from app.config import settings
+    from app.models.evaluation import Evaluation
+    from app.models.request import CaseFile
+    from app.worker.watermark import apply_watermark
+
+    logger.info("Starting watermark task for request=%s evaluation=%s", request_id, evaluation_id)
+
+    with sync_session_factory() as session:
+        evaluation = session.execute(
+            select(Evaluation).where(Evaluation.id == uuid.UUID(evaluation_id))
+        ).scalar_one_or_none()
+        if not evaluation:
+            logger.error("Evaluation %s not found", evaluation_id)
+            return {"status": "NOT_FOUND"}
+
+        request = session.execute(
+            select(Request).where(Request.id == uuid.UUID(request_id))
+        ).scalar_one_or_none()
+        if not request:
+            logger.error("Request %s not found", request_id)
+            return {"status": "NOT_FOUND"}
+
+        # Find first image file from cases
+        case_ids = [c.id for c in request.cases] if request.cases else []
+        image_file = None
+        if case_ids:
+            files = (
+                session.execute(
+                    select(CaseFile).where(CaseFile.case_id.in_(case_ids))
+                )
+                .scalars()
+                .all()
+            )
+            for f in files:
+                if f.filename and any(
+                    f.filename.lower().endswith(ext)
+                    for ext in (".jpg", ".jpeg", ".png")
+                ):
+                    image_file = f
+                    break
+            if not image_file and files:
+                image_file = files[0]
+
+        if not image_file or not image_file.storage_path:
+            logger.warning("No image file found for request %s", request_id)
+            # Still proceed to report generation
+            session.add(
+                OutboxEvent(
+                    event_type="REPORT_REQUESTED",
+                    aggregate_type="request",
+                    aggregate_id=uuid.UUID(request_id),
+                    payload={"request_id": request_id},
+                )
+            )
+            session.commit()
+            return {"status": "NO_IMAGE"}
+
+        # Download input image
+        try:
+            image_bytes = _download_from_storage(
+                settings.storage_bucket_inputs, image_file.storage_path
+            )
+        except Exception as exc:
+            logger.exception("Failed to download image: %s", exc)
+            raise self.retry(exc=exc)
+
+        # Apply watermark
+        watermark_text = evaluation.watermark_text or f"NeuroHub - {request_id[:8]}"
+        try:
+            watermarked = apply_watermark(image_bytes, watermark_text)
+        except Exception as exc:
+            logger.exception("Watermark processing failed: %s", exc)
+            raise self.retry(exc=exc)
+
+        # Upload watermarked file
+        output_path = (
+            f"institutions/{request.institution_id}/requests/{request_id}"
+            f"/watermarked/{image_file.filename or 'output.jpg'}"
+        )
+        try:
+            _upload_to_storage(
+                settings.storage_bucket_outputs, output_path, watermarked, "image/jpeg"
+            )
+        except Exception as exc:
+            logger.exception("Failed to upload watermarked file: %s", exc)
+            raise self.retry(exc=exc)
+
+        # Update evaluation record
+        evaluation.output_storage_path = output_path
+
+        # Emit report generation event
+        session.add(
+            OutboxEvent(
+                event_type="REPORT_REQUESTED",
+                aggregate_type="request",
+                aggregate_id=uuid.UUID(request_id),
+                payload={"request_id": request_id, "watermarked_path": output_path},
+            )
+        )
+
+        # Notify user
+        _create_sync_notification(
+            session,
+            institution_id=request.institution_id,
+            user_id=request.requested_by,
+            event_type="WATERMARK_COMPLETED",
+            title="워터마크 처리 완료",
+            body="워터마크가 적용되었습니다. 보고서 생성이 진행됩니다.",
+            entity_type="request",
+            entity_id=request.id,
+            metadata={"output_path": output_path},
+        )
+
+        session.commit()
+        logger.info("Watermark completed for request %s", request_id)
+        return {"status": "COMPLETED", "output_path": output_path}
+
+
 def _build_report_content(
     request_id: str,
     service_name: str,

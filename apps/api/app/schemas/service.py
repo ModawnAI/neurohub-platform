@@ -156,6 +156,8 @@ class ServiceCreate(BaseModel):
     description: str | None = None
     department: str | None = None
     category: str | None = None
+    service_type: str = Field("AUTOMATIC", pattern="^(AUTOMATIC|HUMAN_IN_LOOP)$")
+    requires_evaluator: bool = False
     definition: ServiceDefinitionPayload | None = None
 
 
@@ -164,6 +166,8 @@ class ServiceUpdate(BaseModel):
     description: str | None = None
     department: str | None = None
     category: str | None = None
+    service_type: str | None = Field(None, pattern="^(AUTOMATIC|HUMAN_IN_LOOP)$")
+    requires_evaluator: bool | None = None
 
 
 class ServiceRead(BaseModel):
@@ -177,6 +181,8 @@ class ServiceRead(BaseModel):
     status: str
     department: str | None = None
     category: str | None = None
+    service_type: str = "AUTOMATIC"
+    requires_evaluator: bool = False
     input_schema: dict | None = None
     upload_slots: list | None = None
     options_schema: dict | None = None

@@ -89,11 +89,20 @@ def _dispatch_pipeline(event: OutboxEvent) -> None:
         )
 
 
+def _dispatch_watermark_requested(event: OutboxEvent) -> None:
+    celery_app.send_task(
+        "neurohub.tasks.apply_watermark",
+        args=[event.payload["request_id"], event.payload["evaluation_id"]],
+        queue="compute",
+    )
+
+
 EVENT_HANDLERS: dict[str, callable] = {
     "RUN_SUBMITTED": _dispatch_run_submitted,
     "REPORT_REQUESTED": _dispatch_report_requested,
     "RUN_COMPLETED": _dispatch_run_completed,
     "PIPELINE_DISPATCHED": _dispatch_pipeline,
+    "WATERMARK_REQUESTED": _dispatch_watermark_requested,
 }
 
 

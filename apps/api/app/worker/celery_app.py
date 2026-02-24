@@ -17,6 +17,7 @@ celery_app.conf.update(
         "neurohub.tasks.execute_run": {"queue": "compute"},
         "neurohub.tasks.generate_report": {"queue": "reporting"},
         "neurohub.tasks.auto_cancel_stale_requests": {"queue": "compute"},
+        "neurohub.tasks.apply_watermark": {"queue": "compute"},
     },
     beat_schedule={
         "auto-cancel-stale-requests": {

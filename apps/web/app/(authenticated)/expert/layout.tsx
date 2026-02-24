@@ -3,7 +3,7 @@
 import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
-import { House, ListChecks, GearSix } from "phosphor-react";
+import { House, ListChecks, Stamp, GearSix } from "phosphor-react";
 
 export default function ExpertLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -13,6 +13,7 @@ export default function ExpertLayout({ children }: { children: React.ReactNode }
   const navItems = [
     { href: "/expert/dashboard", label: t("nav.dashboard"), icon: <House size={20} /> },
     { href: "/expert/reviews", label: t("nav.reviewQueue"), icon: <ListChecks size={20} /> },
+    { href: "/expert/evaluations", label: t("nav.evaluations"), icon: <Stamp size={20} /> },
     { href: "/expert/settings", label: t("nav.settings"), icon: <GearSix size={20} /> },
   ];
 

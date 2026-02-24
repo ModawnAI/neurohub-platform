@@ -73,7 +73,7 @@ export default function ServiceDetailPage() {
   const openEdit = () => {
     if (!service) return;
     setEditDisplayName(service.display_name);
-    setEditVersion(service.version);
+    setEditVersion(String(service.version));
     setEditDepartment(service.department || "");
     setEditDescription((service as any).description || "");
     setEditing(true);

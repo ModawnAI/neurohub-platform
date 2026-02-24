@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     # Backward-compatible default tenant during migration stage
     default_institution_id: str = "00000000-0000-0000-0000-000000000001"
 
+    # Toss Payments
+    toss_secret_key: str = ""
+    toss_client_key: str = ""
+
+    # Reconciler
+    stale_run_threshold_minutes: int = 30
+    max_run_retries: int = 3
+
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

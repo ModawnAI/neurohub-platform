@@ -598,3 +598,102 @@ async def submit_request(
     )
     await db.flush()
     return {"request_id": str(req.id), "status": req.status, "run_ids": run_ids}
+
+
+# ---------------------------------------------------------------------------
+# Download endpoints (PDF report + watermarked file)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/requests/{request_id}/report/download")
+async def download_report(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: AuthenticatedUser,
+):
+    """Return presigned download URL for PDF report."""
+    import httpx
+
+    from app.config import settings
+    from app.models.report import Report
+
+    await _load_request_or_404(db, request_id, user.institution_id)
+
+    report_result = await db.execute(
+        select(Report)
+        .where(Report.request_id == request_id)
+        .order_by(Report.created_at.desc())
+        .limit(1)
+    )
+    report = report_result.scalar_one_or_none()
+    if not report or not report.pdf_storage_path:
+        raise HTTPException(status_code=404, detail="PDF report not available")
+
+    bucket = settings.storage_bucket_reports
+    url = f"{settings.supabase_url}/storage/v1/object/sign/{bucket}/{report.pdf_storage_path}"
+    headers = {
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "apikey": settings.supabase_anon_key,
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(url, json={"expiresIn": 900}, headers=headers)
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Failed to generate download URL")
+
+    data = resp.json()
+    signed_url = data.get("signedURL", "")
+    if signed_url and not signed_url.startswith("http"):
+        signed_url = f"{settings.supabase_url}/storage/v1{signed_url}"
+
+    return {
+        "download_url": signed_url,
+        "filename": f"report-{str(request_id)[:8]}.pdf",
+    }
+
+
+@router.get("/requests/{request_id}/watermarked/download")
+async def download_watermarked(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: AuthenticatedUser,
+):
+    """Return presigned download URL for watermarked file."""
+    import httpx
+
+    from app.config import settings
+    from app.models.report import Report
+
+    await _load_request_or_404(db, request_id, user.institution_id)
+
+    report_result = await db.execute(
+        select(Report)
+        .where(Report.request_id == request_id)
+        .order_by(Report.created_at.desc())
+        .limit(1)
+    )
+    report = report_result.scalar_one_or_none()
+    if not report or not report.watermarked_storage_path:
+        raise HTTPException(status_code=404, detail="Watermarked file not available")
+
+    bucket = settings.storage_bucket_outputs
+    url = f"{settings.supabase_url}/storage/v1/object/sign/{bucket}/{report.watermarked_storage_path}"
+    headers = {
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "apikey": settings.supabase_anon_key,
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(url, json={"expiresIn": 900}, headers=headers)
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Failed to generate download URL")
+
+    data = resp.json()
+    signed_url = data.get("signedURL", "")
+    if signed_url and not signed_url.startswith("http"):
+        signed_url = f"{settings.supabase_url}/storage/v1{signed_url}"
+
+    return {
+        "download_url": signed_url,
+        "filename": f"watermarked-{str(request_id)[:8]}.jpg",
+    }

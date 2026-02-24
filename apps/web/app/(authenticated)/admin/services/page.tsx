@@ -16,6 +16,8 @@ const INITIAL_CREATE: ServiceCreateValues = {
   version: "1.0",
   department: "",
   description: "",
+  service_type: "AUTOMATIC",
+  requires_evaluator: false,
 };
 
 export default function AdminServicesPage() {
@@ -42,6 +44,8 @@ export default function AdminServicesPage() {
         version: data.version,
         department: data.department || undefined,
         description: data.description || undefined,
+        service_type: data.service_type,
+        requires_evaluator: data.requires_evaluator,
       });
     },
     onSuccess: () => {
@@ -59,7 +63,7 @@ export default function AdminServicesPage() {
   function openEdit(svc: ServiceRead) {
     setEditingService(svc);
     setEditDisplayName(svc.display_name);
-    setEditVersion(svc.version);
+    setEditVersion(String(svc.version));
     setEditDepartment(svc.department || "");
   }
 
@@ -125,6 +129,19 @@ export default function AdminServicesPage() {
                     {t("adminServices.descriptionOptional")}
                     <textarea className="textarea" value={createForm.values.description ?? ""} onChange={(e) => createForm.setField("description", e.target.value)} rows={2} />
                   </label>
+                  <div className="form-grid">
+                    <label className="field">
+                      {t("adminServices.serviceType")}
+                      <select className="input" value={createForm.values.service_type} onChange={(e) => createForm.setField("service_type", e.target.value as "AUTOMATIC" | "HUMAN_IN_LOOP")}>
+                        <option value="AUTOMATIC">{t("adminServices.automatic")}</option>
+                        <option value="HUMAN_IN_LOOP">{t("adminServices.humanInLoop")}</option>
+                      </select>
+                    </label>
+                    <label className="field" style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 24 }}>
+                      <input type="checkbox" checked={createForm.values.requires_evaluator ?? false} onChange={(e) => createForm.setField("requires_evaluator", e.target.checked)} />
+                      {t("adminServices.requiresEvaluator")}
+                    </label>
+                  </div>
                   {createMut.isError && <p className="error-text">{(createMut.error as Error).message}</p>}
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <Dialog.Close asChild><button className="btn btn-secondary">{t("common.cancel")}</button></Dialog.Close>
@@ -151,6 +168,7 @@ export default function AdminServicesPage() {
                   <th>{t("adminServices.tableInternalName")}</th>
                   <th>{t("adminServices.tableVersion")}</th>
                   <th>{t("adminServices.tableDepartment")}</th>
+                  <th>{t("adminServices.tableType")}</th>
                   <th>{t("adminServices.tableStatus")}</th>
                   <th>{t("adminServices.tableCreatedDate")}</th>
                   <th></th>
@@ -163,6 +181,11 @@ export default function AdminServicesPage() {
                     <td className="mono-cell">{svc.name}</td>
                     <td>v{svc.version}</td>
                     <td>{svc.department || "-"}</td>
+                    <td>
+                      <span className={`status-chip ${svc.service_type === "HUMAN_IN_LOOP" ? "status-pending" : "status-final"}`}>
+                        {svc.service_type === "HUMAN_IN_LOOP" ? t("adminServices.humanInLoop") : t("adminServices.automatic")}
+                      </span>
+                    </td>
                     <td>
                       <span className={`status-chip ${svc.status === "ACTIVE" ? "status-final" : "status-cancelled"}`}>
                         {svc.status === "ACTIVE" ? t("common.active") : t("common.inactive")}
@@ -190,7 +213,7 @@ export default function AdminServicesPage() {
                 ))}
                 {services.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
+                    <td colSpan={8} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
                       {t("adminServices.noServices")}
                     </td>
                   </tr>

@@ -2,7 +2,7 @@
 
 import { Sidebar } from "@/components/sidebar";
 import { useT } from "@/lib/i18n";
-import { House, ListChecks, PlusCircle, Cube, GearSix, FileText } from "phosphor-react";
+import { House, ListChecks, PlusCircle, Cube, GearSix, FileText, CreditCard } from "phosphor-react";
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const t = useT();
@@ -13,6 +13,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     { href: "/user/requests", label: t("nav.myRequests"), icon: <ListChecks size={20} /> },
     { href: "/user/reports", label: t("nav.reports"), icon: <FileText size={20} /> },
     { href: "/user/new-request", label: t("nav.newRequest"), icon: <PlusCircle size={20} /> },
+    { href: "/user/payment", label: t("nav.payment"), icon: <CreditCard size={20} /> },
     { href: "/user/settings", label: t("nav.settings"), icon: <GearSix size={20} /> },
   ];
 

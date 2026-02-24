@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from app.dependencies import AuthenticatedUser, CurrentUser, DbSession, require_roles
+from app.models.evaluation import ServiceEvaluator
 from app.models.service import PipelineDefinition, ServiceDefinition
+from app.schemas.evaluation import (
+    ServiceEvaluatorCreate,
+    ServiceEvaluatorListResponse,
+    ServiceEvaluatorRead,
+)
 from app.schemas.service import (
     PipelineListResponse,
     PipelineRead,
@@ -29,6 +35,8 @@ def _service_to_read(s: ServiceDefinition) -> ServiceRead:
         status=s.status,
         department=s.department,
         category=s.category,
+        service_type=s.service_type,
+        requires_evaluator=s.requires_evaluator,
         input_schema=s.input_schema,
         upload_slots=s.upload_slots,
         options_schema=s.options_schema,
@@ -134,6 +142,8 @@ async def create_service(
         version_label="1.0.0",
         department=body.department,
         category=body.category,
+        service_type=body.service_type,
+        requires_evaluator=body.requires_evaluator,
         status="DRAFT",
         created_by=user.id,
         input_schema=defn.input_schema.model_dump() if defn and defn.input_schema else None,
@@ -287,3 +297,113 @@ async def create_new_version(
     await db.flush()
     await db.refresh(service)
     return _service_to_read(service)
+
+
+# ---------------------------------------------------------------------------
+# Evaluator Management
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/admin/services/{service_id}/evaluators",
+    response_model=ServiceEvaluatorListResponse,
+)
+async def list_evaluators(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    result = await db.execute(
+        select(ServiceEvaluator).where(
+            ServiceEvaluator.service_id == service_id,
+            ServiceEvaluator.institution_id == user.institution_id,
+            ServiceEvaluator.is_active.is_(True),
+        )
+    )
+    evaluators = result.scalars().all()
+    return ServiceEvaluatorListResponse(
+        items=[
+            ServiceEvaluatorRead(
+                id=e.id,
+                service_id=e.service_id,
+                user_id=e.user_id,
+                institution_id=e.institution_id,
+                is_active=e.is_active,
+                created_at=e.created_at,
+            )
+            for e in evaluators
+        ]
+    )
+
+
+@router.post(
+    "/admin/services/{service_id}/evaluators",
+    response_model=ServiceEvaluatorRead,
+    status_code=201,
+)
+async def assign_evaluator(
+    service_id: uuid.UUID,
+    body: ServiceEvaluatorCreate,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    svc = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    if not svc.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    existing = await db.execute(
+        select(ServiceEvaluator).where(
+            ServiceEvaluator.service_id == service_id,
+            ServiceEvaluator.user_id == body.user_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Evaluator already assigned")
+
+    evaluator = ServiceEvaluator(
+        service_id=service_id,
+        user_id=body.user_id,
+        institution_id=user.institution_id,
+        is_active=True,
+    )
+    db.add(evaluator)
+    await db.flush()
+    await db.refresh(evaluator)
+    return ServiceEvaluatorRead(
+        id=evaluator.id,
+        service_id=evaluator.service_id,
+        user_id=evaluator.user_id,
+        institution_id=evaluator.institution_id,
+        is_active=evaluator.is_active,
+        created_at=evaluator.created_at,
+    )
+
+
+@router.delete(
+    "/admin/services/{service_id}/evaluators/{user_id}",
+    status_code=204,
+)
+async def remove_evaluator(
+    service_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    result = await db.execute(
+        select(ServiceEvaluator).where(
+            ServiceEvaluator.service_id == service_id,
+            ServiceEvaluator.user_id == user_id,
+            ServiceEvaluator.institution_id == user.institution_id,
+        )
+    )
+    evaluator = result.scalar_one_or_none()
+    if not evaluator:
+        raise HTTPException(status_code=404, detail="Evaluator assignment not found")
+
+    evaluator.is_active = False
+    await db.flush()

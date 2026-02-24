@@ -64,6 +64,8 @@ export interface ServiceRead {
   status: string;
   department: string | null;
   category: string | null;
+  service_type: string;
+  requires_evaluator: boolean;
   input_schema: import("@/components/dynamic-form/types").InputSchema | null;
   upload_slots: import("@/components/dynamic-form/types").UploadSlot[] | null;
   options_schema: import("@/components/dynamic-form/types").OptionsSchema | null;
@@ -663,8 +665,13 @@ export async function createService(payload: {
   version?: string;
   department?: string;
   description?: string;
+  service_type?: string;
+  requires_evaluator?: boolean;
 }) {
-  return apiFetch<ServiceRead>("/services", { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch<ServiceRead>("/admin/services", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function updateService(
@@ -675,9 +682,11 @@ export async function updateService(
     department?: string;
     description?: string;
     status?: string;
+    service_type?: string;
+    requires_evaluator?: boolean;
   },
 ) {
-  return apiFetch<ServiceRead>(`/services/${serviceId}`, {
+  return apiFetch<ServiceRead>(`/admin/services/${serviceId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -703,4 +712,148 @@ export interface TransitionRecord {
   actor_id: string | null;
   note: string | null;
   created_at: string;
+}
+
+// ── Evaluations ──
+
+export interface EvaluationQueueItem {
+  request_id: string;
+  request_status: string;
+  service_name: string;
+  service_display_name: string;
+  case_count: number;
+  created_at: string;
+  priority: string;
+}
+
+export interface EvaluationRead {
+  id: string;
+  institution_id: string;
+  request_id: string;
+  evaluator_id: string | null;
+  decision: string;
+  comments: string | null;
+  watermark_text: string | null;
+  output_storage_path: string | null;
+  created_at: string;
+}
+
+export interface EvaluationDetailResponse {
+  request_id: string;
+  request_status: string;
+  service_name: string;
+  service_display_name: string;
+  cases: Array<Record<string, unknown>>;
+  files: Array<Record<string, unknown>>;
+  runs: Array<Record<string, unknown>>;
+  evaluations: EvaluationRead[];
+}
+
+export interface ServiceEvaluatorRead {
+  id: string;
+  service_id: string;
+  user_id: string;
+  institution_id: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function listEvaluationQueue() {
+  return apiFetch<{ items: EvaluationQueueItem[] }>("/evaluations/queue");
+}
+
+export async function getEvaluationDetail(requestId: string) {
+  return apiFetch<EvaluationDetailResponse>(`/evaluations/${requestId}`);
+}
+
+export async function submitEvaluation(
+  requestId: string,
+  payload: { decision: string; comments?: string; watermark_text?: string },
+) {
+  return apiFetch<EvaluationRead>(`/evaluations/${requestId}/decide`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listServiceEvaluators(serviceId: string) {
+  return apiFetch<{ items: ServiceEvaluatorRead[] }>(
+    `/admin/services/${serviceId}/evaluators`,
+  );
+}
+
+export async function assignEvaluator(serviceId: string, userId: string) {
+  return apiFetch<ServiceEvaluatorRead>(
+    `/admin/services/${serviceId}/evaluators`,
+    { method: "POST", body: JSON.stringify({ user_id: userId }) },
+  );
+}
+
+export async function removeEvaluator(serviceId: string, userId: string) {
+  return apiFetch<void>(`/admin/services/${serviceId}/evaluators/${userId}`, {
+    method: "DELETE",
+  });
+}
+
+// ── Downloads ──
+
+export async function getReportDownloadUrl(requestId: string) {
+  return apiFetch<{ download_url: string; filename: string }>(
+    `/requests/${requestId}/report/download`,
+  );
+}
+
+export async function getWatermarkedDownloadUrl(requestId: string) {
+  return apiFetch<{ download_url: string; filename: string }>(
+    `/requests/${requestId}/watermarked/download`,
+  );
+}
+
+// ── Payments ──
+
+export interface PaymentPrepareResponse {
+  payment_id: string;
+  order_id: string;
+  amount: number;
+  currency: string;
+  customer_key: string;
+}
+
+export interface PaymentRead {
+  id: string;
+  order_id: string;
+  payment_key: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  method: string | null;
+  request_id: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+}
+
+export async function preparePayment(payload: {
+  service_id: string;
+  amount: number;
+  request_id?: string;
+}) {
+  return apiFetch<PaymentPrepareResponse>("/payments/prepare", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function confirmPayment(payload: {
+  payment_key: string;
+  order_id: string;
+  amount: number;
+}) {
+  return apiFetch<{ payment_id: string; status: string; method?: string; receipt_url?: string }>(
+    "/payments/confirm",
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function getPaymentHistory() {
+  return apiFetch<{ items: PaymentRead[] }>("/payments/history");
 }

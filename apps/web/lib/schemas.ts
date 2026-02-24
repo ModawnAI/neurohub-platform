@@ -110,6 +110,8 @@ export const serviceCreateSchema = z.object({
   version: z.string().default("1.0"),
   department: z.string().max(100).optional(),
   description: z.string().max(2000).optional(),
+  service_type: z.enum(["AUTOMATIC", "HUMAN_IN_LOOP"]).default("AUTOMATIC"),
+  requires_evaluator: z.boolean().default(false),
 });
 
 export type ServiceCreateValues = z.infer<typeof serviceCreateSchema>;

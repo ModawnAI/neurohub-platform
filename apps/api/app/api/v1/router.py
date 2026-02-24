@@ -6,9 +6,11 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.b2b import router as b2b_router
 from app.api.v1.batch import router as batch_router
 from app.api.v1.billing import router as billing_router
+from app.api.v1.evaluations import router as evaluations_router
 from app.api.v1.health import router as health_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.organizations import router as organizations_router
+from app.api.v1.payments import router as payments_router
 from app.api.v1.requests import router as requests_router
 from app.api.v1.reviews import router as reviews_router
 from app.api.v1.services import router as services_router
@@ -32,3 +34,5 @@ api_v1_router.include_router(admin_router)
 api_v1_router.include_router(b2b_router)
 api_v1_router.include_router(webhooks_router)
 api_v1_router.include_router(batch_router)
+api_v1_router.include_router(evaluations_router)
+api_v1_router.include_router(payments_router)

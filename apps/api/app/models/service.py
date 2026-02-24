@@ -19,6 +19,7 @@ class ServiceDefinition(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    version_legacy: Mapped[str] = mapped_column(String(30), nullable=False, default="1.0.0")
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     version_label: Mapped[str] = mapped_column(String(30), nullable=False, default="1.0.0")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
@@ -42,6 +43,12 @@ class ServiceDefinition(UUIDMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("service_definitions.id", ondelete="SET NULL"),
     )
+
+    # --- Evaluation / service type fields ---
+    service_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="AUTOMATIC"
+    )  # AUTOMATIC | HUMAN_IN_LOOP
+    requires_evaluator: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
