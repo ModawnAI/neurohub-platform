@@ -108,22 +108,36 @@ async def confirm_payment(
         await db.flush()
         raise HTTPException(status_code=400, detail="Amount mismatch")
 
-    # Call Toss Payments API
-    from app.services.toss_payments import TossPaymentsClient
+    # Call Toss Payments API (or bypass in test mode)
+    from app.config import settings
 
-    toss = TossPaymentsClient()
-    try:
-        toss_response = await toss.confirm_payment(
-            payment_key=body.payment_key,
-            order_id=body.order_id,
-            amount=int(body.amount),
-        )
-    except Exception as exc:
-        payment.status = "FAILED"
-        payment.failed_at = datetime.now(timezone.utc)
-        payment.error_detail = str(exc)[:2000]
-        await db.flush()
-        raise HTTPException(status_code=502, detail=f"Toss API error: {exc}") from exc
+    if not settings.toss_secret_key:
+        # Test mode: bypass Toss API, simulate successful confirmation
+        toss_response = {
+            "paymentKey": body.payment_key,
+            "orderId": body.order_id,
+            "status": "DONE",
+            "method": "카드",
+            "totalAmount": int(body.amount),
+            "receipt": {"url": None},
+            "_test_mode": True,
+        }
+    else:
+        from app.services.toss_payments import TossPaymentsClient
+
+        toss = TossPaymentsClient()
+        try:
+            toss_response = await toss.confirm_payment(
+                payment_key=body.payment_key,
+                order_id=body.order_id,
+                amount=int(body.amount),
+            )
+        except Exception as exc:
+            payment.status = "FAILED"
+            payment.failed_at = datetime.now(timezone.utc)
+            payment.error_detail = str(exc)[:2000]
+            await db.flush()
+            raise HTTPException(status_code=502, detail=f"Toss API error: {exc}") from exc
 
     payment.status = "CONFIRMED"
     payment.payment_key = body.payment_key
@@ -204,13 +218,16 @@ async def cancel_payment(
     if not payment.payment_key:
         raise HTTPException(status_code=409, detail="No payment key for cancellation")
 
-    from app.services.toss_payments import TossPaymentsClient
+    from app.config import settings
 
-    toss = TossPaymentsClient()
-    try:
-        await toss.cancel_payment(payment.payment_key, body.reason)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Toss cancel error: {exc}") from exc
+    if settings.toss_secret_key:
+        from app.services.toss_payments import TossPaymentsClient
+
+        toss = TossPaymentsClient()
+        try:
+            await toss.cancel_payment(payment.payment_key, body.reason)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Toss cancel error: {exc}") from exc
 
     payment.status = "REFUNDED"
     await db.flush()
