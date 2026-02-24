@@ -603,7 +603,7 @@ a {
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
@@ -693,6 +693,105 @@ a {
   height: 2px;
   background: var(--border-strong);
   z-index: 0;
+}
+
+/* Usage Guide */
+.guide-section {
+  margin-top: 8px;
+}
+
+.guide-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.guide-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.guide-tab:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.guide-tab--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.guide-tab--active:hover {
+  color: #fff;
+}
+
+.guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: box-shadow 0.15s ease;
+}
+
+.guide-step:hover {
+  box-shadow: var(--shadow);
+}
+
+.guide-step-number {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guide-step-icon {
+  flex-shrink: 0;
+  color: var(--primary);
+  margin-top: 2px;
+}
+
+.guide-step-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.guide-step-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
 }
 
 .audience-grid {
@@ -2281,6 +2380,22 @@ a {
   .workflow-step .workflow-step-number {
     margin: 0;
     flex-shrink: 0;
+  }
+
+  /* ── Landing: Guide ── */
+  .guide-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .guide-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .guide-step {
+    padding: 16px;
+    gap: 12px;
   }
 
   /* ── Landing: Visionary ── */

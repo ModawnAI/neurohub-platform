@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   FeatureCards,
   WorkflowSteps,
+  UsageGuide,
   AudienceCards,
   VisionarySection,
   LandingNav,
@@ -59,6 +60,15 @@ export function LandingPageContent() {
             {t("landing.sectionSubtitleWorkflow")}
           </p>
           <WorkflowSteps />
+        </section>
+
+        {/* 이용 가이드 */}
+        <section className="landing-section">
+          <h2 className="landing-section-title">{t("landing.sectionGuideTitle")}</h2>
+          <p className="landing-section-subtitle">
+            {t("landing.sectionGuideSubtitle")}
+          </p>
+          <UsageGuide />
         </section>
 
         {/* 대상 사용자 */}

@@ -7,9 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n";
 import {
   ShieldCheck,
-  CurrencyKrw,
   ArrowsClockwise,
-  ClipboardText,
   Desktop,
   FirstAidKit,
   ChartLineUp,
@@ -17,6 +15,19 @@ import {
   List,
   X,
   Globe,
+  Exam,
+  CreditCard,
+  Stamp,
+  DownloadSimple,
+  UserCircle,
+  MagnifyingGlass,
+  ClipboardText,
+  ListChecks,
+  FileSearch,
+  CheckCircle,
+  Gear,
+  Monitor,
+  Buildings,
 } from "phosphor-react";
 
 export function LandingNav() {
@@ -92,32 +103,46 @@ export function FeatureCards() {
 
   const features = [
     {
-      icon: <ShieldCheck size={22} weight="duotone" />,
+      icon: <Exam size={22} weight="duotone" />,
       bg: "#dbeafe",
       color: "#1d4ed8",
+      title: t("landing.featureEvaluation"),
+      desc: t("landing.featureEvaluationDesc"),
+    },
+    {
+      icon: <CreditCard size={22} weight="duotone" />,
+      bg: "#dcfce7",
+      color: "#166534",
+      title: t("landing.featurePayment"),
+      desc: t("landing.featurePaymentDesc"),
+    },
+    {
+      icon: <Stamp size={22} weight="duotone" />,
+      bg: "#ede9fe",
+      color: "#6d28d9",
+      title: t("landing.featureWatermark"),
+      desc: t("landing.featureWatermarkDesc"),
+    },
+    {
+      icon: <DownloadSimple size={22} weight="duotone" />,
+      bg: "#fef3c7",
+      color: "#b45309",
+      title: t("landing.featureDownload"),
+      desc: t("landing.featureDownloadDesc"),
+    },
+    {
+      icon: <ShieldCheck size={22} weight="duotone" />,
+      bg: "#fce4ec",
+      color: "#c62828",
       title: t("landing.featureCompliance"),
       desc: t("landing.featureComplianceDesc"),
     },
     {
-      icon: <CurrencyKrw size={22} weight="duotone" />,
-      bg: "#dcfce7",
-      color: "#166534",
-      title: t("landing.featureCostMgt"),
-      desc: t("landing.featureCostMgtDesc"),
-    },
-    {
       icon: <ArrowsClockwise size={22} weight="duotone" />,
-      bg: "#ede9fe",
-      color: "#6d28d9",
+      bg: "#e0f2f1",
+      color: "#00695c",
       title: t("landing.featureReliability"),
       desc: t("landing.featureReliabilityDesc"),
-    },
-    {
-      icon: <ClipboardText size={22} weight="duotone" />,
-      bg: "#fef3c7",
-      color: "#b45309",
-      title: t("landing.featureAudit"),
-      desc: t("landing.featureAuditDesc"),
     },
   ];
 
@@ -145,6 +170,8 @@ export function WorkflowSteps() {
     { num: 3, title: t("landing.workflowStep3Title"), desc: t("landing.workflowStep3Desc") },
     { num: 4, title: t("landing.workflowStep4Title"), desc: t("landing.workflowStep4Desc") },
     { num: 5, title: t("landing.workflowStep5Title"), desc: t("landing.workflowStep5Desc") },
+    { num: 6, title: t("landing.workflowStep6Title"), desc: t("landing.workflowStep6Desc") },
+    { num: 7, title: t("landing.workflowStep7Title"), desc: t("landing.workflowStep7Desc") },
   ];
 
   return (
@@ -159,6 +186,66 @@ export function WorkflowSteps() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+export function UsageGuide() {
+  const t = useT();
+  const [activeTab, setActiveTab] = useState<"user" | "expert" | "admin">("user");
+
+  const tabs = [
+    { key: "user" as const, label: t("landing.guideTabUser"), icon: <FirstAidKit size={16} /> },
+    { key: "expert" as const, label: t("landing.guideTabExpert"), icon: <ChartLineUp size={16} /> },
+    { key: "admin" as const, label: t("landing.guideTabAdmin"), icon: <Desktop size={16} /> },
+  ];
+
+  const guides = {
+    user: [
+      { icon: <ClipboardText size={20} weight="duotone" />, title: t("landing.guideUserStep1Title"), desc: t("landing.guideUserStep1Desc") },
+      { icon: <MagnifyingGlass size={20} weight="duotone" />, title: t("landing.guideUserStep2Title"), desc: t("landing.guideUserStep2Desc") },
+      { icon: <DownloadSimple size={20} weight="duotone" />, title: t("landing.guideUserStep3Title"), desc: t("landing.guideUserStep3Desc") },
+    ],
+    expert: [
+      { icon: <ListChecks size={20} weight="duotone" />, title: t("landing.guideExpertStep1Title"), desc: t("landing.guideExpertStep1Desc") },
+      { icon: <FileSearch size={20} weight="duotone" />, title: t("landing.guideExpertStep2Title"), desc: t("landing.guideExpertStep2Desc") },
+      { icon: <CheckCircle size={20} weight="duotone" />, title: t("landing.guideExpertStep3Title"), desc: t("landing.guideExpertStep3Desc") },
+    ],
+    admin: [
+      { icon: <Gear size={20} weight="duotone" />, title: t("landing.guideAdminStep1Title"), desc: t("landing.guideAdminStep1Desc") },
+      { icon: <Monitor size={20} weight="duotone" />, title: t("landing.guideAdminStep2Title"), desc: t("landing.guideAdminStep2Desc") },
+      { icon: <Buildings size={20} weight="duotone" />, title: t("landing.guideAdminStep3Title"), desc: t("landing.guideAdminStep3Desc") },
+    ],
+  };
+
+  const steps = guides[activeTab];
+
+  return (
+    <div className="guide-section">
+      <div className="guide-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            className={`guide-tab${activeTab === tab.key ? " guide-tab--active" : ""}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="guide-content">
+        {steps.map((step, i) => (
+          <div key={i} className="guide-step">
+            <div className="guide-step-number">{i + 1}</div>
+            <div className="guide-step-icon">{step.icon}</div>
+            <div>
+              <p className="guide-step-title">{step.title}</p>
+              <p className="guide-step-desc">{step.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
