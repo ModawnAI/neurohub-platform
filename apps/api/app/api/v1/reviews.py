@@ -1,15 +1,17 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import Request as FastAPIRequest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DbSession, require_roles
-from app.services.notification_service import create_notification
+from app.models.audit import PatientAccessLog
 from app.models.qc_decision import QCDecision
 from app.models.report import Report, ReportReview
 from app.models.request import Case, Request
-from app.models.run import Run, RunStep
+from app.models.run import Run
+from app.schemas.request import RequestRead
 from app.schemas.review import (
     QCDecisionCreate,
     ReportReviewCreate,
@@ -17,7 +19,7 @@ from app.schemas.review import (
     ReviewQueueItem,
     ReviewQueueResponse,
 )
-from app.schemas.request import RequestRead
+from app.services.notification_service import create_notification
 from app.services.state_machine import RequestStatus as SMStatus
 from app.services.state_machine import validate_transition
 
@@ -84,7 +86,12 @@ async def list_review_queue(
 
 
 @router.get("/{request_id}", response_model=ReviewDetail)
-async def get_review_detail(request_id: uuid.UUID, db: DbSession, user: CurrentUser = Depends(_require_expert)):
+async def get_review_detail(
+    request_id: uuid.UUID,
+    http_request: FastAPIRequest,
+    db: DbSession,
+    user: CurrentUser = Depends(_require_expert),
+):
     result = await db.execute(
         select(Request)
         .options(selectinload(Request.cases).selectinload(Case.files))
@@ -93,6 +100,22 @@ async def get_review_detail(request_id: uuid.UUID, db: DbSession, user: CurrentU
     req = result.scalar_one_or_none()
     if not req:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    # Log patient data access for audit compliance
+    client_ip = http_request.client.host if http_request.client else None
+    for case in req.cases:
+        if case.patient_ref:
+            db.add(
+                PatientAccessLog(
+                    institution_id=user.institution_id,
+                    user_id=user.id,
+                    patient_ref=case.patient_ref,
+                    access_type="REVIEW",
+                    resource_type="request",
+                    resource_id=req.id,
+                    ip_address=client_ip,
+                )
+            )
 
     request_read = RequestRead(
         id=req.id,
@@ -116,12 +139,19 @@ async def get_review_detail(request_id: uuid.UUID, db: DbSession, user: CurrentU
     )
 
     cases_data = [
-        {"id": str(c.id), "patient_ref": c.patient_ref, "status": c.status, "demographics": c.demographics}
+        {
+            "id": str(c.id),
+            "patient_ref": c.patient_ref,
+            "status": c.status,
+            "demographics": c.demographics,
+        }
         for c in (req.cases or [])
     ]
 
     runs_result = await db.execute(
-        select(Run).options(selectinload(Run.steps)).where(Run.request_id == request_id)
+        select(Run)
+        .options(selectinload(Run.steps))
+        .where(Run.request_id == request_id)
         .order_by(Run.created_at.desc())
     )
     runs = runs_result.scalars().all()
@@ -155,7 +185,9 @@ async def get_review_detail(request_id: uuid.UUID, db: DbSession, user: CurrentU
     ]
 
     qc_result = await db.execute(
-        select(QCDecision).where(QCDecision.request_id == request_id).order_by(QCDecision.created_at.desc())
+        select(QCDecision)
+        .where(QCDecision.request_id == request_id)
+        .order_by(QCDecision.created_at.desc())
     )
     qc_decisions = qc_result.scalars().all()
     qc_data = [
@@ -170,10 +202,15 @@ async def get_review_detail(request_id: uuid.UUID, db: DbSession, user: CurrentU
         for q in qc_decisions
     ]
 
-    review_result = await db.execute(
-        select(ReportReview).where(ReportReview.report_id.in_([r.id for r in reports]))
-        .order_by(ReportReview.created_at.desc())
-    ) if reports else None
+    review_result = (
+        await db.execute(
+            select(ReportReview)
+            .where(ReportReview.report_id.in_([r.id for r in reports]))
+            .order_by(ReportReview.created_at.desc())
+        )
+        if reports
+        else None
+    )
     review_data = []
     if review_result:
         reviews = review_result.scalars().all()
@@ -214,7 +251,9 @@ async def submit_qc_decision(
     if not req:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
     if req.status != "QC":
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Request is not in QC status")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Request is not in QC status"
+        )
 
     qc = QCDecision(
         institution_id=user.institution_id,
@@ -278,7 +317,10 @@ async def submit_report_review(
         )
 
     report_result = await db.execute(
-        select(Report).where(Report.request_id == request_id).order_by(Report.created_at.desc()).limit(1)
+        select(Report)
+        .where(Report.request_id == request_id)
+        .order_by(Report.created_at.desc())
+        .limit(1)
     )
     report = report_result.scalar_one_or_none()
 

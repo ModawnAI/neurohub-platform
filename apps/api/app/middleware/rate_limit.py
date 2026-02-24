@@ -1,6 +1,14 @@
-"""Rate limiting middleware with Redis backend (falls back to in-memory)."""
-import time
+"""Rate limiting middleware with Redis backend (falls back to in-memory).
+
+Supports per-endpoint category limits:
+- auth: login/register endpoints (strict)
+- write: POST/PUT/PATCH/DELETE (moderate)
+- read: GET requests (generous)
+- upload: file upload endpoints (strict)
+"""
+
 import logging
+import time
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -8,9 +16,38 @@ from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("neurohub.rate_limit")
 
+# Default window in seconds
 _WINDOW_SEC = 60
-_LIMIT_UNAUTH = 60
-_LIMIT_AUTH = 300
+
+# Per-category limits (requests per window)
+_CATEGORY_LIMITS: dict[str, dict[str, int]] = {
+    "auth": {"unauth": 10, "auth": 20},
+    "upload": {"unauth": 5, "auth": 30},
+    "write": {"unauth": 30, "auth": 120},
+    "read": {"unauth": 60, "auth": 300},
+    "default": {"unauth": 60, "auth": 300},
+}
+
+# Path prefix → category mapping
+_PATH_CATEGORIES: list[tuple[str, str]] = [
+    ("/api/v1/auth", "auth"),
+    ("/api/v1/uploads", "upload"),
+    ("/api/v1/b2b", "write"),
+]
+
+# HTTP methods that are writes
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _categorize_request(path: str, method: str) -> str:
+    """Determine rate limit category from request path and method."""
+    for prefix, category in _PATH_CATEGORIES:
+        if path.startswith(prefix):
+            return category
+    if method in _WRITE_METHODS:
+        return "write"
+    return "read"
+
 
 # In-memory fallback
 _buckets: dict[str, list[float]] = {}
@@ -64,7 +101,9 @@ def _get_rate_limiter():
         return _limiter
     try:
         import redis
+
         from app.config import settings
+
         client = redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=2)
         client.ping()
         _limiter = _RedisLimiter(client)
@@ -78,6 +117,7 @@ def _get_rate_limiter():
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         from app.config import settings
+
         # Skip rate limiting in test/development and for health/metrics
         if settings.app_env in ("test", "development"):
             return await call_next(request)
@@ -85,22 +125,31 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
-        has_auth = bool(
-            request.headers.get("authorization") or request.headers.get("x-api-key")
-        )
-        limit = _LIMIT_AUTH if has_auth else _LIMIT_UNAUTH
+        has_auth = bool(request.headers.get("authorization") or request.headers.get("x-api-key"))
+
+        category = _categorize_request(request.url.path, request.method)
+        limits = _CATEGORY_LIMITS.get(category, _CATEGORY_LIMITS["default"])
+        limit = limits["auth"] if has_auth else limits["unauth"]
+
+        # Key includes category for separate buckets
+        rate_key = f"{client_ip}:{category}"
 
         limiter = _get_rate_limiter()
-        allowed, count = limiter.check_and_increment(client_ip, limit)
+        allowed, count = limiter.check_and_increment(rate_key, limit)
 
         if not allowed:
             return JSONResponse(
                 status_code=429,
-                content={"error": "RATE_LIMITED", "message": "Too many requests"},
+                content={
+                    "error": "RATE_LIMITED",
+                    "message": "Too many requests",
+                    "detail": {"category": category, "retry_after": _WINDOW_SEC},
+                },
                 headers={"Retry-After": str(_WINDOW_SEC)},
             )
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(limit)
         response.headers["X-RateLimit-Remaining"] = str(max(0, limit - count))
+        response.headers["X-RateLimit-Category"] = category
         return response
