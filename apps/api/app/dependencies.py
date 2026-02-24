@@ -45,6 +45,7 @@ def require_roles(*roles: str):
                 detail=f"Required roles: {', '.join(sorted(roles))}",
             )
         return user
+
     return checker
 
 
@@ -118,7 +119,7 @@ async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None
     result = await db.execute(
         select(InstitutionApiKey).where(
             InstitutionApiKey.key_prefix == prefix,
-            InstitutionApiKey.status == "ACTIVE",
+            InstitutionApiKey.status.in_(["ACTIVE", "ROTATING"]),
         )
     )
     key_record = result.scalar_one_or_none()
@@ -135,8 +136,10 @@ async def _resolve_api_key(api_key: str, db: AsyncSession) -> CurrentUser | None
     if key_record.expires_at and key_record.expires_at < datetime.now(timezone.utc):
         return None
 
-    # Update last_used_at
+    # Update usage tracking
     key_record.last_used_at = datetime.now(timezone.utc)
+    if hasattr(key_record, "usage_count"):
+        key_record.usage_count = (key_record.usage_count or 0) + 1
 
     return CurrentUser(
         id=key_record.created_by or uuid.UUID("00000000-0000-0000-0000-000000000000"),
@@ -174,7 +177,10 @@ async def get_current_user(
             claims = await verify_supabase_jwt(token)
             return _user_from_jwt_claims(claims)
 
-    if not (settings.allow_dev_auth_fallback and (settings.app_debug or settings.app_env == "development")):
+    if not (
+        settings.allow_dev_auth_fallback
+        and (settings.app_debug or settings.app_env == "development")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Bearer token is required",

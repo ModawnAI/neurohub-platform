@@ -48,9 +48,44 @@ class ReportReview(UUIDMixin, Base):
     )
     decision: Mapped[str] = mapped_column(String(30), nullable=False)
     comments: Mapped[str | None] = mapped_column(Text)
+    # Structured findings for expert reviews
+    severity: Mapped[str | None] = mapped_column(String(20))  # LOW, MEDIUM, HIGH, CRITICAL
+    category: Mapped[str | None] = mapped_column(String(50))  # ARTIFACT, MOTION, QUALITY, CLINICAL
+    recommendation: Mapped[str | None] = mapped_column(Text)
+    findings: Mapped[dict | None] = mapped_column(JSONB)  # Flexible structured data
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
 
+
+class ReviewAssignment(UUIDMixin, Base):
+    """Tracks reviewer assignments for multi-reviewer workflow."""
+
+    __tablename__ = "review_assignments"
+
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("requests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    reviewer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="PENDING"
+    )  # PENDING, COMPLETED, DECLINED
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

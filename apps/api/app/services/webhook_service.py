@@ -1,10 +1,13 @@
-"""Webhook notification service for B2B integrations."""
+"""Webhook notification service for B2B integrations.
+
+Provides HMAC-signed webhook delivery with retry logic and delivery logging.
+"""
+
 import hashlib
 import hmac
-import json
 import logging
+import uuid
 from datetime import datetime, timezone
-from dataclasses import dataclass
 
 logger = logging.getLogger("neurohub.webhooks")
 
@@ -22,42 +25,73 @@ def generate_webhook_signature(payload_str: str, secret: str) -> str:
     return f"sha256={sig}"
 
 
-@dataclass
-class WebhookDelivery:
-    webhook_url: str
-    payload: dict
-    secret: str
-    max_retries: int = 3
-    retry_delay_base: int = 5
+def verify_webhook_signature(payload_str: str, secret: str, signature: str) -> bool:
+    """Verify HMAC signature from webhook delivery."""
+    expected = generate_webhook_signature(payload_str, secret)
+    return hmac.compare_digest(expected, signature)
 
-    def deliver(self) -> bool:
-        """Attempt to deliver webhook. Returns True on success."""
-        import httpx
 
-        payload_str = json.dumps(self.payload, default=str)
-        signature = generate_webhook_signature(payload_str, self.secret)
+def dispatch_webhook_event(
+    event_type: str,
+    data: dict,
+    institution_id: str,
+) -> None:
+    """Queue webhook delivery for all matching webhooks (via Celery).
 
-        headers = {
-            "Content-Type": "application/json",
-            "X-NeuroHub-Signature": signature,
-            "X-NeuroHub-Event": self.payload.get("event_type", "unknown"),
-        }
+    Called from within a sync session context (e.g., Celery tasks or reconciler).
+    """
+    from sqlalchemy import select
 
-        for attempt in range(self.max_retries + 1):
-            try:
-                with httpx.Client(timeout=10) as client:
-                    resp = client.post(self.webhook_url, content=payload_str, headers=headers)
-                    if resp.status_code < 300:
-                        logger.info("Webhook delivered to %s (attempt %d)", self.webhook_url, attempt + 1)
-                        return True
-                    logger.warning("Webhook to %s returned %d", self.webhook_url, resp.status_code)
-            except Exception as e:
-                logger.warning("Webhook delivery failed (attempt %d): %s", attempt + 1, e)
+    from app.database import sync_session_factory
+    from app.models.webhook import Webhook
 
-            if attempt < self.max_retries:
-                import time
-                delay = self.retry_delay_base * (2 ** attempt)
-                time.sleep(delay)
+    with sync_session_factory() as session:
+        result = session.execute(
+            select(Webhook).where(
+                Webhook.institution_id == uuid.UUID(institution_id),
+                Webhook.status == "ACTIVE",
+            )
+        )
+        webhooks = result.scalars().all()
 
-        logger.error("Webhook delivery exhausted retries for %s", self.webhook_url)
-        return False
+        for wh in webhooks:
+            events = wh.events or []
+            if event_type in events or "*" in events:
+                from app.worker.celery_app import celery_app
+
+                celery_app.send_task(
+                    "neurohub.tasks.deliver_webhook",
+                    args=[str(wh.id), event_type, data],
+                    queue="reporting",
+                )
+
+
+async def dispatch_webhook_event_async(
+    db,
+    event_type: str,
+    data: dict,
+    institution_id: uuid.UUID,
+) -> None:
+    """Async version: queue webhook delivery for matching webhooks."""
+    from sqlalchemy import select
+
+    from app.models.webhook import Webhook
+
+    result = await db.execute(
+        select(Webhook).where(
+            Webhook.institution_id == institution_id,
+            Webhook.status == "ACTIVE",
+        )
+    )
+    webhooks = result.scalars().all()
+
+    for wh in webhooks:
+        events = wh.events or []
+        if event_type in events or "*" in events:
+            from app.worker.celery_app import celery_app
+
+            celery_app.send_task(
+                "neurohub.tasks.deliver_webhook",
+                args=[str(wh.id), event_type, data],
+                queue="reporting",
+            )

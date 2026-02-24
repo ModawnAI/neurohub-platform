@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, PencilSimple } from "phosphor-react";
+import { Plus, PencilSimple, ArrowSquareOut } from "phosphor-react";
+import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { listServices, createService, updateService, type ServiceRead } from "@/lib/api";
 import { useZodForm } from "@/lib/use-zod-form";
@@ -20,6 +21,7 @@ const INITIAL_CREATE: ServiceCreateValues = {
 export default function AdminServicesPage() {
   const { t, locale } = useTranslation();
   const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["services"], queryFn: listServices });
   const services = data?.items ?? [];
@@ -169,6 +171,9 @@ export default function AdminServicesPage() {
                     <td>{new Date(svc.created_at).toLocaleDateString(dateLocale)}</td>
                     <td>
                       <div className="action-row">
+                        <button className="btn btn-sm btn-secondary" onClick={() => router.push(`/admin/services/${svc.id}`)} aria-label={t("serviceDetail.usageStats")}>
+                          <ArrowSquareOut size={14} />
+                        </button>
                         <button className="btn btn-sm btn-secondary" onClick={() => openEdit(svc)}>
                           <PencilSimple size={14} />
                         </button>

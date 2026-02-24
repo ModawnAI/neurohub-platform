@@ -1,4 +1,7 @@
+"""Review endpoints: QC decisions, expert reviews, assignments, consensus, and PDF reports."""
+
 import uuid
+from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi import Request as FastAPIRequest
@@ -7,14 +10,17 @@ from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DbSession, require_roles
 from app.models.audit import PatientAccessLog
+from app.models.outbox import OutboxEvent
 from app.models.qc_decision import QCDecision
-from app.models.report import Report, ReportReview
+from app.models.report import Report, ReportReview, ReviewAssignment
 from app.models.request import Case, Request
 from app.models.run import Run
 from app.schemas.request import RequestRead
 from app.schemas.review import (
     QCDecisionCreate,
     ReportReviewCreate,
+    ReviewAssignmentCreate,
+    ReviewAssignmentRead,
     ReviewDetail,
     ReviewQueueItem,
     ReviewQueueResponse,
@@ -219,6 +225,10 @@ async def get_review_detail(
                 "id": str(rv.id),
                 "decision": rv.decision,
                 "comments": rv.comments,
+                "severity": rv.severity,
+                "category": rv.category,
+                "recommendation": rv.recommendation,
+                "findings": rv.findings,
                 "reviewer_id": str(rv.reviewer_id) if rv.reviewer_id else None,
                 "created_at": rv.created_at.isoformat() if rv.created_at else None,
             }
@@ -233,6 +243,87 @@ async def get_review_detail(
         qc_decisions=qc_data,
         report_reviews=review_data,
     )
+
+
+# ── Review Assignment ─────────────────────────────────────────────────────
+
+
+@router.post("/{request_id}/assign", response_model=ReviewAssignmentRead)
+async def assign_reviewer(
+    request_id: uuid.UUID,
+    body: ReviewAssignmentCreate,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Assign a reviewer to a request in EXPERT_REVIEW state."""
+    result = await db.execute(
+        select(Request).where(
+            Request.id == request_id,
+            Request.institution_id == user.institution_id,
+        )
+    )
+    req = result.scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+    if req.status != "EXPERT_REVIEW":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Request must be in EXPERT_REVIEW status to assign reviewers",
+        )
+
+    # Prevent duplicate assignment
+    existing = await db.execute(
+        select(ReviewAssignment).where(
+            ReviewAssignment.request_id == request_id,
+            ReviewAssignment.reviewer_id == body.reviewer_id,
+            ReviewAssignment.status == "PENDING",
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Reviewer already assigned"
+        )
+
+    assignment = ReviewAssignment(
+        request_id=request_id,
+        reviewer_id=body.reviewer_id,
+        assigned_by=user.id,
+    )
+    db.add(assignment)
+
+    # Notify the assigned reviewer
+    await create_notification(
+        db,
+        institution_id=req.institution_id,
+        user_id=body.reviewer_id,
+        event_type="REVIEW_ASSIGNED",
+        title="검토 요청이 배정되었습니다",
+        body=f"요청 {str(request_id)[:8]}...에 대한 전문가 검토가 배정되었습니다.",
+        entity_type="request",
+        entity_id=request_id,
+        metadata={"assigned_by": str(user.id)},
+    )
+
+    await db.flush()
+    return ReviewAssignmentRead.model_validate(assignment)
+
+
+@router.get("/{request_id}/assignments", response_model=list[ReviewAssignmentRead])
+async def list_assignments(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(_require_expert),
+):
+    """List all reviewer assignments for a request."""
+    result = await db.execute(
+        select(ReviewAssignment)
+        .where(ReviewAssignment.request_id == request_id)
+        .order_by(ReviewAssignment.assigned_at.desc())
+    )
+    return [ReviewAssignmentRead.model_validate(a) for a in result.scalars().all()]
+
+
+# ── QC Decision ───────────────────────────────────────────────────────────
 
 
 @router.post("/{request_id}/qc-decision", status_code=status.HTTP_200_OK)
@@ -252,7 +343,8 @@ async def submit_qc_decision(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
     if req.status != "QC":
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Request is not in QC status"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Request is not in QC status",
         )
 
     qc = QCDecision(
@@ -276,6 +368,21 @@ async def submit_qc_decision(
     elif body.decision == "RERUN":
         req.status = "COMPUTING"
 
+    # Outbox event for audit trail
+    db.add(
+        OutboxEvent(
+            event_type=f"QC_{body.decision}",
+            aggregate_type="request",
+            aggregate_id=req.id,
+            payload={
+                "request_id": str(req.id),
+                "decision": body.decision,
+                "reviewer_id": str(user.id),
+                "qc_score": body.qc_score,
+            },
+        )
+    )
+
     # Notify the request owner about the QC decision
     decision_labels = {"APPROVE": "승인", "REJECT": "거절", "RERUN": "재분석"}
     if req.requested_by:
@@ -293,6 +400,9 @@ async def submit_qc_decision(
 
     await db.flush()
     return {"status": req.status, "decision": body.decision}
+
+
+# ── Expert Report Review (with structured findings + consensus) ───────────
 
 
 @router.post("/{request_id}/report-review", status_code=status.HTTP_200_OK)
@@ -330,18 +440,58 @@ async def submit_report_review(
             reviewer_id=user.id,
             decision=body.decision,
             comments=body.comments,
+            severity=body.severity,
+            category=body.category,
+            recommendation=body.recommendation,
+            findings=body.findings,
         )
         db.add(review)
 
-    if body.decision == "APPROVE":
+    # Mark assignment as completed if exists
+    assignment_result = await db.execute(
+        select(ReviewAssignment).where(
+            ReviewAssignment.request_id == request_id,
+            ReviewAssignment.reviewer_id == user.id,
+            ReviewAssignment.status == "PENDING",
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    if assignment:
+        from datetime import datetime, timezone
+
+        assignment.status = "COMPLETED"
+        assignment.completed_at = datetime.now(timezone.utc)
+
+    # Multi-reviewer consensus: check if all assigned reviewers have submitted
+    consensus_decision = await _check_consensus(db, request_id, body.decision)
+
+    if consensus_decision == "APPROVE":
         from_state = SMStatus(req.status)
         to_state = SMStatus.FINAL
         validate_transition(from_state, to_state, user)
         req.status = to_state.value
-    elif body.decision == "REVISION_NEEDED":
+    elif consensus_decision == "REVISION_NEEDED":
         req.status = "COMPUTING"
+    # If consensus_decision is None, waiting for more reviews — don't transition
 
-    # Notify the request owner about the report review
+    # Outbox event for audit trail
+    db.add(
+        OutboxEvent(
+            event_type=f"REPORT_REVIEW_{body.decision}",
+            aggregate_type="request",
+            aggregate_id=req.id,
+            payload={
+                "request_id": str(req.id),
+                "decision": body.decision,
+                "reviewer_id": str(user.id),
+                "severity": body.severity,
+                "category": body.category,
+                "consensus": consensus_decision,
+            },
+        )
+    )
+
+    # Notify the request owner
     review_labels = {"APPROVE": "최종 승인", "REVISION_NEEDED": "수정 필요"}
     if req.requested_by:
         await create_notification(
@@ -353,8 +503,246 @@ async def submit_report_review(
             body=body.comments,
             entity_type="request",
             entity_id=req.id,
-            metadata={"status": req.status, "decision": body.decision},
+            metadata={
+                "status": req.status,
+                "decision": body.decision,
+                "consensus": consensus_decision,
+            },
         )
 
     await db.flush()
-    return {"status": req.status, "decision": body.decision}
+    return {
+        "status": req.status,
+        "decision": body.decision,
+        "consensus": consensus_decision,
+    }
+
+
+async def _check_consensus(
+    db: DbSession,
+    request_id: uuid.UUID,
+    current_decision: str,
+) -> str | None:
+    """Check multi-reviewer consensus. Returns decision if consensus reached, None otherwise.
+
+    Rules:
+    - If no assignments exist, the single review is the consensus (immediate).
+    - If assignments exist, wait until all assigned reviewers submit.
+    - Majority vote wins. Ties default to REVISION_NEEDED (conservative).
+    """
+    assignments_result = await db.execute(
+        select(ReviewAssignment).where(ReviewAssignment.request_id == request_id)
+    )
+    assignments = assignments_result.scalars().all()
+
+    if not assignments:
+        # No formal assignments — single reviewer decides
+        return current_decision
+
+    # Check if all assignments are completed
+    pending = [a for a in assignments if a.status == "PENDING"]
+    if pending:
+        return None  # Still waiting for more reviews
+
+    # All reviewers submitted — compute majority
+    completed = [a for a in assignments if a.status == "COMPLETED"]
+    if not completed:
+        return current_decision
+
+    # Get all reviews for the latest report
+    report_result = await db.execute(
+        select(Report)
+        .where(Report.request_id == request_id)
+        .order_by(Report.created_at.desc())
+        .limit(1)
+    )
+    report = report_result.scalar_one_or_none()
+    if not report:
+        return current_decision
+
+    reviews_result = await db.execute(
+        select(ReportReview).where(ReportReview.report_id == report.id)
+    )
+    reviews = reviews_result.scalars().all()
+
+    if not reviews:
+        return current_decision
+
+    votes = Counter(r.decision for r in reviews)
+    approve_count = votes.get("APPROVE", 0)
+    revision_count = votes.get("REVISION_NEEDED", 0)
+
+    if approve_count > revision_count:
+        return "APPROVE"
+    return "REVISION_NEEDED"
+
+
+# ── Review History / Audit Trail ──────────────────────────────────────────
+
+
+@router.get("/{request_id}/history")
+async def get_review_history(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(_require_expert),
+):
+    """Get complete review audit trail for a request."""
+    # Verify access
+    result = await db.execute(
+        select(Request).where(
+            Request.id == request_id,
+            Request.institution_id == user.institution_id,
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    # QC decisions
+    qc_result = await db.execute(
+        select(QCDecision)
+        .where(QCDecision.request_id == request_id)
+        .order_by(QCDecision.created_at.asc())
+    )
+    qc_decisions = [
+        {
+            "type": "qc_decision",
+            "id": str(q.id),
+            "decision": q.decision,
+            "qc_score": q.qc_score,
+            "comments": q.comments,
+            "reviewer_id": str(q.reviewer_id) if q.reviewer_id else None,
+            "created_at": q.created_at.isoformat() if q.created_at else None,
+        }
+        for q in qc_result.scalars().all()
+    ]
+
+    # Report reviews
+    reports_result = await db.execute(select(Report).where(Report.request_id == request_id))
+    report_ids = [r.id for r in reports_result.scalars().all()]
+
+    report_reviews = []
+    if report_ids:
+        rv_result = await db.execute(
+            select(ReportReview)
+            .where(ReportReview.report_id.in_(report_ids))
+            .order_by(ReportReview.created_at.asc())
+        )
+        report_reviews = [
+            {
+                "type": "report_review",
+                "id": str(rv.id),
+                "decision": rv.decision,
+                "comments": rv.comments,
+                "severity": rv.severity,
+                "category": rv.category,
+                "recommendation": rv.recommendation,
+                "reviewer_id": str(rv.reviewer_id) if rv.reviewer_id else None,
+                "created_at": rv.created_at.isoformat() if rv.created_at else None,
+            }
+            for rv in rv_result.scalars().all()
+        ]
+
+    # Assignments
+    assign_result = await db.execute(
+        select(ReviewAssignment)
+        .where(ReviewAssignment.request_id == request_id)
+        .order_by(ReviewAssignment.assigned_at.asc())
+    )
+    assignments = [
+        {
+            "type": "assignment",
+            "id": str(a.id),
+            "reviewer_id": str(a.reviewer_id),
+            "assigned_by": str(a.assigned_by) if a.assigned_by else None,
+            "status": a.status,
+            "assigned_at": a.assigned_at.isoformat() if a.assigned_at else None,
+            "completed_at": a.completed_at.isoformat() if a.completed_at else None,
+        }
+        for a in assign_result.scalars().all()
+    ]
+
+    # Merge and sort by time
+    all_events = qc_decisions + report_reviews + assignments
+    all_events.sort(key=lambda e: e.get("created_at") or e.get("assigned_at") or "")
+
+    return {"request_id": str(request_id), "events": all_events, "total": len(all_events)}
+
+
+# ── PDF Report Generation ─────────────────────────────────────────────────
+
+
+@router.post("/{request_id}/generate-pdf", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_pdf_generation(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(_require_expert),
+):
+    """Trigger async PDF report generation via Celery."""
+    result = await db.execute(
+        select(Request).where(
+            Request.id == request_id,
+            Request.institution_id == user.institution_id,
+        )
+    )
+    req = result.scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    # Must have a report record
+    report_result = await db.execute(select(Report).where(Report.request_id == request_id).limit(1))
+    if not report_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No report record exists for this request",
+        )
+
+    from app.worker.celery_app import celery_app
+
+    task = celery_app.send_task(
+        "neurohub.tasks.generate_pdf_report",
+        args=[str(request_id)],
+        queue="reporting",
+    )
+
+    return {"task_id": task.id, "status": "QUEUED"}
+
+
+@router.get("/{request_id}/report-pdf")
+async def download_report_pdf(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(_require_expert),
+):
+    """Get presigned download URL for the PDF report."""
+    result = await db.execute(
+        select(Request).where(
+            Request.id == request_id,
+            Request.institution_id == user.institution_id,
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    report_result = await db.execute(
+        select(Report)
+        .where(Report.request_id == request_id)
+        .order_by(Report.created_at.desc())
+        .limit(1)
+    )
+    report = report_result.scalar_one_or_none()
+    if not report or not report.pdf_storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF report not yet generated",
+        )
+
+    from app.services.storage import create_presigned_download
+
+    # storage_path format: "bucket/path/to/file.pdf"
+    parts = report.pdf_storage_path.split("/", 1)
+    if len(parts) != 2:
+        raise HTTPException(status_code=500, detail="Invalid storage path")
+    bucket, path = parts
+
+    url = await create_presigned_download(bucket, path)
+    return {"download_url": url, "report_id": str(report.id)}
