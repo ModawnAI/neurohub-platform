@@ -2,60 +2,24 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, PencilSimple, ArrowSquareOut } from "phosphor-react";
+import { Plus, PencilSimple, ArrowSquareOut, Cube } from "phosphor-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { listServices, createService, updateService, type ServiceRead } from "@/lib/api";
-import { useZodForm } from "@/lib/use-zod-form";
-import { serviceCreateSchema, type ServiceCreateValues } from "@/lib/schemas";
+import { listServices, updateService, type ServiceRead } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
-
-const INITIAL_CREATE: ServiceCreateValues = {
-  name: "",
-  display_name: "",
-  version: "1.0",
-  department: "",
-  description: "",
-  service_type: "AUTOMATIC",
-  requires_evaluator: false,
-};
 
 export default function AdminServicesPage() {
   const { t, locale } = useTranslation();
-  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
+  const ko = locale === "ko";
+  const dateLocale = ko ? "ko-KR" : "en-US";
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["services"], queryFn: listServices });
   const services = data?.items ?? [];
 
-  const [showCreate, setShowCreate] = useState(false);
+  // Edit dialog state
   const [editingService, setEditingService] = useState<ServiceRead | null>(null);
-
-  // Create form
-  const createForm = useZodForm(serviceCreateSchema, INITIAL_CREATE);
-
-  const createMut = useMutation({
-    mutationFn: () => {
-      const data = createForm.validate();
-      if (!data) throw new Error(t("common.validationError"));
-      return createService({
-        name: data.name,
-        display_name: data.display_name,
-        version: data.version,
-        department: data.department || undefined,
-        description: data.description || undefined,
-        service_type: data.service_type,
-        requires_evaluator: data.requires_evaluator,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      setShowCreate(false);
-      createForm.reset();
-    },
-  });
-
-  // Edit
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editVersion, setEditVersion] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
@@ -96,131 +60,103 @@ export default function AdminServicesPage() {
           <p className="page-subtitle">{t("adminServices.subtitle")}</p>
         </div>
         <div className="page-header-actions">
-          <Dialog.Root open={showCreate} onOpenChange={setShowCreate}>
-            <Dialog.Trigger asChild>
-              <button className="btn btn-primary"><Plus size={16} /> {t("adminServices.registerService")}</button>
-            </Dialog.Trigger>
-            <Dialog.Portal>
-              <Dialog.Overlay className="dialog-overlay" />
-              <Dialog.Content className="dialog-content">
-                <Dialog.Title className="dialog-title">{t("adminServices.newServiceTitle")}</Dialog.Title>
-                <div className="stack-md">
-                  <label className="field">
-                    {t("adminServices.internalName")}
-                    <input className="input" value={createForm.values.name} onChange={(e) => createForm.setField("name", e.target.value)} placeholder={t("adminServices.internalNamePlaceholder")} />
-                    {createForm.errors.name && <span className="error-text">{createForm.errors.name}</span>}
-                  </label>
-                  <label className="field">
-                    {t("adminServices.displayName")}
-                    <input className="input" value={createForm.values.display_name} onChange={(e) => createForm.setField("display_name", e.target.value)} placeholder={t("adminServices.displayNamePlaceholder")} />
-                    {createForm.errors.display_name && <span className="error-text">{createForm.errors.display_name}</span>}
-                  </label>
-                  <div className="form-grid">
-                    <label className="field">
-                      {t("adminServices.version")}
-                      <input className="input" value={createForm.values.version} onChange={(e) => createForm.setField("version", e.target.value)} />
-                    </label>
-                    <label className="field">
-                      {t("adminServices.departmentOptional")}
-                      <input className="input" value={createForm.values.department ?? ""} onChange={(e) => createForm.setField("department", e.target.value)} placeholder={t("adminServices.departmentPlaceholder")} />
-                    </label>
-                  </div>
-                  <label className="field">
-                    {t("adminServices.descriptionOptional")}
-                    <textarea className="textarea" value={createForm.values.description ?? ""} onChange={(e) => createForm.setField("description", e.target.value)} rows={2} />
-                  </label>
-                  <div className="form-grid">
-                    <label className="field">
-                      {t("adminServices.serviceType")}
-                      <select className="input" value={createForm.values.service_type} onChange={(e) => createForm.setField("service_type", e.target.value as "AUTOMATIC" | "HUMAN_IN_LOOP")}>
-                        <option value="AUTOMATIC">{t("adminServices.automatic")}</option>
-                        <option value="HUMAN_IN_LOOP">{t("adminServices.humanInLoop")}</option>
-                      </select>
-                    </label>
-                    <label className="field" style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 24 }}>
-                      <input type="checkbox" checked={createForm.values.requires_evaluator ?? false} onChange={(e) => createForm.setField("requires_evaluator", e.target.checked)} />
-                      {t("adminServices.requiresEvaluator")}
-                    </label>
-                  </div>
-                  {createMut.isError && <p className="error-text">{(createMut.error as Error).message}</p>}
-                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <Dialog.Close asChild><button className="btn btn-secondary">{t("common.cancel")}</button></Dialog.Close>
-                    <button className="btn btn-primary" onClick={() => createMut.mutate()} disabled={createMut.isPending}>
-                      {createMut.isPending ? <span className="spinner" /> : t("common.register")}
-                    </button>
-                  </div>
-                </div>
-              </Dialog.Content>
-            </Dialog.Portal>
-          </Dialog.Root>
+          <Link href="/admin/services/new">
+            <button className="btn btn-primary"><Plus size={16} /> {t("adminServices.registerService")}</button>
+          </Link>
         </div>
       </div>
 
       {isLoading ? (
         <div className="loading-center"><span className="spinner" /></div>
+      ) : services.length === 0 ? (
+        /* Empty state */
+        <div className="panel" style={{ textAlign: "center", padding: "48px 24px" }}>
+          <Cube size={48} weight="light" style={{ color: "var(--muted)", marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+            {ko ? "등록된 서비스가 없습니다" : "No services registered"}
+          </p>
+          <p className="muted-text" style={{ fontSize: 13, marginBottom: 16 }}>
+            {ko ? "새 AI 분석 서비스를 등록하여 시작하세요" : "Get started by registering a new AI analysis service"}
+          </p>
+          <Link href="/admin/services/new">
+            <button className="btn btn-primary"><Plus size={16} /> {ko ? "첫 서비스 등록하기" : "Register First Service"}</button>
+          </Link>
+        </div>
       ) : (
-        <div className="panel">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t("adminServices.tableName")}</th>
-                  <th>{t("adminServices.tableInternalName")}</th>
-                  <th>{t("adminServices.tableVersion")}</th>
-                  <th>{t("adminServices.tableDepartment")}</th>
-                  <th>{t("adminServices.tableType")}</th>
-                  <th>{t("adminServices.tableStatus")}</th>
-                  <th>{t("adminServices.tableCreatedDate")}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {services.map((svc: ServiceRead) => (
-                  <tr key={svc.id}>
-                    <td style={{ fontWeight: 600 }}>{svc.display_name}</td>
-                    <td className="mono-cell">{svc.name}</td>
-                    <td>v{svc.version}</td>
-                    <td>{svc.department || "-"}</td>
-                    <td>
-                      <span className={`status-chip ${svc.service_type === "HUMAN_IN_LOOP" ? "status-pending" : "status-final"}`}>
-                        {svc.service_type === "HUMAN_IN_LOOP" ? t("adminServices.humanInLoop") : t("adminServices.automatic")}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`status-chip ${svc.status === "ACTIVE" ? "status-final" : "status-cancelled"}`}>
-                        {svc.status === "ACTIVE" ? t("common.active") : t("common.inactive")}
-                      </span>
-                    </td>
-                    <td>{new Date(svc.created_at).toLocaleDateString(dateLocale)}</td>
-                    <td>
-                      <div className="action-row">
-                        <button className="btn btn-sm btn-secondary" onClick={() => router.push(`/admin/services/${svc.id}`)} aria-label={t("serviceDetail.usageStats")}>
-                          <ArrowSquareOut size={14} />
-                        </button>
-                        <button className="btn btn-sm btn-secondary" onClick={() => openEdit(svc)}>
-                          <PencilSimple size={14} />
-                        </button>
-                        <button
-                          className={`btn btn-sm ${svc.status === "ACTIVE" ? "btn-danger" : "btn-primary"}`}
-                          onClick={() => toggleMut.mutate({ id: svc.id, status: svc.status })}
-                          disabled={toggleMut.isPending}
-                        >
-                          {svc.status === "ACTIVE" ? t("common.deactivate") : t("common.activate")}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {services.length === 0 && (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
-                      {t("adminServices.noServices")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        /* Service cards grid */
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {services.map((svc: ServiceRead) => (
+            <div
+              key={svc.id}
+              className="panel"
+              style={{ padding: 20, cursor: "pointer", transition: "box-shadow 0.15s", position: "relative" }}
+              onClick={() => router.push(`/admin/services/${svc.id}`)}
+            >
+              {/* Status dot */}
+              <div style={{ position: "absolute", top: 16, right: 16 }}>
+                <span
+                  className={`status-chip ${svc.status === "ACTIVE" ? "status-final" : "status-cancelled"}`}
+                  style={{ fontSize: 10, padding: "2px 8px" }}
+                >
+                  {svc.status === "ACTIVE" ? t("common.active") : t("common.inactive")}
+                </span>
+              </div>
+
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: "var(--radius-md)",
+                  background: "var(--primary-subtle)", display: "flex",
+                  alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  color: "var(--primary)",
+                }}>
+                  <Cube size={20} />
+                </div>
+                <div style={{ minWidth: 0, paddingRight: 60 }}>
+                  <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {svc.display_name}
+                  </p>
+                  <p className="mono-cell" style={{ fontSize: 11, color: "var(--muted)" }}>
+                    {svc.name} v{svc.version}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
+              {svc.description && (
+                <p className="muted-text" style={{ fontSize: 12, marginBottom: 12, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {svc.description}
+                </p>
+              )}
+
+              {/* Meta row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>
+                <span className={`status-chip ${svc.service_type === "HUMAN_IN_LOOP" ? "status-pending" : "status-final"}`} style={{ fontSize: 10, padding: "1px 6px" }}>
+                  {svc.service_type === "HUMAN_IN_LOOP" ? (ko ? "전문가 검토" : "Expert Review") : (ko ? "자동" : "Auto")}
+                </span>
+                {svc.department && <span>{svc.department}</span>}
+                <span>{new Date(svc.created_at).toLocaleDateString(dateLocale)}</span>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: "flex", gap: 6, borderTop: "1px solid var(--border)", paddingTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                <button className="btn btn-sm btn-secondary" onClick={() => router.push(`/admin/services/${svc.id}`)}>
+                  <ArrowSquareOut size={14} /> {ko ? "상세" : "Detail"}
+                </button>
+                <button className="btn btn-sm btn-secondary" onClick={() => openEdit(svc)}>
+                  <PencilSimple size={14} /> {ko ? "편집" : "Edit"}
+                </button>
+                <button
+                  className={`btn btn-sm ${svc.status === "ACTIVE" ? "btn-danger" : "btn-primary"}`}
+                  onClick={() => toggleMut.mutate({ id: svc.id, status: svc.status })}
+                  disabled={toggleMut.isPending}
+                  style={{ marginLeft: "auto" }}
+                >
+                  {svc.status === "ACTIVE" ? t("common.deactivate") : t("common.activate")}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
