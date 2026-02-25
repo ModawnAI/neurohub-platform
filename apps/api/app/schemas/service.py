@@ -168,6 +168,11 @@ class ServiceUpdate(BaseModel):
     category: str | None = None
     service_type: str | None = Field(None, pattern="^(AUTOMATIC|HUMAN_IN_LOOP)$")
     requires_evaluator: bool | None = None
+    input_schema: dict | None = None
+    upload_slots: list | None = None
+    options_schema: dict | None = None
+    pricing: dict | None = None
+    output_schema: dict | None = None
 
 
 class ServiceRead(BaseModel):

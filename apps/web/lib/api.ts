@@ -680,8 +680,41 @@ export async function createService(payload: {
   description?: string;
   service_type?: string;
   requires_evaluator?: boolean;
+  definition?: {
+    input_schema?: { fields: Array<Record<string, unknown>> } | null;
+    upload_slots?: Array<Record<string, unknown>> | null;
+    options_schema?: { fields: Array<Record<string, unknown>> } | null;
+    pricing?: Record<string, unknown> | null;
+    output_schema?: { fields: Array<Record<string, unknown>> } | null;
+  };
 }) {
   return apiFetch<ServiceRead>("/admin/services", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateServiceDefinition(
+  serviceId: string,
+  payload: {
+    input_schema?: { fields: Array<Record<string, unknown>> } | null;
+    upload_slots?: Array<Record<string, unknown>> | null;
+    options_schema?: { fields: Array<Record<string, unknown>> } | null;
+    pricing?: Record<string, unknown> | null;
+    output_schema?: { fields: Array<Record<string, unknown>> } | null;
+  },
+) {
+  return apiFetch<ServiceRead>(`/admin/services/${serviceId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createPipeline(
+  serviceId: string,
+  payload: { name: string; version?: string; steps?: Array<Record<string, unknown>>; qc_rules?: Record<string, unknown>; is_default?: boolean },
+) {
+  return apiFetch<PipelineRead>(`/admin/services/${serviceId}/pipelines`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
