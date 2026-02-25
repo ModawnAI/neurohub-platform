@@ -890,6 +890,51 @@ export async function undeployService(serviceId: string) {
   });
 }
 
+// ── Service Package Upload ──
+
+export interface PackagePresignResponse {
+  presigned_url: string;
+  storage_path: string;
+  expires_at: string;
+}
+
+export interface PackageInfo {
+  file_name: string;
+  file_size: number;
+  storage_path: string;
+  uploaded_at: string;
+}
+
+export async function presignPackageUpload(
+  serviceId: string,
+  payload: { file_name: string; content_type: string; file_size: number },
+) {
+  return apiFetch<PackagePresignResponse>(`/admin/services/${serviceId}/package/presign`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function completePackageUpload(
+  serviceId: string,
+  payload: { storage_path: string; file_name: string; file_size: number },
+) {
+  return apiFetch<PackageInfo>(`/admin/services/${serviceId}/package/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getPackageInfo(serviceId: string) {
+  return apiFetch<PackageInfo | null>(`/admin/services/${serviceId}/package`);
+}
+
+export async function getPackageDownloadUrl(serviceId: string) {
+  return apiFetch<{ download_url: string; filename: string }>(
+    `/admin/services/${serviceId}/package/download`,
+  );
+}
+
 // ── Payments ──
 
 export interface PaymentPrepareResponse {

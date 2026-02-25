@@ -462,6 +462,209 @@ async def remove_evaluator(
 
 
 # ---------------------------------------------------------------------------
+# Service Package Upload
+# ---------------------------------------------------------------------------
+
+
+class PackagePresignRequest(BaseModel):
+    file_name: str
+    content_type: str = "application/zip"
+    file_size: int
+
+
+class PackagePresignResponse(BaseModel):
+    presigned_url: str
+    storage_path: str
+    expires_at: str
+
+
+class PackageInfo(BaseModel):
+    file_name: str
+    file_size: int
+    storage_path: str
+    uploaded_at: str
+
+
+@router.post(
+    "/admin/services/{service_id}/package/presign",
+    response_model=PackagePresignResponse,
+)
+async def presign_package_upload(
+    service_id: uuid.UUID,
+    body: PackagePresignRequest,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Generate a presigned URL to upload a service package (zip/tar.gz/py)."""
+    from app.config import settings
+    from app.services import storage as storage_svc
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    # Validate file type
+    allowed_ext = (".zip", ".tar.gz", ".tgz", ".py", ".whl")
+    if not any(body.file_name.lower().endswith(ext) for ext in allowed_ext):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported file type. Allowed: {', '.join(allowed_ext)}",
+        )
+
+    storage_path = (
+        f"institutions/{user.institution_id}/services/{service_id}/"
+        f"packages/{body.file_name}"
+    )
+
+    presigned_url = await storage_svc.create_presigned_upload(
+        bucket=settings.storage_bucket_outputs,
+        path=storage_path,
+        expires_in=900,
+    )
+
+    from datetime import datetime, timedelta, timezone
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=900)
+
+    return PackagePresignResponse(
+        presigned_url=presigned_url,
+        storage_path=storage_path,
+        expires_at=expires_at.isoformat(),
+    )
+
+
+class PackageCompleteRequest(BaseModel):
+    storage_path: str
+    file_name: str
+    file_size: int
+
+
+@router.post(
+    "/admin/services/{service_id}/package/complete",
+    response_model=PackageInfo,
+)
+async def complete_package_upload(
+    service_id: uuid.UUID,
+    body: PackageCompleteRequest,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Mark a package upload as complete. Stores the package path on the service."""
+    data = body
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    from datetime import datetime, timezone
+
+    # Store package info in the service's output_schema (or a dedicated field)
+    # We use a convention: service metadata stored in a special JSONB area
+    package_info = {
+        "file_name": data.file_name,
+        "file_size": data.file_size,
+        "storage_path": data.storage_path,
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "uploaded_by": str(user.id),
+    }
+
+    # Store in pricing JSONB as a temporary hack... better: use a dedicated column
+    # Actually, let's just put it in a safe place: the service's existing JSONB
+    # We'll use inputs_schema (legacy field) to store package metadata
+    current_meta = service.inputs_schema or {}
+    current_meta["_package"] = package_info
+    service.inputs_schema = current_meta
+    await db.flush()
+    await db.refresh(service)
+
+    return PackageInfo(
+        file_name=data.file_name,
+        file_size=data.file_size,
+        storage_path=data.storage_path,
+        uploaded_at=package_info["uploaded_at"],
+    )
+
+
+@router.get(
+    "/admin/services/{service_id}/package",
+    response_model=PackageInfo | None,
+)
+async def get_package_info(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Get the current uploaded package info for a service."""
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    meta = service.inputs_schema or {}
+    pkg = meta.get("_package")
+    if not pkg:
+        return None
+
+    return PackageInfo(
+        file_name=pkg["file_name"],
+        file_size=pkg["file_size"],
+        storage_path=pkg["storage_path"],
+        uploaded_at=pkg["uploaded_at"],
+    )
+
+
+@router.get("/admin/services/{service_id}/package/download")
+async def download_package(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Get a presigned download URL for the service package."""
+    from app.config import settings
+    from app.services import storage as storage_svc
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    meta = service.inputs_schema or {}
+    pkg = meta.get("_package")
+    if not pkg:
+        raise HTTPException(status_code=404, detail="No package uploaded")
+
+    download_url = await storage_svc.create_presigned_download(
+        bucket=settings.storage_bucket_outputs,
+        path=pkg["storage_path"],
+        expires_in=900,
+    )
+
+    return {"download_url": download_url, "filename": pkg["file_name"]}
+
+
+# ---------------------------------------------------------------------------
 # Service Container Deployment
 # ---------------------------------------------------------------------------
 
