@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, Check, UploadSimple, Package, Cpu,
-  Brain, Stethoscope, Heartbeat, WaveSquare, MagnifyingGlass, Lightning,
+  Brain, FirstAid, Heartbeat, WaveSquare, MagnifyingGlass, Lightning,
 } from "phosphor-react";
 import {
   createService, createPipeline,
@@ -21,7 +21,7 @@ const TEMPLATES = [
   { key: "pet_analysis", icon: <MagnifyingGlass size={28} />, ko: "PET 분석", en: "PET Analysis", desc_ko: "FDG, Amyloid, Tau PET 정량 분석", desc_en: "FDG, Amyloid, Tau PET quantification", inputs: ["DICOM", "NIfTI"], category: "nuclear_medicine" },
   { key: "eeg_analysis", icon: <WaveSquare size={28} />, ko: "EEG 분석", en: "EEG Analysis", desc_ko: "EEG 소스 분석, 스펙트럼 분석", desc_en: "Source localization, spectral analysis", inputs: ["EEG", "EDF", "SET"], category: "neurophysiology" },
   { key: "cardiac", icon: <Heartbeat size={28} />, ko: "심장 영상 분석", en: "Cardiac Imaging", desc_ko: "심장 MRI/CT 기반 기능 분석", desc_en: "Cardiac MRI/CT functional analysis", inputs: ["DICOM"], category: "cardiology" },
-  { key: "pathology", icon: <Stethoscope size={28} />, ko: "병리 분석", en: "Pathology Analysis", desc_ko: "병리 슬라이드 디지털 분석", desc_en: "Digital pathology slide analysis", inputs: ["PNG", "JPEG", "ZIP"], category: "pathology" },
+  { key: "pathology", icon: <FirstAid size={28} />, ko: "병리 분석", en: "Pathology Analysis", desc_ko: "병리 슬라이드 디지털 분석", desc_en: "Digital pathology slide analysis", inputs: ["PNG", "JPEG", "ZIP"], category: "pathology" },
   { key: "custom", icon: <Lightning size={28} />, ko: "커스텀 서비스", en: "Custom Service", desc_ko: "직접 구성하는 맞춤형 서비스", desc_en: "Build your own custom service", inputs: [], category: "custom" },
 ] as const;
 
