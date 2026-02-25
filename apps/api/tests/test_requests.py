@@ -190,13 +190,15 @@ class TestConfirmRequest:
         assert resp.status_code == 200
         assert resp.json()["status"] == "READY_TO_COMPUTE"
 
-    async def test_confirm_non_staging_returns_409(self, client):
+    async def test_confirm_auto_advances_from_created(self, client):
+        """Confirm endpoint auto-advances CREATED → STAGING → READY_TO_COMPUTE."""
         created = await create_test_request(client)
         resp = await client.post(
             f"/api/v1/requests/{created['id']}/confirm",
             json={},
         )
-        assert resp.status_code == 409
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "READY_TO_COMPUTE"
 
 
 class TestSubmitRequest:

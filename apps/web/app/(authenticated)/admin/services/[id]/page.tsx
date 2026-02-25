@@ -2,9 +2,9 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, PencilSimple, ChartBar } from "phosphor-react";
+import { ArrowLeft, PencilSimple, ChartBar, CloudArrowUp, Trash, Spinner } from "phosphor-react";
 import { useState } from "react";
-import { listServices, updateService, listRequests, type ServiceRead, type RequestRead } from "@/lib/api";
+import { listServices, updateService, listRequests, deployService, getDeploymentStatus, undeployService, type ServiceRead, type RequestRead, type DeploymentStatus } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/toast";
 import { SkeletonCards } from "@/components/skeleton";
@@ -23,6 +23,8 @@ export default function ServiceDetailPage() {
   const [editVersion, setEditVersion] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [deployImage, setDeployImage] = useState("");
+  const [showDeploy, setShowDeploy] = useState(false);
 
   const { data: servicesData, isLoading } = useQuery({
     queryKey: ["services"],
@@ -66,6 +68,33 @@ export default function ServiceDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       addToast("success", t("toast.transitionSuccess"));
+    },
+    onError: () => addToast("error", t("toast.genericError")),
+  });
+
+  const { data: deployment, refetch: refetchDeploy } = useQuery({
+    queryKey: ["service-deployment", id],
+    queryFn: () => getDeploymentStatus(id),
+    enabled: !!id,
+    retry: false,
+  });
+
+  const deployMut = useMutation({
+    mutationFn: () => deployService(id, { container_image: deployImage || undefined }),
+    onSuccess: () => {
+      refetchDeploy();
+      setShowDeploy(false);
+      setDeployImage("");
+      addToast("success", locale === "ko" ? "배포 완료" : "Deployed successfully");
+    },
+    onError: () => addToast("error", locale === "ko" ? "배포 실패" : "Deployment failed"),
+  });
+
+  const undeployMut = useMutation({
+    mutationFn: () => undeployService(id),
+    onSuccess: () => {
+      refetchDeploy();
+      addToast("success", locale === "ko" ? "배포 해제 완료" : "Undeployed");
     },
     onError: () => addToast("error", t("toast.genericError")),
   });
@@ -194,6 +223,82 @@ export default function ServiceDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Container Deployment */}
+      <div className="panel">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 className="panel-title">{locale === "ko" ? "컨테이너 배포" : "Container Deployment"}</h3>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowDeploy(!showDeploy)}>
+              <CloudArrowUp size={16} /> {locale === "ko" ? "배포" : "Deploy"}
+            </button>
+            {deployment && deployment.total > 0 && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => { if (confirm(locale === "ko" ? "모든 머신을 중지하시겠습니까?" : "Stop all machines?")) undeployMut.mutate(); }}
+                disabled={undeployMut.isPending}
+              >
+                <Trash size={14} /> {locale === "ko" ? "배포 해제" : "Undeploy"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showDeploy && (
+          <div className="stack-md" style={{ marginBottom: 16, padding: 12, background: "var(--surface-elevated)", borderRadius: "var(--radius-md)" }}>
+            <label className="field">
+              {locale === "ko" ? "컨테이너 이미지 (선택)" : "Container Image (optional)"}
+              <input
+                className="input"
+                value={deployImage}
+                onChange={(e) => setDeployImage(e.target.value)}
+                placeholder={`registry.fly.io/neurohub-svc-${service?.name || "service"}:1.0.0`}
+              />
+              <span className="muted-text" style={{ fontSize: 11 }}>
+                {locale === "ko" ? "비어있으면 기본 레지스트리 태그 사용" : "Leave empty for default registry tag"}
+              </span>
+            </label>
+            <div className="action-row">
+              <button className="btn btn-primary btn-sm" onClick={() => deployMut.mutate()} disabled={deployMut.isPending}>
+                {deployMut.isPending ? <span className="spinner" /> : locale === "ko" ? "배포 시작" : "Start Deploy"}
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(false)}>{t("common.cancel")}</button>
+            </div>
+          </div>
+        )}
+
+        {deployment && deployment.total > 0 ? (
+          <div>
+            <p className="detail-label" style={{ marginBottom: 8 }}>
+              {locale === "ko" ? "실행 중인 머신" : "Running Machines"}: {deployment.total}
+            </p>
+            <div className="stack-sm">
+              {deployment.machines.map((m) => (
+                <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+                  <span className="mono-cell">{m.id.slice(0, 12)}</span>
+                  <span className={`status-chip status-${m.state === "started" ? "computing" : m.state}`}>{m.state}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="muted-text" style={{ fontSize: 13 }}>
+            {locale === "ko" ? "배포된 컨테이너가 없습니다. SDK로 서비스를 빌드한 후 배포하세요." : "No containers deployed. Build your service with the SDK and deploy."}
+          </p>
+        )}
+
+        <div style={{ marginTop: 16, padding: 12, background: "var(--surface-elevated)", borderRadius: "var(--radius-md)" }}>
+          <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{locale === "ko" ? "SDK 가이드" : "SDK Guide"}</p>
+          <pre style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "pre-wrap", margin: 0 }}>
+{`pip install neurohub-sdk
+neurohub init ${service?.name || "my-service"}
+cd ${service?.name || "my-service"}
+# Edit service.py with your AI model
+neurohub build
+neurohub deploy`}
+          </pre>
+        </div>
+      </div>
 
       {/* Recent Requests */}
       <div className="panel">

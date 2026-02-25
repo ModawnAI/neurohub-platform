@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     stale_run_threshold_minutes: int = 30
     max_run_retries: int = 3
 
+    # Container Runner (Fly Machine API)
+    fly_api_token: str = ""
+    fly_org: str = "neurohub"
+    fly_machines_api_url: str = "https://api.machines.dev"
+    container_execution_enabled: bool = False  # When True, uses real containers instead of simulation
+    internal_api_key: str = ""  # Shared secret for service→API callbacks
+    external_compute_url: str = ""  # For external GPU dispatching
+
+    # Compute
+    compute_step_timeout: int = 300
+
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

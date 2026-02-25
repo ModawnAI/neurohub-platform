@@ -459,3 +459,160 @@ async def remove_evaluator(
 
     evaluator.is_active = False
     await db.flush()
+
+
+# ---------------------------------------------------------------------------
+# Service Container Deployment
+# ---------------------------------------------------------------------------
+
+
+class DeployServiceRequest(BaseModel):
+    container_image: str | None = None  # If None, uses default registry tag
+    resource_requirements: dict | None = None
+
+
+class DeployServiceResponse(BaseModel):
+    app_name: str
+    image: str
+    status: str
+    machine_ids: list[str] | None = None
+
+
+@router.post("/admin/services/{service_id}/deploy", response_model=DeployServiceResponse)
+async def deploy_service(
+    service_id: uuid.UUID,
+    body: DeployServiceRequest,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Deploy a service container to Fly.io."""
+    from app.config import settings
+
+    if not settings.fly_api_token:
+        raise HTTPException(status_code=503, detail="Fly.io integration not configured")
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    from app.services.service_deployer import ServiceDeployer
+
+    deployer = ServiceDeployer(
+        fly_api_token=settings.fly_api_token,
+        fly_org=settings.fly_org,
+        registry_host="registry.fly.io",
+        api_base_url=settings.fly_machines_api_url,
+    )
+
+    service_def = {
+        "id": str(service.id),
+        "name": service.name,
+        "display_name": service.display_name,
+        "version": service.version,
+        "version_label": service.version_label,
+        "institution_id": str(service.institution_id),
+        "container_image": body.container_image,
+        "resource_requirements": body.resource_requirements or {},
+    }
+
+    # Create app (idempotent)
+    await deployer.create_app(service_def)
+
+    # Deploy
+    record = await deployer.deploy(service_def)
+
+    return DeployServiceResponse(
+        app_name=record.app_name,
+        image=record.image,
+        status=record.status.value,
+        machine_ids=record.machine_ids,
+    )
+
+
+class ServiceStatusResponse(BaseModel):
+    app_name: str
+    machines: list[dict]
+    total: int
+
+
+@router.get("/admin/services/{service_id}/deployment", response_model=ServiceStatusResponse)
+async def get_deployment_status(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Get deployment status for a service."""
+    from app.config import settings
+
+    if not settings.fly_api_token:
+        raise HTTPException(status_code=503, detail="Fly.io integration not configured")
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    from app.services.service_deployer import ServiceDeployer
+
+    deployer = ServiceDeployer(
+        fly_api_token=settings.fly_api_token,
+        fly_org=settings.fly_org,
+        api_base_url=settings.fly_machines_api_url,
+    )
+
+    app_name = f"neurohub-svc-{service.name.lower()}"
+    try:
+        machines = await deployer.list_machines(app_name)
+    except Exception:
+        machines = []
+
+    return ServiceStatusResponse(
+        app_name=app_name,
+        machines=machines,
+        total=len(machines),
+    )
+
+
+@router.delete("/admin/services/{service_id}/deployment", status_code=204)
+async def undeploy_service(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Undeploy (stop all machines for) a service."""
+    from app.config import settings
+
+    if not settings.fly_api_token:
+        raise HTTPException(status_code=503, detail="Fly.io integration not configured")
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    from app.services.service_deployer import ServiceDeployer
+
+    deployer = ServiceDeployer(
+        fly_api_token=settings.fly_api_token,
+        fly_org=settings.fly_org,
+        api_base_url=settings.fly_machines_api_url,
+    )
+
+    app_name = f"neurohub-svc-{service.name.lower()}"
+    await deployer.undeploy(app_name)

@@ -822,6 +822,41 @@ export async function getWatermarkedDownloadUrl(requestId: string) {
   );
 }
 
+// ── Service Deployment ──
+
+export interface DeploymentRecord {
+  app_name: string;
+  image: string;
+  status: string;
+  machine_ids: string[] | null;
+}
+
+export interface DeploymentStatus {
+  app_name: string;
+  machines: Array<{ id: string; state: string; config?: { image?: string } }>;
+  total: number;
+}
+
+export async function deployService(
+  serviceId: string,
+  payload: { container_image?: string; resource_requirements?: Record<string, number> },
+) {
+  return apiFetch<DeploymentRecord>(`/admin/services/${serviceId}/deploy`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getDeploymentStatus(serviceId: string) {
+  return apiFetch<DeploymentStatus>(`/admin/services/${serviceId}/deployment`);
+}
+
+export async function undeployService(serviceId: string) {
+  return apiFetch<void>(`/admin/services/${serviceId}/deployment`, {
+    method: "DELETE",
+  });
+}
+
 // ── Payments ──
 
 export interface PaymentPrepareResponse {

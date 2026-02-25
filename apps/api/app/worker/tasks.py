@@ -531,6 +531,52 @@ def _build_report_content(
     }
 
 
+def _execute_step_container(run, step, session):
+    """Execute a single step via Fly Machine container.
+
+    Uses asyncio to call the async ContainerRunner from within the sync Celery task.
+    """
+    import asyncio
+
+    from app.config import settings as _settings
+    from app.services.container_runner import ContainerRunner, app_name_from_job_spec
+
+    runner = ContainerRunner(
+        fly_api_token=_settings.fly_api_token,
+        fly_org=_settings.fly_org,
+        api_base_url=_settings.fly_machines_api_url,
+    )
+
+    job_spec = run.job_spec or {}
+    app_name = app_name_from_job_spec(job_spec)
+
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(
+            runner.execute_step(
+                app_name=app_name,
+                job_spec=job_spec,
+                step_index=step.step_index,
+            )
+        )
+    finally:
+        loop.close()
+
+    step.logs_tail = (result.logs or "")[-2000:]
+
+    if result.status == "SUCCEEDED":
+        step.status = "SUCCEEDED"
+        step.exit_code = 0
+    elif result.status == "TIMEOUT":
+        step.status = "FAILED"
+        step.error_detail = result.error or "Container execution timed out"
+        raise TimeoutError(step.error_detail)
+    else:
+        step.status = "FAILED"
+        step.error_detail = result.error or f"Container exited with status: {result.status}"
+        raise RuntimeError(step.error_detail)
+
+
 @celery_app.task(
     name="neurohub.tasks.execute_run",
     bind=True,
@@ -575,13 +621,22 @@ def execute_run(self, run_id: str):
 
             run = session.execute(select(Run).where(Run.id == uuid.UUID(run_id))).scalar_one()
 
+            # Determine execution mode
+            from app.config import settings as _settings
+
+            use_containers = _settings.container_execution_enabled and _settings.fly_api_token
+
             for step in run.steps:
                 step.status = "RUNNING"
                 step.started_at = datetime.now(timezone.utc)
                 session.commit()
 
-                # Simulated work (1 second per step)
-                time.sleep(1)
+                if use_containers and step.docker_image:
+                    # Real container execution via Fly Machines
+                    _execute_step_container(run, step, session)
+                else:
+                    # Simulated work (1 second per step)
+                    time.sleep(1)
 
                 step.status = "SUCCEEDED"
                 step.completed_at = datetime.now(timezone.utc)

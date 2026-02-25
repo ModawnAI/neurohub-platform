@@ -7,7 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /build
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libpq-dev \
+    && apt-get install -y --no-install-recommends \
+       gcc libpq-dev \
+       libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 \
+       libcairo2-dev libgdk-pixbuf-2.0-dev libffi-dev \
+       fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
@@ -24,7 +28,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl libpq5 \
+    && apt-get install -y --no-install-recommends \
+       curl libpq5 \
+       libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 \
+       libcairo2 libgdk-pixbuf-2.0-0 libffi8 \
+       fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1001 appuser \
     && useradd --uid 1001 --gid 1001 --no-create-home appuser

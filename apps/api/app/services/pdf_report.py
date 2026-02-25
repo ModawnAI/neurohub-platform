@@ -245,11 +245,12 @@ def upload_pdf_to_storage(
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "apikey": settings.supabase_service_role_key,
         "Content-Type": "application/pdf",
+        "x-upsert": "true",
     }
 
     try:
         with httpx.Client(timeout=30) as client:
-            resp = client.post(url, content=pdf_bytes, headers=headers)
+            resp = client.put(url, content=pdf_bytes, headers=headers)
             resp.raise_for_status()
         logger.info("PDF uploaded to %s/%s", bucket, path)
     except Exception as e:
@@ -257,4 +258,4 @@ def upload_pdf_to_storage(
         # Don't fail the whole task; path is still stored for retry
         raise
 
-    return f"{bucket}/{path}"
+    return path
