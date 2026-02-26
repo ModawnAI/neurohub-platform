@@ -1071,3 +1071,142 @@ export async function rejectArtifact(
     body: JSON.stringify(body),
   });
 }
+
+// ── Feedback & Learning Loop ──
+
+export interface FeedbackCreate {
+  run_id: string;
+  evaluation_id?: string;
+  feedback_type: "label_correction" | "false_positive" | "false_negative" | "quality_score" | "annotation";
+  original_output?: object;
+  corrected_output?: object;
+  ground_truth?: object;
+  label_annotations?: Array<{ region: string; label: string; confidence: number }>;
+  quality_score?: number;
+  comments?: string;
+}
+
+export interface FeedbackRead {
+  id: string;
+  run_id: string;
+  service_id: string;
+  feedback_type: string;
+  original_output: object | null;
+  corrected_output: object | null;
+  ground_truth: object | null;
+  label_annotations: Array<object> | null;
+  quality_score: number | null;
+  comments: string | null;
+  included_in_training: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface FeedbackStats {
+  service_id: string;
+  total_feedback: number;
+  unused_feedback: number;
+  high_quality_feedback: number;
+  ready_for_training: boolean;
+  threshold: number;
+}
+
+export interface TrainingJobCreate {
+  trigger_type?: string;
+  hyperparameters?: object;
+}
+
+export interface TrainingJobRead {
+  id: string;
+  service_id: string;
+  trigger_type: string;
+  status: string;
+  feedback_count: number;
+  hyperparameters: object | null;
+  training_metrics: object | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_detail: string | null;
+  created_at: string;
+}
+
+export interface PerformanceMetricsRead {
+  service_id: string;
+  artifact_id: string | null;
+  metric_date: string;
+  accuracy: number | null;
+  sensitivity: number | null;
+  specificity: number | null;
+  auc_roc: number | null;
+  f1_score: number | null;
+  avg_latency_s: number | null;
+  total_runs: number | null;
+  failure_rate: number | null;
+  expert_approval_rate: number | null;
+  evaluation_count: number | null;
+  computed_at: string;
+}
+
+export interface PerformanceTimeSeries {
+  service_id: string;
+  data_points: PerformanceMetricsRead[];
+}
+
+export async function submitFeedback(
+  evaluationId: string,
+  body: FeedbackCreate,
+): Promise<FeedbackRead> {
+  return apiFetch<FeedbackRead>(`/evaluations/${evaluationId}/feedback`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getFeedbackStats(serviceId: string): Promise<FeedbackStats> {
+  return apiFetch<FeedbackStats>(`/services/${serviceId}/feedback/stats`);
+}
+
+export async function listServiceFeedback(
+  serviceId: string,
+  params?: { limit?: number; unused_only?: boolean },
+): Promise<FeedbackRead[]> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.unused_only) qs.set("unused_only", "true");
+  return apiFetch<FeedbackRead[]>(`/services/${serviceId}/feedback?${qs}`);
+}
+
+export async function createTrainingJob(
+  serviceId: string,
+  body: TrainingJobCreate,
+): Promise<TrainingJobRead> {
+  return apiFetch<TrainingJobRead>(`/services/${serviceId}/training-jobs`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function listTrainingJobs(serviceId: string): Promise<TrainingJobRead[]> {
+  return apiFetch<TrainingJobRead[]>(`/services/${serviceId}/training-jobs`);
+}
+
+export async function getPerformanceMetrics(
+  serviceId: string,
+  days = 30,
+): Promise<PerformanceTimeSeries> {
+  return apiFetch<PerformanceTimeSeries>(`/services/${serviceId}/performance?days=${days}`);
+}
+
+export async function listEvaluations(params?: {
+  status?: string;
+  limit?: number;
+}): Promise<{ items: EvaluationRead[] }> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  return apiFetch<{ items: EvaluationRead[] }>(`/evaluations?${qs}`);
+}
+
+export async function getEvaluation(evaluationId: string): Promise<EvaluationRead> {
+  return apiFetch<EvaluationRead>(`/evaluations/${evaluationId}`);
+}
