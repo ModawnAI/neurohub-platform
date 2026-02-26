@@ -1068,3 +1068,75 @@ export async function runGroupAnalysis(id: string) {
 export async function getStudyResult(id: string) {
   return apiFetch<Record<string, unknown>>(`/group-studies/${id}/result`);
 }
+
+// ── DICOM Gateway ──
+
+export interface DicomSeriesRead {
+  id: string;
+  study_id: string;
+  series_instance_uid: string;
+  series_number: number | null;
+  series_description: string | null;
+  modality: string | null;
+  num_instances: number;
+  storage_prefix: string | null;
+  created_at: string;
+}
+
+export interface DicomStudyRead {
+  id: string;
+  institution_id: string;
+  study_instance_uid: string;
+  patient_id: string;
+  patient_name: string | null;
+  study_date: string | null;
+  study_description: string | null;
+  modality: string | null;
+  num_series: number;
+  num_instances: number;
+  storage_prefix: string | null;
+  status: string;
+  source_aet: string | null;
+  request_id: string | null;
+  created_at: string;
+  series: DicomSeriesRead[];
+}
+
+export interface DicomStudyList {
+  items: DicomStudyRead[];
+  total: number;
+}
+
+export async function listDicomStudies(params?: {
+  date_from?: string;
+  date_to?: string;
+  modality?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const qs = params ? "?" + new URLSearchParams(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString() : "";
+  return apiFetch<DicomStudyList>(`/dicom/studies${qs}`);
+}
+
+export async function getDicomStudy(uid: string) {
+  return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}`);
+}
+
+export async function getDicomWorklist() {
+  return apiFetch<DicomStudyList>("/dicom/worklist");
+}
+
+export async function linkDicomStudy(uid: string, requestId: string) {
+  return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}/link`, {
+    method: "POST",
+    body: JSON.stringify({ request_id: requestId }),
+  });
+}
+
+export async function createRequestFromDicom(uid: string, serviceId: string) {
+  return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}/create-request`, {
+    method: "POST",
+    body: JSON.stringify({ service_id: serviceId }),
+  });
+}
