@@ -983,3 +983,91 @@ export async function confirmPayment(payload: {
 export async function getPaymentHistory() {
   return apiFetch<{ items: PaymentRead[] }>("/payments/history");
 }
+
+// ── Model Artifacts ──
+
+export interface CodeSecurityScanRead {
+  id: string;
+  scanner: string;
+  status: string;
+  severity: string | null;
+  findings: Record<string, unknown>[] | null;
+  scanned_at: string;
+}
+
+export interface ModelArtifactRead {
+  id: string;
+  service_id: string;
+  artifact_type: string;
+  file_name: string;
+  file_size: number | null;
+  checksum_sha256: string | null;
+  runtime: string | null;
+  status: string;
+  container_image: string | null;
+  build_status: string | null;
+  review_notes: string | null;
+  reviewed_at: string | null;
+  security_scans: CodeSecurityScanRead[];
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ModelArtifactList {
+  items: ModelArtifactRead[];
+  total: number;
+}
+
+export async function uploadArtifact(
+  serviceId: string,
+  artifactType: string,
+  runtime: string | null,
+  file: File,
+): Promise<ModelArtifactRead> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const form = new FormData();
+  form.append("service_id", serviceId);
+  form.append("artifact_type", artifactType);
+  if (runtime) form.append("runtime", runtime);
+  form.append("file", file);
+
+  const res = await fetch(`${API_BASE}/model-artifacts/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, err.code ?? "UPLOAD_ERROR", err.detail ?? "Upload failed");
+  }
+  return res.json();
+}
+
+export async function listArtifacts(serviceId: string): Promise<ModelArtifactList> {
+  return apiFetch<ModelArtifactList>(`/services/${serviceId}/artifacts`);
+}
+
+export async function getArtifact(id: string): Promise<ModelArtifactRead> {
+  return apiFetch<ModelArtifactRead>(`/model-artifacts/${id}`);
+}
+
+export async function approveArtifact(
+  id: string,
+  body: { review_notes?: string; trigger_build?: boolean },
+): Promise<ModelArtifactRead> {
+  return apiFetch<ModelArtifactRead>(`/model-artifacts/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function rejectArtifact(
+  id: string,
+  body: { review_notes: string },
+): Promise<ModelArtifactRead> {
+  return apiFetch<ModelArtifactRead>(`/model-artifacts/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}

@@ -18,6 +18,7 @@ from app.models.request import Case, CaseFile, Request, UploadSession
 from app.models.run import Run, RunStep
 from app.models.service import PipelineDefinition, ServiceDefinition
 from app.models.user import User
+from app.models.model_artifact import CodeSecurityScan, ModelArtifact
 from app.models.webhook import Webhook
 
 __all__ = [
@@ -25,12 +26,14 @@ __all__ = [
     "Base",
     "Case",
     "CaseFile",
+    "CodeSecurityScan",
     "Evaluation",
     "IdempotencyKey",
     "Institution",
     "InstitutionApiKey",
     "InstitutionInvite",
     "InstitutionMember",
+    "ModelArtifact",
     "Notification",
     "OutboxEvent",
     "PatientAccessLog",
