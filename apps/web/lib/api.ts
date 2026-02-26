@@ -983,3 +983,88 @@ export async function confirmPayment(payload: {
 export async function getPaymentHistory() {
   return apiFetch<{ items: PaymentRead[] }>("/payments/history");
 }
+
+// ── Group Analysis ──
+
+export type GroupStudyStatus = "DRAFT" | "RUNNING" | "COMPLETED" | "FAILED";
+export type GroupAnalysisType = "COMPARISON" | "REGRESSION" | "CORRELATION" | "LONGITUDINAL";
+
+export interface GroupStudyMemberRead {
+  id: string;
+  study_id: string;
+  request_id: string;
+  group_label: string;
+  member_metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface GroupStudyRead {
+  id: string;
+  institution_id: string;
+  name: string;
+  description: string | null;
+  service_id: string;
+  status: GroupStudyStatus;
+  analysis_type: GroupAnalysisType;
+  config: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+  created_by: string | null;
+  members: GroupStudyMemberRead[];
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface GroupStudyBrief {
+  id: string;
+  name: string;
+  description: string | null;
+  service_id: string;
+  status: GroupStudyStatus;
+  analysis_type: GroupAnalysisType;
+  member_count: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export async function listGroupStudies() {
+  return apiFetch<GroupStudyBrief[]>("/group-studies");
+}
+
+export async function getGroupStudy(id: string) {
+  return apiFetch<GroupStudyRead>(`/group-studies/${id}`);
+}
+
+export async function createGroupStudy(body: {
+  name: string;
+  description?: string;
+  service_id: string;
+  analysis_type: GroupAnalysisType;
+  config?: Record<string, unknown>;
+}) {
+  return apiFetch<GroupStudyRead>("/group-studies", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function addStudyMember(
+  id: string,
+  body: { request_id: string; group_label?: string; member_metadata?: Record<string, unknown> },
+) {
+  return apiFetch<GroupStudyRead>(`/group-studies/${id}/members`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function removeStudyMember(studyId: string, requestId: string) {
+  return apiFetch<void>(`/group-studies/${studyId}/members/${requestId}`, { method: "DELETE" });
+}
+
+export async function runGroupAnalysis(id: string) {
+  return apiFetch<GroupStudyRead>(`/group-studies/${id}/run`, { method: "POST" });
+}
+
+export async function getStudyResult(id: string) {
+  return apiFetch<Record<string, unknown>>(`/group-studies/${id}/result`);
+}
