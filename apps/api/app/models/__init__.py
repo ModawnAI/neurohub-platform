@@ -1,4 +1,5 @@
 from app.models.audit import AuditLog, PatientAccessLog
+from app.models.dicom_study import DicomSeries, DicomStudy
 from app.models.base import Base
 from app.models.billing import UsageLedger
 from app.models.evaluation import Evaluation, ServiceEvaluator
@@ -24,6 +25,8 @@ __all__ = [
     "AuditLog",
     "Base",
     "Case",
+    "DicomSeries",
+    "DicomStudy",
     "CaseFile",
     "Evaluation",
     "IdempotencyKey",

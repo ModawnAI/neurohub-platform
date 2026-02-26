@@ -983,3 +983,160 @@ export async function confirmPayment(payload: {
 export async function getPaymentHistory() {
   return apiFetch<{ items: PaymentRead[] }>("/payments/history");
 }
+
+// ── Group Analysis ──
+
+export type GroupStudyStatus = "DRAFT" | "RUNNING" | "COMPLETED" | "FAILED";
+export type GroupAnalysisType = "COMPARISON" | "REGRESSION" | "CORRELATION" | "LONGITUDINAL";
+
+export interface GroupStudyMemberRead {
+  id: string;
+  study_id: string;
+  request_id: string;
+  group_label: string;
+  member_metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface GroupStudyRead {
+  id: string;
+  institution_id: string;
+  name: string;
+  description: string | null;
+  service_id: string;
+  status: GroupStudyStatus;
+  analysis_type: GroupAnalysisType;
+  config: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+  created_by: string | null;
+  members: GroupStudyMemberRead[];
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface GroupStudyBrief {
+  id: string;
+  name: string;
+  description: string | null;
+  service_id: string;
+  status: GroupStudyStatus;
+  analysis_type: GroupAnalysisType;
+  member_count: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export async function listGroupStudies() {
+  return apiFetch<GroupStudyBrief[]>("/group-studies");
+}
+
+export async function getGroupStudy(id: string) {
+  return apiFetch<GroupStudyRead>(`/group-studies/${id}`);
+}
+
+export async function createGroupStudy(body: {
+  name: string;
+  description?: string;
+  service_id: string;
+  analysis_type: GroupAnalysisType;
+  config?: Record<string, unknown>;
+}) {
+  return apiFetch<GroupStudyRead>("/group-studies", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function addStudyMember(
+  id: string,
+  body: { request_id: string; group_label?: string; member_metadata?: Record<string, unknown> },
+) {
+  return apiFetch<GroupStudyRead>(`/group-studies/${id}/members`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function removeStudyMember(studyId: string, requestId: string) {
+  return apiFetch<void>(`/group-studies/${studyId}/members/${requestId}`, { method: "DELETE" });
+}
+
+export async function runGroupAnalysis(id: string) {
+  return apiFetch<GroupStudyRead>(`/group-studies/${id}/run`, { method: "POST" });
+}
+
+export async function getStudyResult(id: string) {
+  return apiFetch<Record<string, unknown>>(`/group-studies/${id}/result`);
+}
+
+// ── DICOM Gateway ──
+
+export interface DicomSeriesRead {
+  id: string;
+  study_id: string;
+  series_instance_uid: string;
+  series_number: number | null;
+  series_description: string | null;
+  modality: string | null;
+  num_instances: number;
+  storage_prefix: string | null;
+  created_at: string;
+}
+
+export interface DicomStudyRead {
+  id: string;
+  institution_id: string;
+  study_instance_uid: string;
+  patient_id: string;
+  patient_name: string | null;
+  study_date: string | null;
+  study_description: string | null;
+  modality: string | null;
+  num_series: number;
+  num_instances: number;
+  storage_prefix: string | null;
+  status: string;
+  source_aet: string | null;
+  request_id: string | null;
+  created_at: string;
+  series: DicomSeriesRead[];
+}
+
+export interface DicomStudyList {
+  items: DicomStudyRead[];
+  total: number;
+}
+
+export async function listDicomStudies(params?: {
+  date_from?: string;
+  date_to?: string;
+  modality?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const qs = params ? "?" + new URLSearchParams(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString() : "";
+  return apiFetch<DicomStudyList>(`/dicom/studies${qs}`);
+}
+
+export async function getDicomStudy(uid: string) {
+  return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}`);
+}
+
+export async function getDicomWorklist() {
+  return apiFetch<DicomStudyList>("/dicom/worklist");
+}
+
+export async function linkDicomStudy(uid: string, requestId: string) {
+  return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}/link`, {
+    method: "POST",
+    body: JSON.stringify({ request_id: requestId }),
+  });
+}
+
+export async function createRequestFromDicom(uid: string, serviceId: string) {
+  return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}/create-request`, {
+    method: "POST",
+    body: JSON.stringify({ service_id: serviceId }),
+  });
+}
