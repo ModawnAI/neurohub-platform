@@ -203,7 +203,7 @@ export default function GroupStudyDetailPage() {
                   <div key={k} className="bg-gray-50 rounded p-2">
                     <dt className="text-xs text-gray-400 capitalize">{k.replace(/_/g, " ")}</dt>
                     <dd className="font-medium mt-0.5">
-                      {Array.isArray(v) ? v.join(", ") : String(v)}
+                      {Array.isArray(v) ? (v as unknown[]).join(", ") : String(v)}
                     </dd>
                   </div>
                 ))}

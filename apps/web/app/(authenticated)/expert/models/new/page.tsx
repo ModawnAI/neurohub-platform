@@ -111,28 +111,24 @@ export default function NewModelPage() {
     const updated = [...slots];
     for (let i = 0; i < updated.length; i++) {
       if (!updated[i].file) continue;
-      updated[i] = { ...updated[i], uploading: true, error: null };
+      updated[i] = { ...updated[i], uploading: true, error: null } as ArtifactSlot;
     }
     setSlots([...updated]);
 
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i];
-      if (!slot.file) continue;
+      const currentSlot = slots[i]; if (!currentSlot?.file) continue;
       try {
         const result = await uploadArtifact(
           selectedServiceId,
-          slot.artifactType,
-          slot.runtime ?? null,
-          slot.file,
+          slot!.artifactType,
+          slot!.runtime ?? null,
+          slot!.file!,
         );
-        updated[i] = { ...updated[i], uploaded: result, uploading: false };
+        updated[i] = { ...updated[i], uploaded: result, uploading: false } as ArtifactSlot;
         setSlots([...updated]);
       } catch (e: unknown) {
-        updated[i] = {
-          ...updated[i],
-          uploading: false,
-          error: e instanceof Error ? e.message : "Upload failed",
-        };
+        updated[i] = { ...updated[i], uploading: false, error: e instanceof Error ? e.message : "Upload failed" } as ArtifactSlot;
         setSlots([...updated]);
       }
     }
@@ -204,8 +200,8 @@ export default function NewModelPage() {
       {step === 1 && (
         <div>
           {slots.map((slot, idx) => (
-            <div key={slot.artifactType} className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ marginBottom: 8 }}>{slot.label}</h3>
+            <div key={slot!.artifactType} className="card" style={{ marginBottom: 16 }}>
+              <h3 style={{ marginBottom: 8 }}>{slot!.label}</h3>
               <div
                 style={{
                   border: "2px dashed var(--color-border)",
@@ -213,7 +209,7 @@ export default function NewModelPage() {
                   padding: 24,
                   textAlign: "center",
                   cursor: "pointer",
-                  background: slot.file ? "var(--color-success-light)" : undefined,
+                  background: slot!.file ? "var(--color-success-light)" : undefined,
                 }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
@@ -226,21 +222,21 @@ export default function NewModelPage() {
                 <input
                   id={`file-input-${idx}`}
                   type="file"
-                  accept={slot.accept}
+                  accept={slot!.accept}
                   style={{ display: "none" }}
                   onChange={(e) => handleFileChange(idx, e.target.files?.[0] ?? null)}
                 />
-                {slot.file ? (
-                  <span>✅ {slot.file.name} ({(slot.file.size / 1024).toFixed(1)} KB)</span>
+                {slot!.file ? (
+                  <span>✅ {slot!.file.name} ({(slot!.file.size / 1024).toFixed(1)} KB)</span>
                 ) : (
                   <span style={{ color: "var(--color-text-secondary)" }}>
-                    파일을 드래그하거나 클릭하여 선택 ({slot.accept})
+                    파일을 드래그하거나 클릭하여 선택 ({slot!.accept})
                   </span>
                 )}
               </div>
-              {slot.error && (
+              {slot!.error && (
                 <p style={{ color: "var(--color-error)", marginTop: 8, fontSize: 13 }}>
-                  {slot.error}
+                  {slot!.error}
                 </p>
               )}
             </div>
@@ -265,12 +261,12 @@ export default function NewModelPage() {
           <div className="card">
             <h2 className="card-title">보안 스캔 결과</h2>
             {slots.filter((s) => s.uploaded).map((slot) => (
-              <div key={slot.artifactType} style={{ marginBottom: 16 }}>
+              <div key={slot!.artifactType} style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <strong>{slot.label}</strong>
-                  <StatusBadge status={slot.uploaded!.status} />
+                  <strong>{slot!.label}</strong>
+                  <StatusBadge status={slot!.uploaded!.status} />
                 </div>
-                {slot.uploaded!.security_scans.length > 0 ? (
+                {slot!.uploaded!.security_scans.length > 0 ? (
                   <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
@@ -281,7 +277,7 @@ export default function NewModelPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {slot.uploaded!.security_scans.map((scan) => (
+                      {slot!.uploaded!.security_scans.map((scan) => (
                         <tr key={scan.id} style={{ borderTop: "1px solid var(--color-border)" }}>
                           <td style={{ padding: "4px 8px" }}>{scan.scanner}</td>
                           <td style={{ padding: "4px 8px" }}><StatusBadge status={scan.status} /></td>
@@ -293,7 +289,7 @@ export default function NewModelPage() {
                   </table>
                 ) : (
                   <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-                    {["APPROVED", "REJECTED"].includes(slot.uploaded!.status)
+                    {["APPROVED", "REJECTED"].includes(slot!.uploaded!.status)
                       ? "스캔 항목 없음"
                       : "스캔 진행 중…"}
                   </p>

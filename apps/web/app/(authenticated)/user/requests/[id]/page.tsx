@@ -159,7 +159,7 @@ export default function UserRequestDetailPage() {
 
       <div className="page-header">
         <div>
-          <h1 className="page-title">{serviceSnapshot?.display_name || t("requestDetail.analysisRequest")}</h1>
+          <h1 className="page-title">{serviceSnapshot?.display_name || (t("requestDetail.analysisRequest") as string)}</h1>
           <p className="page-subtitle">{t("requestDetail.requestNumber")}{id.slice(0, 8)}</p>
         </div>
         <span className={`status-chip status-${request.status.toLowerCase()}`}>

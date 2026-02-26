@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getEvaluation, submitFeedback } from "@/lib/api";
+import { getReviewDetail, submitFeedback } from "@/lib/api";
 
 interface LabelAnnotation {
   region: string;
@@ -30,7 +30,7 @@ export default function FeedbackDetailPage() {
   ]);
 
   useEffect(() => {
-    getEvaluation(evaluationId)
+    getReviewDetail(evaluationId)
       .then(setEvaluation)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -54,9 +54,9 @@ export default function FeedbackDetailPage() {
       }
       await submitFeedback(evaluationId, {
         run_id: evaluation.run_id,
-        feedback_type: feedbackType,
+        feedback_type: feedbackType as "label_correction" | "false_positive" | "false_negative" | "quality_score" | "annotation",
         quality_score: qualityScore,
-        corrected_output: corrected,
+        corrected_output: (corrected as Record<string, unknown> | undefined),
         label_annotations: annotations.filter((a) => a.region || a.label),
         comments: comments || undefined,
       });

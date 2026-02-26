@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQueries } from "@tanstack/react-query";
 import { apiFetch, getServicePerformance, type ServiceRead } from "@/lib/api";
@@ -20,7 +21,7 @@ function MetricRow({ label, values }: { label: string; values: (string | number 
   );
 }
 
-export default function CompareModelsPage() {
+function CompareModelsInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const idsParam = searchParams.get("ids") ?? "";
@@ -99,7 +100,7 @@ export default function CompareModelsPage() {
           </div>
         ))}
 
-        <MetricRow label="Status" values={services.map(s => s ? <span className={`status-chip status-${s.status.toLowerCase()}`}>{s.status}</span> : null)} />
+        <MetricRow label="Status" values={services.map(s => s?.status ?? '-')} />
         <MetricRow label="Category" values={services.map(s => s?.category ?? "-")} />
         <MetricRow label="Service Type" values={services.map(s => s?.service_type ?? "-")} />
         <MetricRow label="Department" values={services.map(s => s?.department ?? "-")} />
@@ -130,5 +131,13 @@ export default function CompareModelsPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function CompareModelsPage() {
+  return (
+    <Suspense fallback={<div className="page-loading">Loading...</div>}>
+      <CompareModelsInner />
+    </Suspense>
   );
 }

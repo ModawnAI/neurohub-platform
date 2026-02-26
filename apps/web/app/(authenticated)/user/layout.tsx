@@ -13,7 +13,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     { href: "/user/requests", label: t("nav.myRequests"), icon: <ListChecks size={20} /> },
     { href: "/user/reports", label: t("nav.reports"), icon: <FileText size={20} /> },
     { href: "/user/new-request", label: t("nav.newRequest"), icon: <PlusCircle size={20} /> },
-    { href: "/user/group-studies", label: t("nav.groupStudies") || "Group Studies", icon: <ChartBar size={20} /> },
+    { href: "/user/group-studies", label: "Group Studies", icon: <ChartBar size={20} /> },
     { href: "/user/payment", label: t("nav.payment"), icon: <CreditCard size={20} /> },
     { href: "/user/marketplace", label: "Marketplace", icon: <ShoppingCart size={20} /> },
     { href: "/user/dicom-worklist", label: "DICOM Worklist", icon: <WifiHigh size={20} /> },

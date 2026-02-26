@@ -117,10 +117,10 @@ function PerformanceTab({ serviceId }: { serviceId: string }) {
     <div className="stack-md">
       <div className="grid-4" style={{ "--grid-cols": 4 } as React.CSSProperties}>
         {[
-          { label: "Latest Accuracy", value: latest.accuracy != null ? `${(latest.accuracy * 100).toFixed(1)}%` : "-" },
-          { label: "Total Runs", value: latest.total_runs ?? "-" },
-          { label: "Expert Approval Rate", value: latest.expert_approval_rate != null ? `${(latest.expert_approval_rate * 100).toFixed(1)}%` : "-" },
-          { label: "Evaluations", value: latest.evaluation_count ?? "-" },
+          { label: "Latest Accuracy", value: latest?.accuracy != null ? `${(latest?.accuracy * 100).toFixed(1)}%` : "-" },
+          { label: "Total Runs", value: latest?.total_runs ?? "-" },
+          { label: "Expert Approval Rate", value: latest?.expert_approval_rate != null ? `${(latest?.expert_approval_rate * 100).toFixed(1)}%` : "-" },
+          { label: "Evaluations", value: latest?.evaluation_count ?? "-" },
         ].map(({ label, value }) => (
           <div key={label} className="card" style={{ padding: "16px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 24, fontWeight: 700 }}>{String(value)}</p>

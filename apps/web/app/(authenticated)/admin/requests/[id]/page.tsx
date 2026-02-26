@@ -153,7 +153,7 @@ export default function AdminRequestDetailPage() {
             <div className="stack-md">
               <div><p className="detail-label">{t("adminRequests.requestId")}</p><p className="detail-value" style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{request.id}</p></div>
               <div><p className="detail-label">{t("requestDetail.service")}</p><p className="detail-value">{serviceSnapshot?.display_name || "-"}</p></div>
-              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}{t("common.unitCount")}</p></div>
+              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}"건"</p></div>
               <div><p className="detail-label">{t("adminRequests.priority")}</p><p className="detail-value">{request.priority}</p></div>
               <div><p className="detail-label">{t("requestDetail.createdDate")}</p><p className="detail-value">{new Date(request.created_at).toLocaleString(dateLocale)}</p></div>
               {request.updated_at && <div><p className="detail-label">{t("adminRequests.lastModified")}</p><p className="detail-value">{new Date(request.updated_at).toLocaleString(dateLocale)}</p></div>}

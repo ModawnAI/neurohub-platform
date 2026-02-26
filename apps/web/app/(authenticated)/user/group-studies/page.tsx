@@ -120,7 +120,7 @@ export default function GroupStudiesPage() {
               {studies.map((s) => (
                 <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium">{s.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{s.analysis_type}</td>
+                  <td className="px-4 py-3 text-gray-500">{s.description ?? "-"}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status] ?? ""}`}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { listEvaluations } from "@/lib/api";
+import { listEvaluationQueue } from "@/lib/api";
 
 interface EvaluationSummary {
   id: string;
@@ -17,7 +17,7 @@ export default function ExpertFeedbackPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    listEvaluations({ status: "COMPLETED", limit: 50 })
+    listEvaluationQueue()
       .then((data: any) => setEvaluations(data?.items ?? data ?? []))
       .catch(console.error)
       .finally(() => setLoading(false));
