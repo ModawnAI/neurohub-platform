@@ -149,6 +149,7 @@ export default function UserNewRequestPage() {
           onChange={(cases) => setDraft({ cases })}
           onNext={handleAdvanceToUpload}
           onPrev={prev}
+          inputSchema={selectedService?.input_schema}
         />
       )}
 

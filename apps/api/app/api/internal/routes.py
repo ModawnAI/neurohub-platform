@@ -217,17 +217,10 @@ async def report_heartbeat(
     run.heartbeat_at = datetime.now(timezone.utc)
     if payload.worker_id:
         run.worker_id = payload.worker_id
-
-    # Store progress in job_spec metadata (non-destructive)
-    if payload.progress_pct is not None or payload.current_step is not None:
-        progress = (run.job_spec or {}).get("_progress", {})
-        if payload.progress_pct is not None:
-            progress["pct"] = payload.progress_pct
-        if payload.current_step is not None:
-            progress["current_step"] = payload.current_step
-        job_spec = dict(run.job_spec or {})
-        job_spec["_progress"] = progress
-        run.job_spec = job_spec
+    if payload.progress_pct is not None:
+        run.progress_pct = payload.progress_pct
+    if payload.current_step is not None:
+        run.current_step = payload.current_step
 
     logger.debug("Heartbeat for run %s from worker %s", run_id, payload.worker_id)
 
