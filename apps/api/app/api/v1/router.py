@@ -17,6 +17,7 @@ from app.api.v1.services import router as services_router
 from app.api.v1.uploads import router as uploads_router
 from app.api.v1.users import router as users_router
 from app.api.v1.webhooks import router as webhooks_router
+from app.api.v1.dicom_gateway import router as dicom_gateway_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(health_router)
@@ -36,3 +37,4 @@ api_v1_router.include_router(webhooks_router)
 api_v1_router.include_router(batch_router)
 api_v1_router.include_router(evaluations_router)
 api_v1_router.include_router(payments_router)
+api_v1_router.include_router(dicom_gateway_router)
