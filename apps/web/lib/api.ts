@@ -1251,3 +1251,87 @@ export async function listEvaluations(params?: {
 export async function getEvaluation(evaluationId: string): Promise<EvaluationRead> {
   return apiFetch<EvaluationRead>(`/evaluations/${evaluationId}`);
 }
+
+// ── Phase D: Extended Interfaces ──
+
+export interface ArtifactRead {
+  id: string
+  service_id: string
+  artifact_type: string
+  file_name: string
+  file_size: number | null
+  checksum_sha256: string | null
+  runtime: string | null
+  status: string
+  container_image: string | null
+  build_status: string | null
+  review_notes: string | null
+  reviewed_at: string | null
+  security_scans: SecurityScanRead[]
+  created_at: string
+}
+
+export interface SecurityScanRead {
+  id: string
+  scanner: string
+  status: string
+  severity: string | null
+  findings: Array<{rule: string, severity: string, message: string, line?: number}> | null
+  scanned_at: string
+}
+
+export interface PerformancePoint {
+  service_id: string
+  metric_date: string
+  accuracy: number | null
+  sensitivity: number | null
+  auc_roc: number | null
+  f1_score: number | null
+  avg_latency_s: number | null
+  total_runs: number | null
+  expert_approval_rate: number | null
+  evaluation_count: number | null
+}
+
+export interface TrainingJobFull {
+  id: string
+  service_id: string
+  trigger_type: string
+  status: string
+  feedback_count: number
+  hyperparameters: Record<string, unknown> | null
+  training_metrics: {epochs?: Array<{epoch: number, train_loss: number, val_loss: number, accuracy: number}>, final?: Record<string, unknown>} | null
+  started_at: string | null
+  completed_at: string | null
+  error_detail: string | null
+  created_at: string
+}
+
+export async function getServicePerformance(serviceId: string, days = 90): Promise<{service_id: string, data_points: PerformancePoint[]}> {
+  return apiFetch<{service_id: string, data_points: PerformancePoint[]}>(`/services/${serviceId}/performance?days=${days}`);
+}
+
+export async function getArtifactFull(id: string): Promise<ArtifactRead> {
+  return apiFetch<ArtifactRead>(`/model-artifacts/${id}`);
+}
+
+export async function listArtifactsFull(serviceId: string): Promise<{items: ArtifactRead[], total: number}> {
+  return apiFetch<{items: ArtifactRead[], total: number}>(`/services/${serviceId}/artifacts`);
+}
+
+export async function listAllArtifacts(status?: string): Promise<{items: ArtifactRead[], total: number}> {
+  const qs = status ? `?status=${status}` : "";
+  return apiFetch<{items: ArtifactRead[], total: number}>(`/admin/model-artifacts${qs}`);
+}
+
+export async function listTrainingJobsFull(serviceId: string): Promise<{items: TrainingJobFull[]}> {
+  return apiFetch<{items: TrainingJobFull[]}>(`/services/${serviceId}/training-jobs`);
+}
+
+export async function getTrainingJobFull(id: string): Promise<TrainingJobFull> {
+  return apiFetch<TrainingJobFull>(`/training-jobs/${id}`);
+}
+
+export async function listAllTrainingJobs(): Promise<{items: TrainingJobFull[]}> {
+  return apiFetch<{items: TrainingJobFull[]}>(`/admin/training-jobs`);
+}
