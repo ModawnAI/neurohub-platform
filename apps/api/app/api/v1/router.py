@@ -12,6 +12,8 @@ from app.api.v1.notifications import router as notifications_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.dicom_gateway import router as dicom_gateway_router
 from app.api.v1.group_analysis import router as group_analysis_router
+from app.api.v1.model_artifacts import router as model_artifacts_router
+from app.api.v1.feedback import router as feedback_router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.requests import router as requests_router
 from app.api.v1.reviews import router as reviews_router
@@ -40,3 +42,5 @@ api_v1_router.include_router(evaluations_router)
 api_v1_router.include_router(payments_router)
 api_v1_router.include_router(group_analysis_router)
 api_v1_router.include_router(dicom_gateway_router)
+api_v1_router.include_router(model_artifacts_router)
+api_v1_router.include_router(feedback_router)

@@ -535,20 +535,39 @@ def _execute_step_container(run, step, session):
     """Execute a single step via Fly Machine container.
 
     Uses asyncio to call the async ContainerRunner from within the sync Celery task.
+    Applies SandboxConfig for resource and security constraints.
     """
     import asyncio
 
     from app.config import settings as _settings
     from app.services.container_runner import ContainerRunner, app_name_from_job_spec
+    from app.services.sandbox_config import SandboxConfig
+
+    job_spec = run.job_spec or {}
+
+    # Build sandbox config from this step's resource requirements
+    step_dict = {
+        "resources": step.resources if hasattr(step, "resources") and step.resources else {},
+        "timeout_seconds": step.timeout_seconds if hasattr(step, "timeout_seconds") else 1800,
+    }
+    sandbox = SandboxConfig.from_pipeline_step(step_dict)
+
+    # Inject sandbox constraints into job_spec for this execution
+    job_spec = dict(job_spec)
+    job_spec["sandbox"] = {
+        "no_network": sandbox.no_network,
+        "memory_mb": sandbox.memory_mb,
+        "cpus": sandbox.cpus,
+        "timeout_seconds": sandbox.timeout_seconds,
+    }
+
+    app_name = app_name_from_job_spec(job_spec)
 
     runner = ContainerRunner(
         fly_api_token=_settings.fly_api_token,
         fly_org=_settings.fly_org,
         api_base_url=_settings.fly_machines_api_url,
     )
-
-    job_spec = run.job_spec or {}
-    app_name = app_name_from_job_spec(job_spec)
 
     loop = asyncio.new_event_loop()
     try:
@@ -557,6 +576,7 @@ def _execute_step_container(run, step, session):
                 app_name=app_name,
                 job_spec=job_spec,
                 step_index=step.step_index,
+                timeout_override=float(sandbox.timeout_seconds),
             )
         )
     finally:
@@ -567,6 +587,13 @@ def _execute_step_container(run, step, session):
     if result.status == "SUCCEEDED":
         step.status = "SUCCEEDED"
         step.exit_code = 0
+        # Parse and store structured output on the step if it has logs
+        if result.logs:
+            from app.services.output_parser import parse_container_output
+            output_schema = job_spec.get("output_schema")
+            parsed = parse_container_output(result.logs, output_schema)
+            if hasattr(step, "result_manifest"):
+                step.result_manifest = parsed
     elif result.status == "TIMEOUT":
         step.status = "FAILED"
         step.error_detail = result.error or "Container execution timed out"
@@ -635,8 +662,13 @@ def execute_run(self, run_id: str):
                     # Real container execution via Fly Machines
                     _execute_step_container(run, step, session)
                 else:
-                    # Simulated work (1 second per step)
-                    time.sleep(1)
+                    # No container configured — log warning but continue
+                    logger.warning(
+                        "Run %s step %s has no docker_image or container execution disabled; "
+                        "marking step as succeeded without execution",
+                        run_id,
+                        getattr(step, "step_index", "?"),
+                    )
 
                 step.status = "SUCCEEDED"
                 step.completed_at = datetime.now(timezone.utc)
@@ -644,14 +676,28 @@ def execute_run(self, run_id: str):
                 run.heartbeat_at = datetime.now(timezone.utc)
                 session.commit()
 
+            # Collect and parse output from the final step's logs
+            from app.services.output_parser import extract_qc_metrics, parse_container_output
+
+            last_step_logs = ""
+            if run.steps:
+                last_step = run.steps[-1]
+                last_step_logs = getattr(last_step, "logs_tail", "") or ""
+
+            output_schema = (run.job_spec or {}).get("output_schema")
+            result_manifest = parse_container_output(last_step_logs, output_schema)
+            qc_data = extract_qc_metrics(result_manifest)
+
             # Mark run SUCCEEDED
             run.status = "SUCCEEDED"
             run.completed_at = datetime.now(timezone.utc)
             run.result_manifest = {
-                "status": "completed",
+                **result_manifest,
                 "steps_completed": len(run.steps),
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }
+            if hasattr(run, "metrics"):
+                run.metrics = qc_data
 
             # Record usage capture in billing ledger
             service_id = run.job_spec.get("service_id") if run.job_spec else None

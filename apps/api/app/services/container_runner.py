@@ -316,6 +316,48 @@ class ContainerRunner:
             duration_ms=elapsed_ms,
         )
 
+    async def run_job(self, job_spec: dict, timeout_seconds: int = 1800) -> dict:
+        """High-level: launch machine, wait for completion, collect logs, destroy.
+
+        Returns dict with 'logs', 'exit_code', 'status'.
+        Executes all steps sequentially and aggregates logs.
+        """
+        steps = job_spec.get("steps", [{}])
+        app_name = app_name_from_job_spec(job_spec)
+        all_logs: list[str] = []
+        final_exit_code = 0
+
+        for step_index in range(len(steps)):
+            result = await self.execute_step(
+                app_name=app_name,
+                job_spec=job_spec,
+                step_index=step_index,
+                timeout_override=float(timeout_seconds),
+            )
+            if result.logs:
+                all_logs.append(result.logs)
+
+            if result.status == "TIMEOUT":
+                return {
+                    "logs": "\n".join(all_logs),
+                    "exit_code": 124,
+                    "status": "TIMEOUT",
+                    "error": result.error,
+                }
+            if result.status != "SUCCEEDED":
+                return {
+                    "logs": "\n".join(all_logs),
+                    "exit_code": result.exit_code or 1,
+                    "status": "FAILED",
+                    "error": result.error,
+                }
+
+        return {
+            "logs": "\n".join(all_logs),
+            "exit_code": final_exit_code,
+            "status": "SUCCEEDED",
+        }
+
     async def enrich_input_urls(
         self,
         job_spec: dict,

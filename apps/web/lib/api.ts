@@ -999,7 +999,6 @@ export interface GroupStudyMemberRead {
 }
 
 export interface GroupStudyRead {
-  id: string;
   institution_id: string;
   name: string;
   description: string | null;
@@ -1010,102 +1009,66 @@ export interface GroupStudyRead {
   result: Record<string, unknown> | null;
   created_by: string | null;
   members: GroupStudyMemberRead[];
-  created_at: string;
   updated_at: string | null;
-}
 
 export interface GroupStudyBrief {
-  id: string;
-  name: string;
-  description: string | null;
-  service_id: string;
-  status: GroupStudyStatus;
-  analysis_type: GroupAnalysisType;
   member_count: number;
-  created_at: string;
-  updated_at: string | null;
-}
 
 export async function listGroupStudies() {
   return apiFetch<GroupStudyBrief[]>("/group-studies");
-}
 
 export async function getGroupStudy(id: string) {
   return apiFetch<GroupStudyRead>(`/group-studies/${id}`);
-}
 
 export async function createGroupStudy(body: {
-  name: string;
   description?: string;
-  service_id: string;
-  analysis_type: GroupAnalysisType;
   config?: Record<string, unknown>;
 }) {
   return apiFetch<GroupStudyRead>("/group-studies", {
     method: "POST",
     body: JSON.stringify(body),
   });
-}
 
 export async function addStudyMember(
   id: string,
   body: { request_id: string; group_label?: string; member_metadata?: Record<string, unknown> },
 ) {
   return apiFetch<GroupStudyRead>(`/group-studies/${id}/members`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
 
 export async function removeStudyMember(studyId: string, requestId: string) {
   return apiFetch<void>(`/group-studies/${studyId}/members/${requestId}`, { method: "DELETE" });
-}
 
 export async function runGroupAnalysis(id: string) {
   return apiFetch<GroupStudyRead>(`/group-studies/${id}/run`, { method: "POST" });
-}
 
 export async function getStudyResult(id: string) {
   return apiFetch<Record<string, unknown>>(`/group-studies/${id}/result`);
-}
 
 // ── DICOM Gateway ──
 
 export interface DicomSeriesRead {
-  id: string;
-  study_id: string;
   series_instance_uid: string;
   series_number: number | null;
   series_description: string | null;
   modality: string | null;
   num_instances: number;
   storage_prefix: string | null;
-  created_at: string;
-}
 
 export interface DicomStudyRead {
-  id: string;
-  institution_id: string;
   study_instance_uid: string;
   patient_id: string;
   patient_name: string | null;
   study_date: string | null;
   study_description: string | null;
-  modality: string | null;
   num_series: number;
-  num_instances: number;
-  storage_prefix: string | null;
   status: string;
   source_aet: string | null;
   request_id: string | null;
-  created_at: string;
   series: DicomSeriesRead[];
-}
 
 export interface DicomStudyList {
   items: DicomStudyRead[];
   total: number;
-}
 
 export async function listDicomStudies(params?: {
   date_from?: string;
@@ -1114,29 +1077,177 @@ export async function listDicomStudies(params?: {
   status?: string;
   limit?: number;
   offset?: number;
-}) {
   const qs = params ? "?" + new URLSearchParams(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString() : "";
   return apiFetch<DicomStudyList>(`/dicom/studies${qs}`);
-}
 
 export async function getDicomStudy(uid: string) {
   return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}`);
-}
 
 export async function getDicomWorklist() {
   return apiFetch<DicomStudyList>("/dicom/worklist");
-}
 
 export async function linkDicomStudy(uid: string, requestId: string) {
   return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}/link`, {
-    method: "POST",
     body: JSON.stringify({ request_id: requestId }),
-  });
-}
 
 export async function createRequestFromDicom(uid: string, serviceId: string) {
   return apiFetch<DicomStudyRead>(`/dicom/studies/${uid}/create-request`, {
-    method: "POST",
     body: JSON.stringify({ service_id: serviceId }),
-  });
+// ── Model Artifacts ──
+
+export interface CodeSecurityScanRead {
+  scanner: string;
+  severity: string | null;
+  findings: Record<string, unknown>[] | null;
+  scanned_at: string;
+
+export interface ModelArtifactRead {
+  artifact_type: string;
+  file_name: string;
+  file_size: number | null;
+  checksum_sha256: string | null;
+  runtime: string | null;
+  container_image: string | null;
+  build_status: string | null;
+  review_notes: string | null;
+  reviewed_at: string | null;
+  security_scans: CodeSecurityScanRead[];
+
+export interface ModelArtifactList {
+  items: ModelArtifactRead[];
+
+export async function uploadArtifact(
+  serviceId: string,
+  artifactType: string,
+  runtime: string | null,
+  file: File,
+): Promise<ModelArtifactRead> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const form = new FormData();
+  form.append("service_id", serviceId);
+  form.append("artifact_type", artifactType);
+  if (runtime) form.append("runtime", runtime);
+  form.append("file", file);
+
+  const res = await fetch(`${API_BASE}/model-artifacts/upload`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, err.code ?? "UPLOAD_ERROR", err.detail ?? "Upload failed");
+  return res.json();
+
+export async function listArtifacts(serviceId: string): Promise<ModelArtifactList> {
+  return apiFetch<ModelArtifactList>(`/services/${serviceId}/artifacts`);
+
+export async function getArtifact(id: string): Promise<ModelArtifactRead> {
+  return apiFetch<ModelArtifactRead>(`/model-artifacts/${id}`);
+
+export async function approveArtifact(
+  body: { review_notes?: string; trigger_build?: boolean },
+  return apiFetch<ModelArtifactRead>(`/model-artifacts/${id}/approve`, {
+
+export async function rejectArtifact(
+  body: { review_notes: string },
+  return apiFetch<ModelArtifactRead>(`/model-artifacts/${id}/reject`, {
+
+// ── Feedback & Learning Loop ──
+
+export interface FeedbackCreate {
+  run_id: string;
+  evaluation_id?: string;
+  feedback_type: "label_correction" | "false_positive" | "false_negative" | "quality_score" | "annotation";
+  original_output?: object;
+  corrected_output?: object;
+  ground_truth?: object;
+  label_annotations?: Array<{ region: string; label: string; confidence: number }>;
+  quality_score?: number;
+  comments?: string;
+
+export interface FeedbackRead {
+  feedback_type: string;
+  original_output: object | null;
+  corrected_output: object | null;
+  ground_truth: object | null;
+  label_annotations: Array<object> | null;
+  quality_score: number | null;
+  comments: string | null;
+  included_in_training: boolean;
+
+export interface FeedbackStats {
+  total_feedback: number;
+  unused_feedback: number;
+  high_quality_feedback: number;
+  ready_for_training: boolean;
+  threshold: number;
+
+export interface TrainingJobCreate {
+  trigger_type?: string;
+  hyperparameters?: object;
+
+export interface TrainingJobRead {
+  trigger_type: string;
+  feedback_count: number;
+  hyperparameters: object | null;
+  training_metrics: object | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_detail: string | null;
+
+export interface PerformanceMetricsRead {
+  artifact_id: string | null;
+  metric_date: string;
+  accuracy: number | null;
+  sensitivity: number | null;
+  specificity: number | null;
+  auc_roc: number | null;
+  f1_score: number | null;
+  avg_latency_s: number | null;
+  total_runs: number | null;
+  failure_rate: number | null;
+  expert_approval_rate: number | null;
+  evaluation_count: number | null;
+  computed_at: string;
+
+export interface PerformanceTimeSeries {
+  data_points: PerformanceMetricsRead[];
+
+export async function submitFeedback(
+  evaluationId: string,
+  body: FeedbackCreate,
+): Promise<FeedbackRead> {
+  return apiFetch<FeedbackRead>(`/evaluations/${evaluationId}/feedback`, {
+
+export async function getFeedbackStats(serviceId: string): Promise<FeedbackStats> {
+  return apiFetch<FeedbackStats>(`/services/${serviceId}/feedback/stats`);
+
+export async function listServiceFeedback(
+  params?: { limit?: number; unused_only?: boolean },
+): Promise<FeedbackRead[]> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.unused_only) qs.set("unused_only", "true");
+  return apiFetch<FeedbackRead[]>(`/services/${serviceId}/feedback?${qs}`);
+
+export async function createTrainingJob(
+  body: TrainingJobCreate,
+): Promise<TrainingJobRead> {
+  return apiFetch<TrainingJobRead>(`/services/${serviceId}/training-jobs`, {
+
+export async function listTrainingJobs(serviceId: string): Promise<TrainingJobRead[]> {
+  return apiFetch<TrainingJobRead[]>(`/services/${serviceId}/training-jobs`);
+
+export async function getPerformanceMetrics(
+  days = 30,
+): Promise<PerformanceTimeSeries> {
+  return apiFetch<PerformanceTimeSeries>(`/services/${serviceId}/performance?days=${days}`);
+
+export async function listEvaluations(params?: {
+}): Promise<{ items: EvaluationRead[] }> {
+  if (params?.status) qs.set("status", params.status);
+  return apiFetch<{ items: EvaluationRead[] }>(`/evaluations?${qs}`);
+
+export async function getEvaluation(evaluationId: string): Promise<EvaluationRead> {
+  return apiFetch<EvaluationRead>(`/evaluations/${evaluationId}`);
 }

@@ -19,7 +19,9 @@ from app.models.request import Case, CaseFile, Request, UploadSession
 from app.models.run import Run, RunStep
 from app.models.service import PipelineDefinition, ServiceDefinition
 from app.models.user import User
+from app.models.model_artifact import CodeSecurityScan, ModelArtifact
 from app.models.webhook import Webhook
+from app.models.feedback import ModelFeedback, ModelTrainingJob, ModelPerformanceMetrics
 
 __all__ = [
     "AuditLog",
@@ -28,12 +30,17 @@ __all__ = [
     "DicomSeries",
     "DicomStudy",
     "CaseFile",
+    "CodeSecurityScan",
     "Evaluation",
     "IdempotencyKey",
     "Institution",
     "InstitutionApiKey",
     "InstitutionInvite",
     "InstitutionMember",
+    "ModelArtifact",
+    "ModelFeedback",
+    "ModelTrainingJob",
+    "ModelPerformanceMetrics",
     "Notification",
     "OutboxEvent",
     "PatientAccessLog",
