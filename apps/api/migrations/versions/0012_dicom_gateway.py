@@ -1,61 +1,95 @@
-"""Add DICOM Gateway tables (dicom_studies, dicom_series).
+"""dicom_gateway — DICOM studies/series tables + SCP metadata columns
 
 Revision ID: 0012
-Revises: 0009
-Create Date: 2026-02-26
+Revises: a0a895db89cc
+Create Date: 2026-02-26 12:00:00.000000
 """
+from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "0012"
-down_revision = "0009"
-branch_labels = None
-depends_on = None
+# revision identifiers, used by Alembic.
+revision: str = "0012"
+down_revision: Union[str, None] = "a0a895db89cc"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # ------------------------------------------------------------------
+    # dicom_studies
+    # ------------------------------------------------------------------
     op.create_table(
         "dicom_studies",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), onupdate=sa.func.now()),
-        sa.Column("institution_id", UUID(as_uuid=True), sa.ForeignKey("institutions.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column("id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("institution_id", sa.UUID(), nullable=False),
         sa.Column("study_instance_uid", sa.String(128), nullable=False),
-        sa.Column("patient_id", sa.String(200), nullable=False, server_default=""),
-        sa.Column("patient_name", sa.String(500)),
-        sa.Column("study_date", sa.Date()),
-        sa.Column("study_description", sa.String(500)),
-        sa.Column("modality", sa.String(20)),
-        sa.Column("num_series", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("num_instances", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("storage_prefix", sa.String(1000)),
-        sa.Column("status", sa.String(20), nullable=False, server_default="RECEIVING"),
-        sa.Column("source_aet", sa.String(64)),
-        sa.Column("request_id", UUID(as_uuid=True), sa.ForeignKey("requests.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("dicom_metadata", JSONB),
-        sa.UniqueConstraint("institution_id", "study_instance_uid", name="uq_dicom_study_institution_uid"),
+        sa.Column("patient_id", sa.String(64), nullable=True),
+        sa.Column("patient_name", sa.String(256), nullable=True),
+        sa.Column("study_date", sa.Date(), nullable=True),
+        sa.Column("study_description", sa.String(256), nullable=True),
+        sa.Column("modality", sa.String(16), nullable=True),
+        sa.Column("source_ae_title", sa.String(64), nullable=True),
+        sa.Column(
+            "received_via",
+            sa.String(16),
+            nullable=True,
+            comment="STOW_RS or C_STORE",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("institution_id", "study_instance_uid", name="uq_dicom_study_uid"),
     )
-    op.create_index("ix_dicom_studies_institution_id", "dicom_studies", ["institution_id"])
-    op.create_index("ix_dicom_studies_study_instance_uid", "dicom_studies", ["study_instance_uid"])
-    op.create_index("ix_dicom_studies_status", "dicom_studies", ["status"])
+    op.create_index(
+        "ix_dicom_studies_institution_id", "dicom_studies", ["institution_id"]
+    )
+    op.create_index(
+        "ix_dicom_studies_study_instance_uid", "dicom_studies", ["study_instance_uid"]
+    )
 
+    # ------------------------------------------------------------------
+    # dicom_series
+    # ------------------------------------------------------------------
     op.create_table(
         "dicom_series",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), onupdate=sa.func.now()),
-        sa.Column("study_id", UUID(as_uuid=True), sa.ForeignKey("dicom_studies.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("study_id", sa.UUID(), nullable=False),
         sa.Column("series_instance_uid", sa.String(128), nullable=False),
-        sa.Column("series_number", sa.Integer),
-        sa.Column("series_description", sa.String(500)),
-        sa.Column("modality", sa.String(20)),
-        sa.Column("num_instances", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("storage_prefix", sa.String(1000)),
+        sa.Column("series_number", sa.Integer(), nullable=True),
+        sa.Column("series_description", sa.String(256), nullable=True),
+        sa.Column("modality", sa.String(16), nullable=True),
+        sa.Column("instance_count", sa.Integer(), nullable=True, server_default="0"),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.ForeignKeyConstraint(["study_id"], ["dicom_studies.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("study_id", "series_instance_uid", name="uq_dicom_series_uid"),
     )
-    op.create_index("ix_dicom_series_study_id", "dicom_series", ["study_id"])
-    op.create_index("ix_dicom_series_series_instance_uid", "dicom_series", ["series_instance_uid"])
+    op.create_index(
+        "ix_dicom_series_study_id", "dicom_series", ["study_id"]
+    )
 
 
 def downgrade() -> None:

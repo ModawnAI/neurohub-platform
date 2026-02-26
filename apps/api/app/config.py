@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # Compute
     compute_step_timeout: int = 300
 
+    # DICOM SCP (pynetdicom)
+    dicom_scp_port: int = 11112
+    dicom_scp_ae_title: str = "NEUROHUB"
+    dicom_ae_institutions: dict = {}  # AE title → institution_id mapping
+
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

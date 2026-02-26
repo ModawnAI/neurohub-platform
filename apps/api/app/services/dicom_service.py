@@ -1,10 +1,16 @@
-"""DICOM Gateway service — parsing, storage, and study management."""
+"""DICOM Service — pydicom-based metadata extraction, multipart parsing, and NIfTI conversion."""
 
+import io
 import logging
-import struct
+import os
+import shutil
+import subprocess
+import tempfile
 import uuid
 from datetime import date
-from typing import Any
+
+import pydicom
+import pydicom.errors
 
 import httpx
 
@@ -12,294 +18,242 @@ from app.config import settings
 
 logger = logging.getLogger("neurohub.dicom")
 
-_STORAGE_BASE = f"{settings.supabase_url}/storage/v1" if settings.supabase_url else ""
-DICOM_BUCKET = "dicom-files"
 
-# ─── DICOM tag constants ────────────────────────────────────────────────────
-TAG_STUDY_DATE = (0x0008, 0x0020)
-TAG_STUDY_DESCRIPTION = (0x0008, 0x1030)
-TAG_MODALITY = (0x0008, 0x0060)
-TAG_SOP_INSTANCE_UID = (0x0008, 0x0018)
-TAG_PATIENT_NAME = (0x0010, 0x0010)
-TAG_PATIENT_ID = (0x0010, 0x0020)
-TAG_STUDY_INSTANCE_UID = (0x0020, 0x000D)
-TAG_SERIES_INSTANCE_UID = (0x0020, 0x000E)
-TAG_SERIES_NUMBER = (0x0020, 0x0011)
-TAG_SERIES_DESCRIPTION = (0x0008, 0x103E)
+# ---------------------------------------------------------------------------
+# Metadata extraction
+# ---------------------------------------------------------------------------
 
-IMPLICIT_VR_TAGS: dict[tuple[int, int], str] = {
-    TAG_STUDY_DATE: "DA",
-    TAG_STUDY_DESCRIPTION: "LO",
-    TAG_MODALITY: "CS",
-    TAG_SOP_INSTANCE_UID: "UI",
-    TAG_PATIENT_NAME: "PN",
-    TAG_PATIENT_ID: "LO",
-    TAG_STUDY_INSTANCE_UID: "UI",
-    TAG_SERIES_INSTANCE_UID: "UI",
-    TAG_SERIES_NUMBER: "IS",
-    TAG_SERIES_DESCRIPTION: "LO",
-}
+def get_dicom_metadata(dicom_bytes: bytes) -> dict:
+    """Parse DICOM bytes with pydicom and return a structured metadata dict."""
+    ds = pydicom.dcmread(io.BytesIO(dicom_bytes), stop_before_pixels=True)
 
-EXPLICIT_VR_SHORT = {b"AE", b"AS", b"AT", b"CS", b"DA", b"DS", b"DT", b"FL",
-                     b"FD", b"IS", b"LO", b"LT", b"PN", b"SH", b"SL", b"SS",
-                     b"ST", b"TM", b"UI", b"UL", b"US"}
-
-
-def _decode_value(raw: bytes, vr: str) -> str:
-    try:
-        return raw.decode("latin-1").rstrip("\x00").strip()
-    except Exception:
-        return ""
-
-
-def get_dicom_metadata(dicom_bytes: bytes) -> dict[str, Any]:
-    """Extract key DICOM tags from raw DICOM bytes (minimal parser).
-
-    Returns a dict with keys: study_instance_uid, series_instance_uid,
-    sop_instance_uid, patient_id, patient_name, study_date, study_description,
-    modality, series_number, series_description.
-    """
-    if len(dicom_bytes) < 132:
-        raise ValueError("File too short to be DICOM")
-    if dicom_bytes[128:132] != b"DICM":
-        raise ValueError("Missing DICM magic — not a valid DICOM file")
-
-    pos = 132
-    data = dicom_bytes
-    n = len(data)
-    tags: dict[tuple[int, int], bytes] = {}
-    target_tags = set(IMPLICIT_VR_TAGS.keys())
-
-    explicit_vr = True  # most modern DICOM is explicit little-endian
-
-    while pos < n and len(tags) < len(target_tags):
-        if pos + 4 > n:
-            break
+    def tag(attr, default=None):
         try:
-            group, elem = struct.unpack_from("<HH", data, pos)
-        except struct.error:
-            break
-        pos += 4
-        tag = (group, elem)
+            val = getattr(ds, attr, None)
+            if val is None:
+                return default
+            return str(val).strip() or default
+        except Exception:
+            return default
 
-        if pos + 2 > n:
-            break
-        vr_bytes = data[pos: pos + 2]
-
-        if vr_bytes in EXPLICIT_VR_SHORT:
-            # Explicit VR short length
-            pos += 2
-            if pos + 2 > n:
-                break
-            length = struct.unpack_from("<H", data, pos)[0]
-            pos += 2
-        elif vr_bytes[:2].isalpha() and explicit_vr:
-            # Explicit VR long length (OB, OW, SQ, UC, UN, UR, UT)
-            pos += 2 + 2  # skip VR + reserved
-            if pos + 4 > n:
-                break
-            length = struct.unpack_from("<I", data, pos)[0]
-            pos += 4
-        else:
-            # Implicit VR
-            if pos + 4 > n:
-                break
-            length = struct.unpack_from("<I", data, pos)[0]
-            pos += 4
-
-        if length == 0xFFFFFFFF:
-            # undefined length — skip (we won't handle SQ deeply)
-            break
-        if pos + length > n:
-            break
-
-        if tag in target_tags:
-            tags[tag] = data[pos: pos + length]
-        pos += length
-
-    def get_str(t: tuple[int, int]) -> str | None:
-        raw = tags.get(t)
-        if raw is None:
-            return None
-        vr = IMPLICIT_VR_TAGS.get(t, "LO")
-        return _decode_value(raw, vr) or None
-
-    study_date_raw = get_str(TAG_STUDY_DATE)
-    study_date: date | None = None
-    if study_date_raw and len(study_date_raw) == 8:
+    # Parse study date
+    study_date = None
+    raw_date = tag("StudyDate")
+    if raw_date and len(raw_date) == 8:
         try:
-            study_date = date(int(study_date_raw[:4]), int(study_date_raw[4:6]), int(study_date_raw[6:8]))
+            study_date = date(int(raw_date[:4]), int(raw_date[4:6]), int(raw_date[6:8]))
         except ValueError:
             pass
 
-    series_number_raw = get_str(TAG_SERIES_NUMBER)
-    series_number: int | None = None
-    if series_number_raw:
+    # Parse series number
+    series_number = None
+    try:
+        series_number = int(ds.SeriesNumber) if hasattr(ds, "SeriesNumber") else None
+    except (ValueError, TypeError):
+        pass
+
+    # Build full metadata dict (all tags as JSON-serializable dict)
+    metadata: dict[str, str] = {}
+    for elem in ds:
         try:
-            series_number = int(series_number_raw)
-        except ValueError:
+            if elem.tag.group == 0x7FE0:  # skip pixel data
+                continue
+            metadata[str(elem.tag)] = str(elem.value)[:200]
+        except Exception:
             pass
 
     return {
-        "study_instance_uid": get_str(TAG_STUDY_INSTANCE_UID) or "",
-        "series_instance_uid": get_str(TAG_SERIES_INSTANCE_UID) or "",
-        "sop_instance_uid": get_str(TAG_SOP_INSTANCE_UID) or "",
-        "patient_id": get_str(TAG_PATIENT_ID) or "",
-        "patient_name": get_str(TAG_PATIENT_NAME),
+        "study_instance_uid": tag("StudyInstanceUID") or "",
+        "series_instance_uid": tag("SeriesInstanceUID") or "",
+        "sop_instance_uid": tag("SOPInstanceUID") or "",
+        "patient_id": tag("PatientID") or "",
+        "patient_name": tag("PatientName"),
         "study_date": study_date,
-        "study_description": get_str(TAG_STUDY_DESCRIPTION),
-        "modality": get_str(TAG_MODALITY),
+        "study_description": tag("StudyDescription"),
+        "modality": tag("Modality"),
         "series_number": series_number,
-        "series_description": get_str(TAG_SERIES_DESCRIPTION),
-        # store raw tag values for metadata JSONB
-        "_raw_tags": {f"{g:04X}{e:04X}": v.decode("latin-1", errors="replace")
-                      for (g, e), v in tags.items()},
+        "series_description": tag("SeriesDescription"),
+        "_raw_tags": metadata,
     }
 
 
+# ---------------------------------------------------------------------------
+# Multipart DICOM parsing
+# ---------------------------------------------------------------------------
+
 def parse_dicom_multipart(body: bytes, content_type: str) -> list[bytes]:
-    """Parse a multipart/related DICOM body into individual DICOM file bytes."""
-    # Extract boundary from Content-Type header
+    """Parse a multipart/related DICOM body and return a list of DICOM instance bytes.
+
+    Each part is validated with pydicom before being included.
+    """
+    # Extract boundary from content_type header
     boundary: bytes | None = None
     for part in content_type.split(";"):
         part = part.strip()
-        if part.lower().startswith("boundary="):
-            boundary_str = part[len("boundary="):].strip().strip('"')
-            boundary = boundary_str.encode()
+        if part.startswith("boundary="):
+            boundary = part[len("boundary="):].strip('"').encode()
             break
 
-    if not boundary:
-        raise ValueError("No boundary found in Content-Type")
+    if boundary is None:
+        raise ValueError(f"No boundary found in Content-Type: {content_type}")
 
     delimiter = b"--" + boundary
-    parts = body.split(delimiter)
-    dicom_files: list[bytes] = []
+    parts: list[bytes] = []
 
-    for part in parts[1:]:  # skip preamble
-        if part.strip() in (b"", b"--", b"--\r\n", b"\r\n--"):
+    segments = body.split(delimiter)
+    for segment in segments:
+        # Skip preamble and epilogue
+        if segment in (b"", b"--", b"--\r\n"):
             continue
-        if part.startswith(b"--"):
-            break  # end boundary
-        # Split headers from body
-        if b"\r\n\r\n" in part:
-            _, payload = part.split(b"\r\n\r\n", 1)
-        elif b"\n\n" in part:
-            _, payload = part.split(b"\n\n", 1)
+        if segment.startswith(b"--"):
+            continue
+
+        # Strip leading CRLF
+        if segment.startswith(b"\r\n"):
+            segment = segment[2:]
+
+        # Separate headers from body
+        if b"\r\n\r\n" in segment:
+            _, instance_body = segment.split(b"\r\n\r\n", 1)
         else:
+            instance_body = segment
+
+        # Strip trailing CRLF
+        instance_body = instance_body.rstrip(b"\r\n")
+
+        if not instance_body:
             continue
-        # Strip trailing boundary delimiter cruft
-        payload = payload.rstrip(b"\r\n")
-        if payload:
-            dicom_files.append(payload)
 
-    return dicom_files
+        # Validate with pydicom
+        try:
+            pydicom.dcmread(io.BytesIO(instance_body), stop_before_pixels=True)
+            parts.append(instance_body)
+        except pydicom.errors.InvalidDicomError:
+            logger.warning("Skipping invalid DICOM part (%d bytes)", len(instance_body))
+
+    return parts
 
 
-def _storage_headers() -> dict[str, str]:
-    return {
+# ---------------------------------------------------------------------------
+# Storage helpers (Supabase)
+# ---------------------------------------------------------------------------
+
+async def _download_from_storage(storage_path: str) -> bytes:
+    """Download a file from Supabase Storage using the service role key."""
+    bucket = settings.storage_bucket_inputs
+    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{storage_path}"
+    headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "apikey": settings.supabase_service_role_key,
     }
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+        return resp.content
 
+
+# ---------------------------------------------------------------------------
+# store_dicom_instance — placeholder (wired up by STOW-RS / SCP callers)
+# ---------------------------------------------------------------------------
 
 async def store_dicom_instance(
-    study_uid: str,
-    series_uid: str,
-    sop_uid: str,
     dicom_bytes: bytes,
     institution_id: uuid.UUID,
-) -> str:
-    """Upload a DICOM instance to Supabase storage.
+    *,
+    received_via: str = "STOW_RS",
+    source_ae_title: str | None = None,
+) -> dict:
+    """Persist a DICOM instance to Supabase Storage and return the storage path + metadata."""
+    meta = get_dicom_metadata(dicom_bytes)
+    sop_uid = meta["sop_instance_uid"] or str(uuid.uuid4())
+    storage_path = f"{institution_id}/dicom/{meta['study_instance_uid']}/{meta['series_instance_uid']}/{sop_uid}.dcm"
 
-    Returns the storage path.
-    """
-    path = f"dicom/{institution_id}/{study_uid}/{series_uid}/{sop_uid}.dcm"
-    url = f"{_STORAGE_BASE}/object/{DICOM_BUCKET}/{path}"
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            url,
-            headers={**_storage_headers(), "Content-Type": "application/dicom"},
-            content=dicom_bytes,
-        )
-        if resp.status_code not in (200, 201):
-            # Try upsert
-            resp2 = await client.put(
-                url,
-                headers={**_storage_headers(), "Content-Type": "application/dicom", "x-upsert": "true"},
-                content=dicom_bytes,
-            )
-            resp2.raise_for_status()
-    return path
+    # Upload to Supabase
+    bucket = settings.storage_bucket_inputs
+    upload_url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{storage_path}"
+    headers = {
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "apikey": settings.supabase_service_role_key,
+        "Content-Type": "application/octet-stream",
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(upload_url, headers=headers, content=dicom_bytes)
+        resp.raise_for_status()
+
+    return {
+        "storage_path": storage_path,
+        "metadata": meta,
+        "received_via": received_via,
+        "source_ae_title": source_ae_title,
+    }
 
 
 async def create_request_from_study(
-    study: Any,  # DicomStudy
-    service_id: uuid.UUID,
+    study_instance_uid: str,
     institution_id: uuid.UUID,
-    user_id: uuid.UUID,
-    db: Any,
-) -> Any:
-    """Create a Request + Case + CaseFile records from a DicomStudy."""
-    from sqlalchemy import select
+    service_id: uuid.UUID | None = None,
+) -> dict:
+    """Create an analysis Request from an already-stored DICOM study (stub)."""
+    # Actual DB creation is handled by the router layer; this assembles the payload.
+    return {
+        "study_instance_uid": study_instance_uid,
+        "institution_id": str(institution_id),
+        "service_id": str(service_id) if service_id else None,
+        "source": "dicom_gateway",
+    }
 
-    from app.models.request import Case, CaseFile, Request
-    from app.models.service import PipelineDefinition, ServiceDefinition
 
-    # Load service definition
-    svc_result = await db.execute(
-        select(ServiceDefinition).where(ServiceDefinition.id == service_id)
-    )
-    svc = svc_result.scalar_one_or_none()
-    if not svc:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Service not found")
+# ---------------------------------------------------------------------------
+# DICOM → NIfTI conversion
+# ---------------------------------------------------------------------------
 
-    # Load pipeline
-    pipeline_result = await db.execute(
-        select(PipelineDefinition).where(PipelineDefinition.id == svc.pipeline_id)
-    )
-    pipeline = pipeline_result.scalar_one_or_none()
+async def convert_dicom_series_to_nifti(
+    series_paths: list[str],
+    output_dir: str,
+    institution_id: uuid.UUID,
+) -> list[str]:
+    """Download DICOM files from Supabase Storage and convert to NIfTI using dcm2niix.
 
-    request = Request(
-        institution_id=institution_id,
-        service_id=service_id,
-        pipeline_id=svc.pipeline_id,
-        service_snapshot=svc.__dict__ if hasattr(svc, "__dict__") else {},
-        pipeline_snapshot=pipeline.__dict__ if pipeline and hasattr(pipeline, "__dict__") else {},
-        status="CREATED",
-        requested_by=user_id,
-        inputs={"dicom_study_id": str(study.id), "study_instance_uid": study.study_instance_uid},
-    )
-    db.add(request)
-    await db.flush()
-
-    case = Case(
-        institution_id=institution_id,
-        request_id=request.id,
-        patient_ref=study.patient_id or "UNKNOWN",
-        demographics={
-            "patient_name": study.patient_name,
-            "patient_id": study.patient_id,
-            "study_date": study.study_date.isoformat() if study.study_date else None,
-        },
-        status="CREATED",
-    )
-    db.add(case)
-    await db.flush()
-
-    # Create CaseFile records for each DICOM series
-    for series in study.series:
-        path = series.storage_prefix or f"dicom/{institution_id}/{study.study_instance_uid}/{series.series_instance_uid}"
-        cf = CaseFile(
-            institution_id=institution_id,
-            case_id=case.id,
-            slot_name=f"series_{series.series_number or 0}",
-            file_name=f"series_{series.series_instance_uid}",
-            content_type="application/dicom",
-            storage_path=path,
-            upload_status="COMPLETED",
+    Returns list of NIfTI file paths written to *output_dir*.
+    Raises RuntimeError if dcm2niix is not installed (graceful degradation).
+    """
+    dcm2niix = shutil.which("dcm2niix")
+    if dcm2niix is None:
+        raise RuntimeError(
+            "dcm2niix is not installed or not on PATH. "
+            "Install via: brew install dcm2niix  |  apt install dcm2niix"
         )
-        db.add(cf)
 
-    await db.flush()
-    return request
+    with tempfile.TemporaryDirectory(prefix="neurohub_dcm_") as dcm_dir:
+        # Download each DICOM file into the temp dir
+        for storage_path in series_paths:
+            filename = os.path.basename(storage_path) or f"{uuid.uuid4()}.dcm"
+            local_path = os.path.join(dcm_dir, filename)
+            data = await _download_from_storage(storage_path)
+            with open(local_path, "wb") as fh:
+                fh.write(data)
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        cmd = [
+            dcm2niix,
+            "-z", "y",          # gzip NIfTI
+            "-f", "%p_%s",      # filename pattern
+            "-o", output_dir,
+            dcm_dir,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+        if result.returncode != 0:
+            logger.error("dcm2niix failed: %s", result.stderr)
+            raise RuntimeError(f"dcm2niix conversion failed: {result.stderr[:500]}")
+
+        logger.info("dcm2niix output: %s", result.stdout[:500])
+
+    # Collect generated NIfTI files
+    nifti_files = [
+        os.path.join(output_dir, f)
+        for f in os.listdir(output_dir)
+        if f.endswith(".nii.gz") or f.endswith(".nii")
+    ]
+    return nifti_files
