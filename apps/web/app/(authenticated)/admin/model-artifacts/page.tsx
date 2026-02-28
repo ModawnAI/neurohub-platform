@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listAllArtifacts, approveArtifact, rejectArtifact, type ArtifactRead } from "@/lib/api";
 import { CheckCircle, XCircle } from "phosphor-react";
+import { useT } from "@/lib/i18n";
 
 type FilterTab = "all" | "PENDING_SCAN" | "APPROVED" | "REJECTED";
 
@@ -22,20 +23,22 @@ function BuildChip({ status }: { status: string | null }) {
 }
 
 function ScanSummary({ scans }: { scans: ArtifactRead["security_scans"] }) {
-  if (!scans?.length) return <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>No scans</span>;
+  const t = useT();
+  if (!scans?.length) return <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>{t("artifacts.noScans")}</span>;
   const pass = scans.filter(s => s.status === "PASS").length;
   const warn = scans.filter(s => s.status === "WARN").length;
   const fail = scans.filter(s => s.status === "FAIL").length;
   return (
     <div style={{ display: "flex", gap: 4 }}>
-      {pass > 0 && <span className="badge badge-success">{pass} pass</span>}
-      {warn > 0 && <span className="badge badge-warning">{warn} warn</span>}
-      {fail > 0 && <span className="badge badge-danger">{fail} fail</span>}
+      {pass > 0 && <span className="badge badge-success">{pass} {t("artifacts.pass")}</span>}
+      {warn > 0 && <span className="badge badge-warning">{warn} {t("artifacts.warn")}</span>}
+      {fail > 0 && <span className="badge badge-danger">{fail} {t("artifacts.fail")}</span>}
     </div>
   );
 }
 
 export default function AdminModelArtifactsPage() {
+  const t = useT();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -59,18 +62,18 @@ export default function AdminModelArtifactsPage() {
   const artifacts = data?.items ?? [];
 
   const TABS: Array<{ key: FilterTab; label: string }> = [
-    { key: "all", label: "All" },
-    { key: "PENDING_SCAN", label: "Pending Scan" },
-    { key: "APPROVED", label: "Approved" },
-    { key: "REJECTED", label: "Rejected" },
+    { key: "all", label: t("artifacts.tabAll") },
+    { key: "PENDING_SCAN", label: t("artifacts.tabPendingScan") },
+    { key: "APPROVED", label: t("artifacts.tabApproved") },
+    { key: "REJECTED", label: t("artifacts.tabRejected") },
   ];
 
   return (
     <div className="stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Model Artifacts</h1>
-          <p className="page-subtitle">Review and approve AI model artifacts submitted by experts.</p>
+          <h1 className="page-title">{t("artifacts.title")}</h1>
+          <p className="page-subtitle">{t("artifacts.subtitle")}</p>
         </div>
       </div>
 
@@ -85,7 +88,7 @@ export default function AdminModelArtifactsPage() {
       {isLoading ? (
         <div className="loading-center"><span className="spinner" /></div>
       ) : artifacts.length === 0 ? (
-        <div className="empty-state"><p className="empty-state-text">No artifacts found.</p></div>
+        <div className="empty-state"><p className="empty-state-text">{t("artifacts.noArtifacts")}</p></div>
       ) : (
         <div className="stack-md">
           {artifacts.map((artifact) => (
@@ -98,22 +101,22 @@ export default function AdminModelArtifactsPage() {
                     <StatusChip status={artifact.status} />
                   </div>
                   <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--color-text-secondary)" }}>
-                    <span>Build: <BuildChip status={artifact.build_status} /></span>
-                    <span>Scans: <ScanSummary scans={artifact.security_scans} /></span>
-                    <span>Created: {new Date(artifact.created_at).toLocaleDateString()}</span>
+                    <span>{t("artifacts.build")}: <BuildChip status={artifact.build_status} /></span>
+                    <span>{t("artifacts.scans")}: <ScanSummary scans={artifact.security_scans} /></span>
+                    <span>{t("artifacts.created")}: {new Date(artifact.created_at).toLocaleDateString()}</span>
                   </div>
                   {artifact.review_notes && (
-                    <p style={{ fontSize: 12, marginTop: 6, color: "var(--color-text-secondary)" }}>Note: {artifact.review_notes}</p>
+                    <p style={{ fontSize: 12, marginTop: 6, color: "var(--color-text-secondary)" }}>{t("artifacts.note")} {artifact.review_notes}</p>
                   )}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <button className="btn btn-sm btn-secondary" disabled={approveMutation.isPending}
                     onClick={() => approveMutation.mutate(artifact.id)}>
-                    <CheckCircle size={14} /> Approve
+                    <CheckCircle size={14} /> {t("artifacts.approve")}
                   </button>
                   <button className="btn btn-sm btn-danger"
                     onClick={() => { setRejectId(artifact.id); setRejectNote(""); }}>
-                    <XCircle size={14} /> Reject
+                    <XCircle size={14} /> {t("artifacts.reject")}
                   </button>
                 </div>
               </div>
@@ -125,15 +128,15 @@ export default function AdminModelArtifactsPage() {
       {rejectId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div className="card" style={{ padding: 24, width: 420 }}>
-            <h3 style={{ marginBottom: 12 }}>Reject Artifact</h3>
-            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 12 }}>Provide a reason for rejection. This will be visible to the submitter.</p>
-            <textarea className="input" rows={4} placeholder="Reason for rejection..." value={rejectNote}
+            <h3 style={{ marginBottom: 12 }}>{t("artifacts.rejectTitle")}</h3>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 12 }}>{t("artifacts.rejectDesc")}</p>
+            <textarea className="input" rows={4} placeholder={t("artifacts.rejectPlaceholder")} value={rejectNote}
               onChange={e => setRejectNote(e.target.value)} style={{ width: "100%", marginBottom: 12 }} />
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button className="btn btn-secondary" onClick={() => setRejectId(null)}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => setRejectId(null)}>{t("common.cancel")}</button>
               <button className="btn btn-danger" disabled={!rejectNote.trim() || rejectMutation.isPending}
                 onClick={() => rejectMutation.mutate({ id: rejectId, note: rejectNote })}>
-                Reject
+                {t("artifacts.reject")}
               </button>
             </div>
           </div>

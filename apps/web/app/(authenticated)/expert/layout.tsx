@@ -14,7 +14,7 @@ export default function ExpertLayout({ children }: { children: React.ReactNode }
     { href: "/expert/dashboard", label: t("nav.dashboard"), icon: <House size={20} /> },
     { href: "/expert/reviews", label: t("nav.reviewQueue"), icon: <ListChecks size={20} /> },
     { href: "/expert/evaluations", label: t("nav.evaluations"), icon: <Stamp size={20} /> },
-    { href: "/expert/models", label: "Models", icon: <HardDrives size={20} /> },
+    { href: "/expert/models", label: t("nav.models"), icon: <HardDrives size={20} /> },
     { href: "/expert/feedback", label: "Feedback", icon: <ChatDots size={20} /> },
     { href: "/expert/performance", label: "Performance", icon: <ChartLine size={20} /> },
     { href: "/expert/training", label: "Training", icon: <Robot size={20} /> },
@@ -24,7 +24,7 @@ export default function ExpertLayout({ children }: { children: React.ReactNode }
   return (
     <div className="app-layout">
       <Sidebar items={navItems} />
-      <main className="main-content">
+      <main id="main-content" className="main-content">
         <div className="main-content-inner">
           {isPending && (
             <div className="banner banner-warning" style={{ marginBottom: 20 }}>

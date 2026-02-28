@@ -1,22 +1,30 @@
-"""Supabase Storage service for presigned URL generation."""
+"""S3-compatible storage service (MinIO / Supabase Storage)."""
 
+import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
 
-import httpx
+import boto3
+from botocore.client import Config
 
 from app.config import settings
 
 logger = logging.getLogger("neurohub.storage")
 
-_STORAGE_BASE = f"{settings.supabase_url}/storage/v1" if settings.supabase_url else ""
+
+def _s3_client():
+    return boto3.client(
+        "s3",
+        endpoint_url=settings.minio_endpoint,
+        aws_access_key_id=settings.minio_access_key,
+        aws_secret_access_key=settings.minio_secret_key,
+        config=Config(signature_version="s3v4"),
+        region_name=settings.minio_region,
+    )
 
 
-def _headers() -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_service_role_key,
-    }
+def _s3_client_sync():
+    """Return a sync S3 client for use in Celery tasks."""
+    return _s3_client()
 
 
 async def create_presigned_upload(
@@ -25,24 +33,15 @@ async def create_presigned_upload(
     *,
     expires_in: int = 900,
 ) -> str:
-    """Generate a presigned upload URL via Supabase Storage REST API.
-
-    Returns the presigned URL string.
-    """
-    url = f"{_STORAGE_BASE}/object/upload/sign/{bucket}/{path}"
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(
-            url,
-            headers=_headers(),
-            json={"expiresIn": expires_in},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        # Supabase returns a relative signed URL — make it absolute
-        signed_url = data.get("signedURL") or data.get("url", "")
-        if signed_url.startswith("/"):
-            signed_url = f"{settings.supabase_url}/storage/v1{signed_url}"
-        return signed_url
+    """Generate a presigned upload URL."""
+    client = _s3_client()
+    url = await asyncio.to_thread(
+        client.generate_presigned_url,
+        "put_object",
+        Params={"Bucket": bucket, "Key": path},
+        ExpiresIn=expires_in,
+    )
+    return url
 
 
 async def create_presigned_download(
@@ -51,17 +50,62 @@ async def create_presigned_download(
     *,
     expires_in: int = 900,
 ) -> str:
-    """Generate a presigned download URL via Supabase Storage REST API."""
-    url = f"{_STORAGE_BASE}/object/sign/{bucket}/{path}"
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(
-            url,
-            headers=_headers(),
-            json={"expiresIn": expires_in},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        signed_url = data.get("signedURL") or data.get("url", "")
-        if signed_url.startswith("/"):
-            signed_url = f"{settings.supabase_url}/storage/v1{signed_url}"
-        return signed_url
+    """Generate a presigned download URL."""
+    client = _s3_client()
+    url = await asyncio.to_thread(
+        client.generate_presigned_url,
+        "get_object",
+        Params={"Bucket": bucket, "Key": path},
+        ExpiresIn=expires_in,
+    )
+    return url
+
+
+async def put_object(
+    bucket: str,
+    path: str,
+    data: bytes,
+    content_type: str = "application/octet-stream",
+) -> None:
+    """Upload bytes directly to storage."""
+    client = _s3_client()
+    await asyncio.to_thread(
+        client.put_object,
+        Bucket=bucket,
+        Key=path,
+        Body=data,
+        ContentType=content_type,
+    )
+
+
+async def get_object(bucket: str, path: str) -> bytes:
+    """Download bytes from storage."""
+    client = _s3_client()
+    resp = await asyncio.to_thread(client.get_object, Bucket=bucket, Key=path)
+    return resp["Body"].read()
+
+
+# Sync variants for use in Celery workers (non-async context)
+def put_object_sync(
+    bucket: str,
+    path: str,
+    data: bytes,
+    content_type: str = "application/octet-stream",
+) -> None:
+    client = _s3_client_sync()
+    client.put_object(Bucket=bucket, Key=path, Body=data, ContentType=content_type)
+
+
+def get_object_sync(bucket: str, path: str) -> bytes:
+    client = _s3_client_sync()
+    resp = client.get_object(Bucket=bucket, Key=path)
+    return resp["Body"].read()
+
+
+def create_presigned_download_sync(bucket: str, path: str, *, expires_in: int = 900) -> str:
+    client = _s3_client_sync()
+    return client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": bucket, "Key": path},
+        ExpiresIn=expires_in,
+    )

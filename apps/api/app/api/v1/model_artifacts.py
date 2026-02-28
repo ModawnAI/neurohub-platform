@@ -5,12 +5,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 
 from app.config import settings
-from app.dependencies import AuthenticatedUser, DbSession, require_roles
+from app.dependencies import AuthenticatedUser, CurrentUser, DbSession, require_roles
 from app.models.model_artifact import ModelArtifact
 from app.models.service import ServiceDefinition
 from app.schemas.model_artifact import (
@@ -39,10 +38,10 @@ MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
 async def upload_artifact(
     service_id: Annotated[uuid.UUID, Form()],
     artifact_type: Annotated[str, Form()],
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("EXPERT", "ADMIN")),
     runtime: Annotated[str | None, Form()] = None,
     file: UploadFile = File(...),
-    db: DbSession = Depends(),
-    user: AuthenticatedUser = Depends(require_roles("EXPERT", "ADMIN")),
 ):
     """Upload a model artifact (script, weights, requirements, etc.)."""
     if artifact_type not in ALLOWED_ARTIFACT_TYPES:
@@ -59,20 +58,14 @@ async def upload_artifact(
     checksum = hashlib.sha256(content).hexdigest()
     storage_path = f"{user.institution_id}/{service_id}/{uuid.uuid4()}/{file.filename}"
 
-    supabase_url = f"{settings.supabase_url}/storage/v1/object/model-artifacts/{storage_path}"
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(
-            supabase_url,
-            headers={
-                "Authorization": f"Bearer {settings.supabase_service_role_key}",
-                "apikey": settings.supabase_service_role_key,
-                "Content-Type": file.content_type or "application/octet-stream",
-                "x-upsert": "true",
-            },
-            content=content,
-        )
-        if resp.status_code not in (200, 201):
-            raise HTTPException(500, "Failed to upload to storage")
+    from app.services.storage import put_object
+
+    await put_object(
+        "model-artifacts",
+        storage_path,
+        content,
+        content_type=file.content_type or "application/octet-stream",
+    )
 
     artifact = ModelArtifact(
         institution_id=user.institution_id,
@@ -133,7 +126,7 @@ async def approve_artifact(
     artifact_id: uuid.UUID,
     body: ArtifactApproveRequest,
     db: DbSession,
-    user: Annotated[AuthenticatedUser, Depends(require_roles("ADMIN"))],
+    user: CurrentUser = Depends(require_roles("ADMIN")),
 ):
     """Admin: approve artifact and optionally trigger Docker image build."""
     artifact = await db.get(ModelArtifact, artifact_id)
@@ -165,7 +158,7 @@ async def reject_artifact(
     artifact_id: uuid.UUID,
     body: ArtifactRejectRequest,
     db: DbSession,
-    user: Annotated[AuthenticatedUser, Depends(require_roles("ADMIN"))],
+    user: CurrentUser = Depends(require_roles("ADMIN")),
 ):
     artifact = await db.get(ModelArtifact, artifact_id)
     if not artifact or artifact.institution_id != user.institution_id:

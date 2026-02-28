@@ -1,3 +1,4 @@
+from app.models.ai_agent import AIAgentRun
 from app.models.audit import AuditLog, PatientAccessLog
 from app.models.dicom_study import DicomSeries, DicomStudy
 from app.models.base import Base
@@ -20,10 +21,12 @@ from app.models.run import Run, RunStep
 from app.models.service import PipelineDefinition, ServiceDefinition
 from app.models.user import User
 from app.models.model_artifact import CodeSecurityScan, ModelArtifact
+from app.models.technique import PreQCResult, ServiceTechniqueWeight, TechniqueModule, TechniqueRun
 from app.models.webhook import Webhook
 from app.models.feedback import ModelFeedback, ModelTrainingJob, ModelPerformanceMetrics
 
 __all__ = [
+    "AIAgentRun",
     "AuditLog",
     "Base",
     "Case",
@@ -54,6 +57,10 @@ __all__ = [
     "RunStep",
     "ServiceDefinition",
     "ServiceEvaluator",
+    "PreQCResult",
+    "ServiceTechniqueWeight",
+    "TechniqueModule",
+    "TechniqueRun",
     "UploadSession",
     "UsageLedger",
     "User",

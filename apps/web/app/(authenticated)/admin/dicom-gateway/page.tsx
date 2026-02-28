@@ -7,6 +7,7 @@ import {
   createRequestFromDicom,
   type DicomStudyRead,
 } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 const STATUS_TABS = ["All", "RECEIVING", "RECEIVED", "LINKED", "FAILED"] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
@@ -18,14 +19,22 @@ function StatusBadge({ status }: { status: string }) {
     LINKED: "bg-green-100 text-green-800",
     FAILED: "bg-red-100 text-red-800",
   };
+  const t = useT();
+  const labelMap: Record<string, string> = {
+    RECEIVING: t("dicom.statusReceiving"),
+    RECEIVED: t("dicom.statusReceived"),
+    LINKED: t("dicom.statusLinked"),
+    FAILED: t("dicom.statusFailed"),
+  };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[status] ?? "bg-gray-100 text-gray-700"}`}>
-      {status}
+      {labelMap[status] ?? status}
     </span>
   );
 }
 
 export default function DicomGatewayPage() {
+  const t = useT();
   const [studies, setStudies] = useState<DicomStudyRead[]>([]);
   const [total, setTotal] = useState(0);
   const [activeTab, setActiveTab] = useState<StatusTab>("All");
@@ -42,6 +51,14 @@ export default function DicomGatewayPage() {
   const [createServiceId, setCreateServiceId] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
 
+  const tabLabels: Record<StatusTab, string> = {
+    All: t("dicom.tabAll"),
+    RECEIVING: t("dicom.statusReceiving"),
+    RECEIVED: t("dicom.statusReceived"),
+    LINKED: t("dicom.statusLinked"),
+    FAILED: t("dicom.statusFailed"),
+  };
+
   const fetchStudies = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -51,11 +68,11 @@ export default function DicomGatewayPage() {
       setStudies(data.items);
       setTotal(data.total);
     } catch (e: any) {
-      setError(e.message || "Failed to load studies");
+      setError(e.message || t("dicom.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, t]);
 
   useEffect(() => {
     fetchStudies();
@@ -70,7 +87,7 @@ export default function DicomGatewayPage() {
       setLinkRequestId("");
       await fetchStudies();
     } catch (e: any) {
-      alert("Link failed: " + (e.message || String(e)));
+      alert(`${t("dicom.linkFailed")} ${e.message || String(e)}`);
     } finally {
       setLinkLoading(false);
     }
@@ -85,7 +102,7 @@ export default function DicomGatewayPage() {
       setCreateServiceId("");
       await fetchStudies();
     } catch (e: any) {
-      alert("Create request failed: " + (e.message || String(e)));
+      alert(`${t("dicom.createFailed")} ${e.message || String(e)}`);
     } finally {
       setCreateLoading(false);
     }
@@ -94,9 +111,9 @@ export default function DicomGatewayPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">DICOM Gateway</h1>
+        <h1 className="text-2xl font-bold">{t("dicom.gatewayTitle")}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Incoming DICOM studies from PACS systems via STOW-RS
+          {t("dicom.gatewaySubtitle")}
         </p>
       </div>
 
@@ -112,11 +129,11 @@ export default function DicomGatewayPage() {
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
-            {tab}
+            {tabLabels[tab]}
           </button>
         ))}
         <div className="ml-auto flex items-center text-sm text-gray-400">
-          {total} studies
+          {t("dicom.studyCount").replace("{count}", String(total))}
         </div>
       </div>
 
@@ -127,23 +144,23 @@ export default function DicomGatewayPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading…</div>
+        <div className="text-center py-12 text-gray-400">{t("dicom.loading")}</div>
       ) : studies.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">No studies found.</div>
+        <div className="text-center py-12 text-gray-400">{t("dicom.noStudies")}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="text-left text-xs text-gray-500 uppercase tracking-wide border-b">
-                <th className="py-2 pr-4">Study UID</th>
-                <th className="py-2 pr-4">Patient</th>
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Modality</th>
-                <th className="py-2 pr-4">Series</th>
-                <th className="py-2 pr-4">Instances</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Source AET</th>
-                <th className="py-2">Actions</th>
+                <th className="py-2 pr-4">{t("dicom.studyUid")}</th>
+                <th className="py-2 pr-4">{t("dicom.patient")}</th>
+                <th className="py-2 pr-4">{t("dicom.studyDate")}</th>
+                <th className="py-2 pr-4">{t("dicom.modality")}</th>
+                <th className="py-2 pr-4">{t("dicom.series")}</th>
+                <th className="py-2 pr-4">{t("dicom.instances")}</th>
+                <th className="py-2 pr-4">{t("common.status")}</th>
+                <th className="py-2 pr-4">{t("dicom.sourceAet")}</th>
+                <th className="py-2">{t("dicom.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -172,18 +189,18 @@ export default function DicomGatewayPage() {
                             onClick={() => { setLinkStudy(s); setLinkRequestId(""); }}
                             className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100"
                           >
-                            Link
+                            {t("dicom.link")}
                           </button>
                           <button
                             onClick={() => { setCreateStudy(s); setCreateServiceId(""); }}
                             className="text-xs px-2 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50"
                           >
-                            Create Request
+                            {t("dicom.createRequest")}
                           </button>
                         </>
                       )}
                       {s.request_id && (
-                        <span className="text-xs text-green-600">Linked</span>
+                        <span className="text-xs text-green-600">{t("dicom.linked")}</span>
                       )}
                     </div>
                   </td>
@@ -198,11 +215,11 @@ export default function DicomGatewayPage() {
       {linkStudy && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Link Study to Request</h2>
+            <h2 className="text-lg font-semibold mb-4">{t("dicom.linkModalTitle")}</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Study: <span className="font-mono">{linkStudy.study_instance_uid.slice(-20)}</span>
+              {t("dicom.linkModalStudy")} <span className="font-mono">{linkStudy.study_instance_uid.slice(-20)}</span>
             </p>
-            <label className="block text-sm font-medium mb-1">Request ID (UUID)</label>
+            <label className="block text-sm font-medium mb-1">{t("dicom.linkModalRequestId")}</label>
             <input
               type="text"
               value={linkRequestId}
@@ -212,14 +229,14 @@ export default function DicomGatewayPage() {
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setLinkStudy(null)} className="px-4 py-2 text-sm border rounded">
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handleLink}
                 disabled={linkLoading || !linkRequestId.trim()}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded disabled:opacity-50"
               >
-                {linkLoading ? "Linking…" : "Link"}
+                {linkLoading ? t("dicom.linking") : t("dicom.link")}
               </button>
             </div>
           </div>
@@ -230,14 +247,14 @@ export default function DicomGatewayPage() {
       {createStudy && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Create Request from DICOM Study</h2>
+            <h2 className="text-lg font-semibold mb-4">{t("dicom.createModalTitle")}</h2>
             <p className="text-sm text-gray-500 mb-1">
-              Patient: <strong>{createStudy.patient_name || createStudy.patient_id}</strong>
+              {t("dicom.createModalPatient")} <strong>{createStudy.patient_name || createStudy.patient_id}</strong>
             </p>
             <p className="text-sm text-gray-500 mb-4">
-              Modality: {createStudy.modality} · {createStudy.num_instances} instances
+              {t("dicom.createModalModality")} {createStudy.modality} · {createStudy.num_instances} {t("dicom.createModalInstances")}
             </p>
-            <label className="block text-sm font-medium mb-1">Service ID (UUID)</label>
+            <label className="block text-sm font-medium mb-1">{t("dicom.serviceId")}</label>
             <input
               type="text"
               value={createServiceId}
@@ -247,14 +264,14 @@ export default function DicomGatewayPage() {
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setCreateStudy(null)} className="px-4 py-2 text-sm border rounded">
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handleCreateRequest}
                 disabled={createLoading || !createServiceId.trim()}
                 className="px-4 py-2 text-sm bg-green-600 text-white rounded disabled:opacity-50"
               >
-                {createLoading ? "Creating…" : "Create Request"}
+                {createLoading ? t("dicom.creating") : t("dicom.createRequest")}
               </button>
             </div>
           </div>

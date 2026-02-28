@@ -110,25 +110,32 @@ export default function NewModelPage() {
 
     const updated = [...slots];
     for (let i = 0; i < updated.length; i++) {
-      if (!updated[i].file) continue;
-      updated[i] = { ...updated[i], uploading: true, error: null } as ArtifactSlot;
+      const currentSlot = updated[i];
+      if (!currentSlot?.file) continue;
+      updated[i] = { ...currentSlot, uploading: true, error: null } as ArtifactSlot;
     }
     setSlots([...updated]);
 
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i];
-      const currentSlot = slots[i]; if (!currentSlot?.file) continue;
+      if (!slot?.file) continue;
+      const currentUpdated = updated[i];
+      if (!currentUpdated) continue;
       try {
         const result = await uploadArtifact(
           selectedServiceId,
-          slot!.artifactType,
-          slot!.runtime ?? null,
-          slot!.file!,
+          slot.artifactType,
+          slot.runtime ?? null,
+          slot.file,
         );
-        updated[i] = { ...updated[i], uploaded: result, uploading: false } as ArtifactSlot;
+        updated[i] = { ...currentUpdated, uploaded: result, uploading: false } as ArtifactSlot;
         setSlots([...updated]);
       } catch (e: unknown) {
-        updated[i] = { ...updated[i], uploading: false, error: e instanceof Error ? e.message : "Upload failed" } as ArtifactSlot;
+        updated[i] = {
+          ...currentUpdated,
+          uploading: false,
+          error: e instanceof Error ? e.message : "Upload failed",
+        } as ArtifactSlot;
         setSlots([...updated]);
       }
     }

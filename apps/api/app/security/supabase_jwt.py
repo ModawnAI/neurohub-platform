@@ -82,6 +82,11 @@ def _get_key_by_kid(jwks: dict[str, Any], kid: str | None) -> dict[str, Any] | N
 
 
 async def verify_supabase_jwt(token: str) -> dict[str, Any]:
+    if settings.use_local_auth:
+        from app.security.local_jwt import decode_access_token
+
+        return decode_access_token(token)
+
     if not settings.supabase_jwks_url:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -40,6 +40,9 @@ class TestNeuroHubErrorResponse:
         # Directly invoke the handler to verify its behavior
         from unittest.mock import MagicMock
         mock_request = MagicMock()
+        mock_request.headers.get.return_value = "test-req-id"
+        mock_request.method = "GET"
+        mock_request.url.path = "/test"
         exc = RuntimeError("secret internal details")
         resp = await handlers[Exception](mock_request, exc)
         assert resp.status_code == 500

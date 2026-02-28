@@ -43,6 +43,7 @@ def _service_to_read(s: ServiceDefinition) -> ServiceRead:
         options_schema=s.options_schema,
         pricing=s.pricing,
         output_schema=s.output_schema,
+        clinical_config=s.clinical_config,
         created_at=s.created_at,
     )
 

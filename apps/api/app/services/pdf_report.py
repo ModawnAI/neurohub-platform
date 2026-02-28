@@ -232,30 +232,18 @@ def upload_pdf_to_storage(
     request_id: str,
     report_id: str,
 ) -> str:
-    """Upload PDF to Supabase Storage. Returns the storage path."""
-    import httpx
-
+    """Upload PDF to storage. Returns the storage path."""
     from app.config import settings
+    from app.services.storage import put_object_sync
 
     bucket = settings.storage_bucket_reports
     path = f"institutions/{institution_id}/requests/{request_id}/reports/{report_id}.pdf"
-    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{path}"
-
-    headers = {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_service_role_key,
-        "Content-Type": "application/pdf",
-        "x-upsert": "true",
-    }
 
     try:
-        with httpx.Client(timeout=30) as client:
-            resp = client.put(url, content=pdf_bytes, headers=headers)
-            resp.raise_for_status()
+        put_object_sync(bucket, path, pdf_bytes, content_type="application/pdf")
         logger.info("PDF uploaded to %s/%s", bucket, path)
     except Exception as e:
         logger.error("Failed to upload PDF: %s", e)
-        # Don't fail the whole task; path is still stored for retry
         raise
 
     return path

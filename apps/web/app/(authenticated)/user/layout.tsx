@@ -16,14 +16,14 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     { href: "/user/group-studies", label: "Group Studies", icon: <ChartBar size={20} /> },
     { href: "/user/payment", label: t("nav.payment"), icon: <CreditCard size={20} /> },
     { href: "/user/marketplace", label: "Marketplace", icon: <ShoppingCart size={20} /> },
-    { href: "/user/dicom-worklist", label: "DICOM Worklist", icon: <WifiHigh size={20} /> },
+    { href: "/user/dicom-worklist", label: t("nav.dicomWorklist"), icon: <WifiHigh size={20} /> },
     { href: "/user/settings", label: t("nav.settings"), icon: <GearSix size={20} /> },
   ];
 
   return (
     <div className="app-layout">
       <Sidebar items={navItems} />
-      <main className="main-content">
+      <main id="main-content" className="main-content">
         <div className="main-content-inner">{children}</div>
       </main>
     </div>

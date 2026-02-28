@@ -333,43 +333,16 @@ def generate_pdf_report(self, request_id: str):
 # ── Watermark Task ────────────────────────────────────────────────────────
 
 
-def _supabase_storage_headers() -> dict[str, str]:
-    from app.config import settings
-
-    return {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_anon_key,
-    }
-
-
 def _download_from_storage(bucket: str, path: str) -> bytes:
-    import httpx
+    from app.services.storage import get_object_sync
 
-    from app.config import settings
-
-    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{path}"
-    with httpx.Client(timeout=30) as client:
-        resp = client.get(url, headers=_supabase_storage_headers())
-    if resp.status_code != 200:
-        raise Exception(f"Storage download failed: {resp.status_code}")
-    return resp.content
+    return get_object_sync(bucket, path)
 
 
 def _upload_to_storage(bucket: str, path: str, data: bytes, content_type: str) -> str:
-    import httpx
+    from app.services.storage import put_object_sync
 
-    from app.config import settings
-
-    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{path}"
-    headers = {
-        **_supabase_storage_headers(),
-        "Content-Type": content_type,
-        "x-upsert": "true",
-    }
-    with httpx.Client(timeout=60) as client:
-        resp = client.put(url, content=data, headers=headers)
-    if resp.status_code not in (200, 201):
-        raise Exception(f"Storage upload failed: {resp.status_code} {resp.text[:200]}")
+    put_object_sync(bucket, path, data, content_type=content_type)
     return path
 
 

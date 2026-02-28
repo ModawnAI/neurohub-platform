@@ -2,15 +2,47 @@
 
 import { listServices, type ServiceRead } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { MagnifyingGlass, Cube, ArrowRight } from "phosphor-react";
+import { MagnifyingGlass, Cube, ArrowRight, Brain, Lightning, Heartbeat } from "phosphor-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 
+const MODALITY_COLORS: Record<string, string> = {
+  PET: "#e74c3c",
+  MRI: "#3498db",
+  EEG: "#9b59b6",
+  fMRI: "#2ecc71",
+  MEG: "#f39c12",
+  SPECT: "#e67e22",
+  PSG: "#1abc9c",
+  DTI: "#3498db",
+};
+
+function ModalityBadge({ modality }: { modality: string }) {
+  const color = MODALITY_COLORS[modality] ?? "var(--muted)";
+  return (
+    <span style={{
+      display: "inline-block", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
+      backgroundColor: `${color}18`, color, border: `1px solid ${color}40`,
+    }}>
+      {modality}
+    </span>
+  );
+}
+
+function extractModalities(category: string | null): string[] {
+  if (!category) return [];
+  return category.split("/").map(s => s.trim()).filter(Boolean);
+}
+
+function formatPrice(pricing: ServiceRead["pricing"]): string {
+  if (!pricing?.base_price) return "";
+  return `${(pricing.base_price).toLocaleString("ko-KR")}원`;
+}
+
 export default function ServiceCatalogPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["services"],
@@ -18,14 +50,15 @@ export default function ServiceCatalogPage() {
   });
 
   const services = (data?.items ?? []).filter(
-    (s: ServiceRead) => s.status === "ACTIVE",
+    (s: ServiceRead) => s.status === "ACTIVE" || s.status === "PUBLISHED",
   );
 
   const filtered = search
     ? services.filter(
         (s: ServiceRead) =>
           s.display_name.toLowerCase().includes(search.toLowerCase()) ||
-          s.name.toLowerCase().includes(search.toLowerCase()),
+          s.name.toLowerCase().includes(search.toLowerCase()) ||
+          (s.description ?? "").toLowerCase().includes(search.toLowerCase()),
       )
     : services;
 
@@ -66,65 +99,100 @@ export default function ServiceCatalogPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: 16,
+            gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+            gap: 20,
           }}
         >
-          {filtered.map((svc: ServiceRead) => (
-            <div key={svc.id} className="panel" style={{ padding: 20 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: 12,
-                }}
-              >
-                <div>
-                  <h3 style={{ fontWeight: 600, fontSize: 16 }}>
-                    {svc.display_name}
-                  </h3>
-                  <p
-                    style={{
-                      color: "var(--muted)",
-                      fontSize: 13,
-                      marginTop: 2,
-                    }}
-                  >
-                    {svc.name} v{svc.version}
-                  </p>
+          {filtered.map((svc: ServiceRead) => {
+            const cc = svc.clinical_config;
+            const techCount = cc?.technique_count ?? 0;
+            const modalities = extractModalities(svc.category);
+            const hasClinical = !!cc;
+
+            return (
+              <div key={svc.id} className="panel" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 10,
+                      background: hasClinical ? "linear-gradient(135deg, var(--primary-light), #e8f4fd)" : "var(--bg-secondary)",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>
+                      {hasClinical ? <Brain size={24} style={{ color: "var(--primary)" }} /> : <Cube size={22} style={{ color: "var(--muted)" }} />}
+                    </div>
+                    <div>
+                      <h3 style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{svc.display_name}</h3>
+                      {svc.department && (
+                        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>{svc.department}</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className="badge" style={{
+                    backgroundColor: "var(--success-light)", color: "var(--success)", fontSize: 11,
+                  }}>
+                    {svc.status === "PUBLISHED" ? "Published" : t("common.active")}
+                  </span>
                 </div>
-                <span
-                  className="badge"
-                  style={{
-                    backgroundColor: "var(--success-light)",
-                    color: "var(--success)",
-                  }}
+
+                {/* Description */}
+                {svc.description && (
+                  <p style={{
+                    fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6,
+                    display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
+                    {svc.description}
+                  </p>
+                )}
+
+                {/* Modality badges + technique count */}
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  {modalities.map(m => <ModalityBadge key={m} modality={m} />)}
+                  {techCount > 0 && (
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                      padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
+                      backgroundColor: "var(--primary-light)", color: "var(--primary)",
+                    }}>
+                      <Lightning size={12} /> {techCount}개 분석 기법
+                    </span>
+                  )}
+                </div>
+
+                {/* Clinical metadata row */}
+                {hasClinical && (
+                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--color-text-secondary)", flexWrap: "wrap" }}>
+                    {cc?.fusion_method && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <Heartbeat size={13} style={{ color: "var(--primary)" }} />
+                        {cc.fusion_method.length > 30 ? cc.fusion_method.slice(0, 30) + "..." : cc.fusion_method}
+                      </span>
+                    )}
+                    {cc?.clinical_intent && (
+                      <span>{cc.clinical_intent}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Price */}
+                {svc.pricing?.base_price ? (
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--primary)" }}>
+                    {formatPrice(svc.pricing)}
+                  </p>
+                ) : null}
+
+                {/* CTA */}
+                <button
+                  className="btn btn-primary"
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: "auto" }}
+                  onClick={() => router.push(`/user/new-request?service=${svc.id}`)}
                 >
-                  {t("common.active")}
-                </span>
+                  {t("serviceCatalog.requestAnalysis")}
+                  <ArrowRight size={16} />
+                </button>
               </div>
-
-              {svc.department && (
-                <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>
-                  {t("serviceCatalog.department")} {svc.department}
-                </p>
-              )}
-
-              <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
-                {t("serviceCatalog.createdDate")} {new Date(svc.created_at).toLocaleDateString(dateLocale)}
-              </p>
-
-              <button
-                className="btn btn-primary"
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                onClick={() => router.push("/user/new-request")}
-              >
-                {t("serviceCatalog.requestAnalysis")}
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

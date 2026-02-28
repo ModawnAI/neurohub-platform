@@ -24,6 +24,8 @@ class CurrentUser(BaseModel):
 
     def has_any_role(self, *roles: str) -> bool:
         role_set = set(self.roles)
+        if "SYSTEM_ADMIN" in role_set:
+            return True
         return any(role in role_set for role in roles)
 
     def has_scope(self, scope: str) -> bool:

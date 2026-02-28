@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Brain, EnvelopeSimple, Globe } from "phosphor-react";
-import { useAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { Brain, Globe } from "phosphor-react";
+import { useAuth, getRoleHomePath } from "@/lib/auth";
 import { useT, useLocale } from "@/lib/i18n";
 
 export default function RegisterPage() {
   const t = useT();
+  const router = useRouter();
   const { locale, setLocale } = useLocale();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,10 +17,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [registered, setRegistered] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resent, setResent] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, refreshUser } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,89 +36,13 @@ export default function RegisterPage() {
 
     try {
       await signUp(email, password);
-      setRegistered(true);
+      const user = await refreshUser();
+      const dest = user ? getRoleHomePath(user.userType) : "/onboarding";
+      window.location.href = dest;
     } catch (err: any) {
       setError(err?.message || t("auth.errorSignUpFailed"));
-    } finally {
       setLoading(false);
     }
-  }
-
-  async function handleResend() {
-    if (!supabase || resending) return;
-    setResending(true);
-    setResent(false);
-    try {
-      const { error: resendError } = await supabase.auth.resend({ type: "signup", email });
-      if (resendError) throw resendError;
-      setResent(true);
-    } catch {
-      // silently fail — don't reveal if email exists
-    } finally {
-      setResending(false);
-    }
-  }
-
-  if (registered) {
-    return (
-      <div className="auth-page">
-        <div className="auth-card" style={{ textAlign: "center" }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                background: "#dbeafe",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#1d4ed8",
-              }}
-            >
-              <EnvelopeSimple size={28} weight="duotone" />
-            </div>
-          </div>
-
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0 0 0.5rem" }}>
-            {t("auth.verificationTitle")}
-          </h1>
-
-          <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1.5rem" }}>
-            <strong>{email}</strong>{t("auth.verificationMessage")}
-            <br />
-            {t("auth.verificationInstruction")}
-          </p>
-
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "12px 16px",
-              fontSize: "0.85rem",
-              color: "var(--muted)",
-              marginBottom: "1.5rem",
-            }}
-          >
-            {t("auth.verificationSpamWarning")}
-          </div>
-
-          <button
-            className="btn btn-secondary"
-            onClick={handleResend}
-            disabled={resending || resent}
-            style={{ width: "100%", justifyContent: "center", marginBottom: "0.75rem" }}
-          >
-            {resent ? t("auth.resentEmail") : resending ? t("auth.sendingEmail") : t("auth.resendEmail")}
-          </button>
-
-          <p className="auth-footer">
-            <Link href="/login">{t("auth.backToLogin")}</Link>
-          </p>
-        </div>
-      </div>
-    );
   }
 
   return (

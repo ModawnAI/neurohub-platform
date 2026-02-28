@@ -12,8 +12,6 @@ from datetime import date
 import pydicom
 import pydicom.errors
 
-import httpx
-
 from app.config import settings
 
 logger = logging.getLogger("neurohub.dicom")
@@ -139,17 +137,11 @@ def parse_dicom_multipart(body: bytes, content_type: str) -> list[bytes]:
 # ---------------------------------------------------------------------------
 
 async def _download_from_storage(storage_path: str) -> bytes:
-    """Download a file from Supabase Storage using the service role key."""
+    """Download a file from storage."""
+    from app.services.storage import get_object
+
     bucket = settings.storage_bucket_inputs
-    url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{storage_path}"
-    headers = {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_service_role_key,
-    }
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.get(url, headers=headers)
-        resp.raise_for_status()
-        return resp.content
+    return await get_object(bucket, storage_path)
 
 
 # ---------------------------------------------------------------------------
@@ -168,17 +160,11 @@ async def store_dicom_instance(
     sop_uid = meta["sop_instance_uid"] or str(uuid.uuid4())
     storage_path = f"{institution_id}/dicom/{meta['study_instance_uid']}/{meta['series_instance_uid']}/{sop_uid}.dcm"
 
-    # Upload to Supabase
+    # Upload to storage
+    from app.services.storage import put_object
+
     bucket = settings.storage_bucket_inputs
-    upload_url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{storage_path}"
-    headers = {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_service_role_key,
-        "Content-Type": "application/octet-stream",
-    }
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(upload_url, headers=headers, content=dicom_bytes)
-        resp.raise_for_status()
+    await put_object(bucket, storage_path, dicom_bytes, content_type="application/octet-stream")
 
     return {
         "storage_path": storage_path,

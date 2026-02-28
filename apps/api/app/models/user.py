@@ -20,6 +20,7 @@ class User(UUIDMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         unique=True,
     )
+    password_hash: Mapped[str | None] = mapped_column(String(200))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(

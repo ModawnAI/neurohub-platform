@@ -1,0 +1,628 @@
+{
+  "schema": {
+    "schema_name": "NeuroHub_Services_Metadata",
+    "schema_version": "2.0.0",
+    "last_updated": "2026-02-28",
+    "design_goals": [
+      "서비스 선택 시 입력 요구사항 자동 생성",
+      "QC 기반 분석 신뢰도/가중치 자동 조정",
+      "멀티모달 통합(확률/점수) 산출 명시",
+      "리포트/출력/임상 사용범위/규제 메타데이터 포함",
+      "버전/로그/감사추적(Traceability) 고려"
+    ],
+    "global_conventions": {
+      "confidence_score_range": "0-100",
+      "probability_range": "0-1",
+      "qc_score_range": "0-100",
+      "qc_default_minimum_score": 60,
+      "qc_default_fail_score": 40,
+      "fusion_default_method": "QC-adjusted weighted fusion",
+      "report_default_language": ["ko", "en"],
+      "data_privacy": {
+        "phi_handling": "De-identification required for cloud processing unless on-prem deployment",
+        "encryption": "In transit and at rest",
+        "audit_log": "Enabled"
+      }
+    }
+  },
+
+  "services": {
+    "Epilepsy_Lesion_Analysis": {
+      "service_id": "svc_epilepsy_lesion",
+      "service_name": "뇌전증 병소 분석 서비스",
+      "service_version": "2.0.0",
+      "description_public": "약물로 조절되지 않는 뇌전증에서 발작이 시작되는 부위를 최대한 정밀하게 추정하기 위해 MRI·PET·SPECT·EEG·MEG·fMRI 결과를 종합 분석하는 수술 전 정밀 평가 서비스입니다.",
+      "clinical_intent": "Pre-surgical localization support",
+      "clinical_use_level": "Clinical decision support (not standalone diagnosis)",
+      "target_population": ["Drug-resistant epilepsy", "Pre-surgical evaluation", "MRI-negative epilepsy"],
+      "contraindications_or_limits": [
+        "Generalized epilepsy is not intended for focal lesion localization",
+        "Severe motion or insufficient clean EEG/MEG/fMRI data may limit conclusions"
+      ],
+
+      "techniques": [
+        "FDG_PET",
+        "SPECT_SISCOM",
+        "Cortical_Thickness",
+        "VBM",
+        "Diffusion_Properties",
+        "Tractography",
+        "EEG_Source",
+        "EEG_Connectivity",
+        "MEG_Source",
+        "MEG_Connectivity",
+        "fMRI_Task",
+        "fMRI_Connectivity"
+      ],
+
+      "input_requirements": {
+        "imaging": {
+          "mandatory_any_of": [["T1_MRI"], ["FDG_PET"], ["SPECT_Ictal", "SPECT_Interictal"]],
+          "mandatory_all": [],
+          "optional": ["FLAIR_MRI", "T2_MRI", "Resting_fMRI", "Task_fMRI", "DTI_MRI"]
+        },
+        "electrophysiology": {
+          "optional": ["EEG", "MEG"],
+          "recommended_for_best_performance": ["EEG_Source", "MEG_Source"]
+        },
+        "clinical_data_minimum": [
+          "Age",
+          "Sex",
+          "Seizure_type",
+          "Seizure_frequency",
+          "Age_of_onset",
+          "Medication_history",
+          "Surgery_planning_question"
+        ],
+        "clinical_data_optional": ["EEG_report_summary", "MRI_radiology_report", "Neuropsych_summary"],
+        "data_formats": {
+          "MRI": ["DICOM", "NIfTI"],
+          "PET_SPECT": ["DICOM"],
+          "EEG": ["EDF", "BDF"],
+          "MEG": ["FIF", "CTF", "4D"]
+        }
+      },
+
+      "minimum_dataset_profiles": [
+        {
+          "profile_id": "minimal_localization",
+          "name": "기본 병소 추정",
+          "includes": ["T1_MRI", "EEG (optional)", "FDG_PET (optional)"],
+          "note": "입력 데이터가 제한적인 경우 병소 확률 지도는 제공하되 신뢰도는 낮을 수 있음"
+        },
+        {
+          "profile_id": "standard_presurgical",
+          "name": "표준 수술 전 평가",
+          "includes": ["T1_MRI", "FDG_PET", "SPECT_Ictal", "SPECT_Interictal", "EEG", "MEG (optional)", "DTI_MRI", "Task_fMRI (optional)"]
+        }
+      ],
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": [
+            "Down-weight affected modality in fusion",
+            "Add low-confidence disclaimer in report",
+            "Highlight QC issues in QC appendix"
+          ],
+          "below_fail": [
+            "Exclude modality from fusion",
+            "Mark report section as 'Limited'",
+            "Recommend re-acquisition if clinically feasible"
+          ]
+        },
+        "qc_weighting": {
+          "method": "w_adjusted = w_base * (qc_score/100)",
+          "caps": {
+            "SPECT_SISCOM_injection_latency_fail": "If latency > 60 sec then max weight capped to 0.5*w_base"
+          }
+        }
+      },
+
+      "integration_model": {
+        "type": "Lesion probability fusion",
+        "fusion_method": "QC-adjusted weighted fusion + concordance scoring",
+        "spatial_unit": "ROI and voxel (dual reporting)",
+        "core_outputs": ["LesionProbabilityMap", "TopCandidatesList", "ConcordanceScore", "EloquentRiskScore"],
+        "base_weights_default": {
+          "SPECT_SISCOM": 0.20,
+          "FDG_PET": 0.15,
+          "EEG_Source": 0.15,
+          "MEG_Source": 0.15,
+          "Cortical_Thickness": 0.10,
+          "VBM": 0.10,
+          "Diffusion_Properties": 0.08,
+          "Tractography": 0.04,
+          "fMRI_Connectivity": 0.02,
+          "EEG_Connectivity": 0.01
+        },
+        "concordance_definition": {
+          "threshold_per_modality": "modality-specific z or confidence threshold",
+          "score": "Concordance(r) = (#modalities supporting r) / (#available modalities)"
+        },
+        "eloquent_risk": {
+          "inputs": ["fMRI_Task"],
+          "score_definition": "Overlap/proximity between candidate focus and eloquent activations"
+        }
+      },
+
+      "expected_diagnostic_scope": [
+        "Focal epilepsy",
+        "Temporal lobe epilepsy",
+        "Extratemporal epilepsy",
+        "Cortical dysplasia (support)",
+        "Pre-surgical functional localization"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          {
+            "output_id": "lesion_probability_map",
+            "type": "3D map",
+            "format": ["NIfTI", "PDF overlay"],
+            "description": "병소 가능성을 0–1 확률로 표현한 지도"
+          },
+          {
+            "output_id": "top_candidates",
+            "type": "table",
+            "format": ["PDF", "JSON"],
+            "fields": ["rank", "region_name", "coordinates", "probability", "concordance", "supporting_modalities", "eloquent_risk"]
+          }
+        ],
+        "secondary_outputs": [
+          "ModalitiesSummaryCards",
+          "QCReport",
+          "SurgicalPlanningOverlay (if tractography available)"
+        ]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Concordance Summary (Across Modalities)",
+        "Lesion Localization Probability Map",
+        "Top Candidate Foci (ranked)",
+        "Structural Findings (T1/VBM/Thickness)",
+        "Metabolic & Perfusion Findings (FDG-PET / SISCOM)",
+        "Electrophysiology Findings (EEG/MEG)",
+        "Connectivity Findings (EEG/MEG/fMRI)",
+        "Functional Mapping & Eloquent Risk (Task fMRI)",
+        "Integrated Conclusion & Recommendations",
+        "Appendix: QC & Quantitative Tables"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Supports clinicians in presurgical evaluation by providing quantitative multimodal evidence; not intended as sole basis for diagnosis or treatment decisions.",
+        "risk_class_hint": "Clinical decision support / SaMD (jurisdiction dependent)",
+        "human_in_the_loop": true,
+        "auditability": ["Input hashes", "Model version", "QC logs", "Operator actions"]
+      }
+    },
+
+    "Epilepsy_Medication_Response": {
+      "service_id": "svc_epilepsy_meds",
+      "service_name": "뇌전증 약물 반응 분석 서비스",
+      "service_version": "2.0.0",
+      "description_public": "뇌파와 뇌 네트워크의 안정성 지표를 기반으로 약물 반응 가능성과 발작 재발 위험도를 정량적으로 평가하는 보조 서비스입니다.",
+      "clinical_intent": "Treatment response stratification support",
+      "clinical_use_level": "Risk stratification support (not a treatment prescription tool)",
+      "target_population": ["Newly diagnosed epilepsy", "Medication adjustment cases"],
+
+      "techniques": ["EEG_Spectrum", "EEG_Connectivity", "EEG_DCM", "fMRI_Connectivity", "fMRI_MEM", "EEG_MEM"],
+
+      "input_requirements": {
+        "electrophysiology": {
+          "mandatory_all": ["EEG"],
+          "optional": ["Resting_fMRI"]
+        },
+        "clinical_data_minimum": ["Age", "Sex", "Seizure_type", "Medication_list", "Seizure_frequency"],
+        "clinical_data_optional": ["Sleep_status", "Triggers", "Adherence_estimate"]
+      },
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": ["Down-weight network indices", "Flag limited reliability"],
+          "below_fail": ["Exclude modality indices", "Recommend repeat recording"]
+        }
+      },
+
+      "integration_model": {
+        "type": "Risk scoring",
+        "fusion_method": "QC-adjusted ensemble scoring",
+        "core_outputs": ["NetworkStabilityScore", "SeizureRiskIndex", "DrugResponseSupportScore"],
+        "base_weights_default": {
+          "EEG_Spectrum": 0.20,
+          "EEG_Connectivity": 0.25,
+          "EEG_DCM": 0.15,
+          "EEG_MEM": 0.15,
+          "fMRI_Connectivity": 0.15,
+          "fMRI_MEM": 0.10
+        }
+      },
+
+      "expected_diagnostic_scope": [
+        "Network instability",
+        "Drug response prediction support",
+        "Seizure recurrence risk stratification"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          { "output_id": "network_stability_score", "type": "score", "range": "0-100" },
+          { "output_id": "seizure_risk_index", "type": "risk_category", "levels": ["Low", "Moderate", "High"] }
+        ],
+        "secondary_outputs": ["ConnectivityMaps", "ComplexityIndices", "QCReport"]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Network Stability Score",
+        "Seizure Risk Index",
+        "Connectivity Maps",
+        "Effective Connectivity Directionality",
+        "Nonlinear Complexity Index (MEM)",
+        "QC Summary",
+        "Clinical Interpretation Notes"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Provides quantitative indices to support clinician assessment of network stability and risk; not a replacement for clinical judgment.",
+        "human_in_the_loop": true
+      }
+    },
+
+    "Schizophrenia_Medication_Response": {
+      "service_id": "svc_sz_meds",
+      "service_name": "조현병 약물 반응 분석 서비스",
+      "service_version": "2.0.0",
+      "description_public": "뇌 구조와 기능적 연결, 네트워크 방향성/복잡성 지표를 종합해 치료 반응성과 네트워크 불균형을 정량적으로 제시하는 보조 서비스입니다.",
+      "clinical_intent": "Treatment response stratification support",
+      "clinical_use_level": "Clinical decision support (not standalone diagnosis)",
+      "target_population": ["Schizophrenia", "Treatment-resistant psychosis"],
+
+      "techniques": ["Cortical_Thickness", "VBM", "EEG_Connectivity", "fMRI_Connectivity", "fMRI_DCM", "fMRI_MEM"],
+
+      "input_requirements": {
+        "imaging": { "optional": ["T1_MRI", "Resting_fMRI"] },
+        "electrophysiology": { "optional": ["EEG"] },
+        "clinical_data_minimum": ["Age", "Sex", "Medication_history", "Symptom_severity_scale"],
+        "clinical_data_optional": ["Illness_duration", "Cognitive_testing_summary"]
+      },
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": ["Down-weight affected modality", "Flag limited reliability"],
+          "below_fail": ["Exclude modality", "Recommend repeat acquisition"]
+        }
+      },
+
+      "integration_model": {
+        "type": "Composite profiling",
+        "fusion_method": "QC-adjusted weighted profile + normative deviation",
+        "core_outputs": ["StructuralBrainIndex", "FunctionalConnectivityProfile", "DirectionalityIndex", "ComplexityIndex", "TreatmentSupportScore"],
+        "base_weights_default": {
+          "Cortical_Thickness": 0.25,
+          "VBM": 0.20,
+          "EEG_Connectivity": 0.10,
+          "fMRI_Connectivity": 0.20,
+          "fMRI_DCM": 0.10,
+          "fMRI_MEM": 0.15
+        }
+      },
+
+      "expected_diagnostic_scope": [
+        "Frontotemporal network dysfunction",
+        "Treatment response stratification",
+        "Functional connectivity imbalance"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          { "output_id": "structural_brain_index", "type": "score", "range": "0-100" },
+          { "output_id": "connectivity_profile", "type": "profile", "format": ["PDF", "JSON"] }
+        ],
+        "secondary_outputs": ["QCReport", "NormativeDeviationMaps"]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Structural Brain Index",
+        "Functional Connectivity Profile",
+        "Effective Connectivity Directionality",
+        "Network Complexity Index",
+        "Personalized Treatment Support",
+        "QC Summary"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Provides quantitative biomarkers to support clinician review; not intended to determine medication choice automatically.",
+        "human_in_the_loop": true
+      }
+    },
+
+    "Dementia_Diagnosis": {
+      "service_id": "svc_dementia_dx",
+      "service_name": "치매 정밀 진단 서비스",
+      "service_version": "2.0.0",
+      "description_public": "인지 저하의 원인을 다각도로 분석해 치매 유형 감별과 질환 가능성을 확률 형태로 제시하는 다중 모달 통합 서비스입니다.",
+      "clinical_intent": "Differential diagnosis support",
+      "clinical_use_level": "Diagnostic support (not standalone diagnosis)",
+      "target_population": ["Mild cognitive impairment", "Suspected dementia"],
+
+      "techniques": ["FDG_PET", "Amyloid_PET", "Tau_PET", "Cortical_Thickness", "VBM", "fMRI_Connectivity", "EEG_Spectrum"],
+
+      "input_requirements": {
+        "imaging": { "optional": ["T1_MRI", "FDG_PET", "Amyloid_PET", "Tau_PET", "Resting_fMRI"] },
+        "electrophysiology": { "optional": ["EEG"] },
+        "clinical_data_minimum": ["Age", "Sex", "Symptom_duration", "Cognitive_test_scores"],
+        "clinical_data_optional": ["Family_history", "Vascular_risk_factors"]
+      },
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": ["Down-weight affected modality", "Flag limited reliability"],
+          "below_fail": ["Exclude modality", "Recommend repeat if feasible"]
+        }
+      },
+
+      "integration_model": {
+        "type": "Differential probability scoring",
+        "fusion_method": "QC-adjusted multimodal Bayesian scoring",
+        "core_outputs": ["ATNProfile", "DifferentialDiagnosisProbabilities", "BrainAgingIndex"],
+        "base_weights_default": {
+          "Amyloid_PET": 0.20,
+          "Tau_PET": 0.20,
+          "FDG_PET": 0.20,
+          "Cortical_Thickness": 0.15,
+          "VBM": 0.10,
+          "fMRI_Connectivity": 0.10,
+          "EEG_Spectrum": 0.05
+        }
+      },
+
+      "expected_diagnostic_scope": [
+        "Alzheimer disease",
+        "Frontotemporal dementia",
+        "Dementia with Lewy bodies",
+        "Mild cognitive impairment"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          { "output_id": "differential_dx_probability", "type": "probabilities", "format": ["JSON", "PDF"] },
+          { "output_id": "atn_profile", "type": "classification", "values": ["A+/A-", "T+/T-", "N+/N-"] }
+        ],
+        "secondary_outputs": ["MetabolicPatternMap", "StructuralAtrophyMap", "QCReport"]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Cognitive Decline Index",
+        "AT(N) Profile (Amyloid/Tau/Neurodegeneration)",
+        "Amyloid Status & Burden",
+        "Tau Burden & Staging Support",
+        "FDG Metabolic Pattern Analysis",
+        "Structural Atrophy (Thickness/VBM)",
+        "Functional Network Assessment",
+        "Final Differential Diagnosis Probability",
+        "QC Summary"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Supports differential diagnosis by providing quantitative multimodal markers; not intended as sole diagnostic evidence.",
+        "human_in_the_loop": true
+      }
+    },
+
+    "Parkinson_Diagnosis": {
+      "service_id": "svc_pd_dx",
+      "service_name": "파킨슨병 정밀 분석 서비스",
+      "service_version": "2.0.0",
+      "description_public": "운동 기능 저하의 원인을 대사·구조·기능·연결망 관점에서 분석하여 파킨슨병 및 유사 질환 가능성을 정량적으로 제시합니다.",
+      "clinical_intent": "Differential diagnosis support",
+      "clinical_use_level": "Diagnostic support (not standalone diagnosis)",
+      "target_population": ["Parkinsonism", "Motor slowing"],
+
+      "techniques": ["FDG_PET", "Diffusion_Properties", "Cortical_Thickness", "fMRI_Task", "fMRI_Connectivity"],
+
+      "input_requirements": {
+        "imaging": { "optional": ["T1_MRI", "FDG_PET", "DTI_MRI", "Task_fMRI", "Resting_fMRI"] },
+        "clinical_data_minimum": ["Age", "Sex", "Motor_symptom_duration", "UPDRS_or_equivalent"],
+        "clinical_data_optional": ["Medication_list", "Nonmotor_symptoms"]
+      },
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": ["Down-weight affected modality", "Flag limited reliability"],
+          "below_fail": ["Exclude modality", "Recommend repeat if feasible"]
+        }
+      },
+
+      "integration_model": {
+        "type": "Pattern + network scoring",
+        "fusion_method": "QC-adjusted weighted scoring",
+        "core_outputs": ["MotorMetabolicPatternScore", "WhiteMatterIntegrityScore", "MotorNetworkActivation", "IntegratedProbability"],
+        "base_weights_default": {
+          "FDG_PET": 0.35,
+          "Diffusion_Properties": 0.20,
+          "Cortical_Thickness": 0.15,
+          "fMRI_Task": 0.15,
+          "fMRI_Connectivity": 0.15
+        }
+      },
+
+      "expected_diagnostic_scope": [
+        "Parkinson disease",
+        "Atypical parkinsonism",
+        "Motor network dysfunction"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          { "output_id": "integrated_probability", "type": "probabilities", "format": ["JSON", "PDF"] },
+          { "output_id": "motor_network_summary", "type": "profile", "format": ["PDF"] }
+        ],
+        "secondary_outputs": ["QCReport", "ActivationMaps", "MetabolicPatternMaps"]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Motor Network Metabolic Pattern",
+        "White Matter Integrity Score",
+        "Structural Atrophy Index",
+        "Motor Task Activation Map",
+        "Integrated Diagnostic Probability",
+        "QC Summary"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Provides quantitative indices supporting clinician evaluation; not a definitive diagnostic tool.",
+        "human_in_the_loop": true
+      }
+    },
+
+    "Brain_Health_Checkup": {
+      "service_id": "svc_brain_checkup",
+      "service_name": "뇌 건강 종합 검진 서비스",
+      "service_version": "2.0.0",
+      "description_public": "현재 뇌의 구조적·기능적 건강 상태를 정량 지표로 요약하고, 조기 이상 신호를 탐지해 생활 관리와 추적 관찰에 도움을 주는 예방 중심 서비스입니다.",
+      "clinical_intent": "Preventive screening support",
+      "clinical_use_level": "Wellness/health screening support (not diagnosis)",
+      "target_population": ["Healthy adults", "High-risk individuals"],
+
+      "techniques": ["Cortical_Thickness", "VBM", "EEG_Spectrum", "fMRI_Connectivity", "fMRI_MEM"],
+
+      "input_requirements": {
+        "imaging": { "optional": ["T1_MRI", "Resting_fMRI"] },
+        "electrophysiology": { "optional": ["EEG"] },
+        "clinical_data_minimum": ["Age", "Sex"],
+        "clinical_data_optional": ["Education_years", "Sleep_quality", "Stress_level", "Vascular_risk_factors"]
+      },
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": ["Down-weight affected indices", "Flag limited reliability"],
+          "below_fail": ["Exclude affected component"]
+        }
+      },
+
+      "integration_model": {
+        "type": "Normative deviation + aging composite",
+        "fusion_method": "QC-adjusted composite scoring",
+        "core_outputs": ["BrainAgingScore", "StructuralIntegrityIndex", "FunctionalBalanceIndex", "NetworkComplexityScore"],
+        "base_weights_default": {
+          "Cortical_Thickness": 0.30,
+          "VBM": 0.20,
+          "fMRI_Connectivity": 0.20,
+          "fMRI_MEM": 0.15,
+          "EEG_Spectrum": 0.15
+        }
+      },
+
+      "expected_diagnostic_scope": [
+        "Early cognitive decline risk (screening)",
+        "Network imbalance (screening)",
+        "Brain aging index"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          { "output_id": "brain_aging_score", "type": "score", "range": "0-100" },
+          { "output_id": "recommendations", "type": "text", "format": ["PDF", "JSON"] }
+        ],
+        "secondary_outputs": ["QCReport", "NormativeDeviationSummary"]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Brain Aging Score",
+        "Structural Integrity Index",
+        "Functional Connectivity Profile",
+        "Network Complexity Score",
+        "Preventive Recommendation",
+        "QC Summary"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Provides wellness-oriented quantitative summaries; not intended to diagnose disease.",
+        "human_in_the_loop": true
+      }
+    },
+
+    "Sleep_Diagnosis": {
+      "service_id": "svc_sleep_dx",
+      "service_name": "수면 정밀 분석 서비스",
+      "service_version": "2.0.0",
+      "description_public": "수면 중 뇌파와 호흡·산소 포화도 등의 생체 신호를 분석해 수면 단계, 각성, 무호흡 이벤트를 정량 평가하는 서비스입니다.",
+      "clinical_intent": "Sleep disorder assessment support",
+      "clinical_use_level": "Clinical decision support (requires clinician interpretation)",
+      "target_population": ["Sleep apnea suspicion", "Chronic fatigue", "Daytime sleepiness"],
+
+      "techniques": ["Sleep_Apnea_Analysis", "EEG_Spectrum"],
+
+      "input_requirements": {
+        "physiology": {
+          "mandatory_all": ["PSG_EEG", "Respiratory_airflow", "Thoracoabdominal_effort", "SpO2"],
+          "optional": ["ECG", "EMG", "EOG", "Snore_mic", "Body_position"]
+        },
+        "clinical_data_minimum": ["Age", "Sex", "BMI", "Sleep_questionnaire_scores"],
+        "clinical_data_optional": ["Comorbidities", "Medication_list"]
+      },
+
+      "qc_policy": {
+        "minimum_qc_score": 60,
+        "fail_qc_score": 40,
+        "actions": {
+          "below_minimum": ["Flag limited staging accuracy", "Down-weight event detection confidence"],
+          "below_fail": ["Mark analysis as incomplete", "Recommend repeat PSG if feasible"]
+        }
+      },
+
+      "integration_model": {
+        "type": "Sleep staging + respiratory event scoring",
+        "fusion_method": "Rule-based event detection + QC-adjusted confidence",
+        "core_outputs": ["SleepStageDistribution", "AHI", "ODI", "SleepQualityScore"]
+      },
+
+      "expected_diagnostic_scope": [
+        "Obstructive sleep apnea (support)",
+        "Sleep fragmentation",
+        "Sleep-related cognitive impairment (support)"
+      ],
+
+      "output_spec": {
+        "primary_outputs": [
+          { "output_id": "ahi", "type": "index", "unit": "events/hour" },
+          { "output_id": "sleep_stage_distribution", "type": "table", "format": ["PDF", "JSON"] }
+        ],
+        "secondary_outputs": ["RespiratoryEventTimeline", "OxygenDesaturationProfile", "QCReport"]
+      },
+
+      "report_structure": [
+        "Executive Summary",
+        "Sleep Stage Distribution",
+        "Respiratory Event Index (AHI) & ODI",
+        "Oxygen Desaturation Profile",
+        "Sleep Fragmentation Metrics",
+        "Sleep Quality Score",
+        "Clinical Recommendation",
+        "QC Summary"
+      ],
+
+      "regulatory_metadata": {
+        "intended_use_statement": "Supports clinician review of PSG-derived indices; not intended to replace clinical diagnosis.",
+        "human_in_the_loop": true
+      }
+    }
+  }
+}

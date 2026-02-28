@@ -3,11 +3,13 @@ import pytest
 from unittest.mock import patch
 
 from app.middleware.rate_limit import (
-    _LIMIT_UNAUTH,
-    _LIMIT_AUTH,
+    _CATEGORY_LIMITS,
     _InMemoryLimiter,
     _get_rate_limiter,
 )
+
+_LIMIT_UNAUTH = _CATEGORY_LIMITS["read"]["unauth"]  # 60
+_LIMIT_AUTH = _CATEGORY_LIMITS["read"]["auth"]  # 300
 
 
 class TestRateLimitMiddleware:

@@ -38,6 +38,11 @@ class ServiceDefinition(UUIDMixin, TimestampMixin, Base):
     # Legacy field kept for backward compat (will be removed)
     inputs_schema: Mapped[dict | None] = mapped_column(JSONB)
 
+    # Clinical intelligence layer metadata (fusion, QC policy, report structure)
+    clinical_config: Mapped[dict | None] = mapped_column(
+        JSONB, comment="fusion_method, qc_policy, clinical_purpose, report_structure, icon_key"
+    )
+
     is_immutable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     parent_service_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

@@ -1,0 +1,1275 @@
+{
+  "FDG_PET": {
+    "title": "뇌 대사 분석 (FDG-PET)",
+    "modality": "PET",
+    "overview": "뇌의 포도당 대사 상태를 분석하여 기능 저하 또는 과활성 부위를 평가",
+    "description": "FDG-PET은 뇌가 포도당(에너지)을 얼마나 사용하는지를 측정하는 검사입니다. 뇌는 활동이 많은 부위일수록 에너지를 많이 사용하며, 기능이 저하된 부위는 포도당 사용량이 감소합니다. 이 검사는 뇌 전체의 대사 패턴을 시각적으로 보여주고, 정상 연령대와 비교하여 어느 부위에서 기능 저하 또는 과활성이 나타나는지 정량적으로 분석합니다. 알츠하이머병에서는 측두엽과 두정엽의 대사가 감소하는 특징이 나타날 수 있고, 파킨슨병이나 기타 퇴행성 질환에서도 특정 대사 패턴이 관찰됩니다. 뇌전증의 경우 발작 간기(interictal)에는 병소 부위의 대사가 감소하는 경우가 많아 병소 위치를 추정하는 데 도움이 됩니다. 이 검사는 구조 MRI와 함께 해석하면 보다 정확한 진단 보조 정보를 제공합니다.",
+    "required_data": [
+      "FDG PET DICOM",
+      "Optional T1-weighted MRI for co-registration"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Memory decline",
+      "Cognitive impairment",
+      "Seizure",
+      "Motor slowing"
+    ],
+    "possible_diagnosis": [
+      "Alzheimer disease",
+      "Frontotemporal dementia",
+      "Parkinson disease",
+      "Epilepsy (interictal hypometabolism)",
+      "Other neurodegenerative disorder"
+    ],
+    "category": "Metabolic Imaging",
+
+    "minimum_requirement": [
+      "FDG injection followed by 30–60 min uptake period",
+      "Static acquisition protocol",
+      "Voxel size ≤2.5 mm",
+      "Whole brain coverage",
+      "Attenuation correction applied",
+      "Minimal motion artifact"
+    ],
+
+    "recommended_requirement": [
+      "Co-registered high-resolution T1 MRI (≤1.2 mm)",
+      "Motion correction applied",
+      "Scanner harmonization information available",
+      "Normative database compatibility"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head motion (mm)",
+        "Signal-to-noise ratio (SNR)",
+        "Attenuation correction integrity",
+        "SUV normalization stability",
+        "Brain coverage completeness (%)"
+      ],
+      "threshold": {
+        "motion_warning": ">3 mm",
+        "motion_fail": ">5 mm",
+        "snr_fail": "Below acceptable PET threshold",
+        "coverage_fail": "<95%",
+        "attenuation_fail": "Incomplete attenuation correction"
+      },
+      "scoring_method": "Composite PET quality index (0–100) based on motion, SNR, normalization stability",
+      "impact_on_confidence": "QC<60 reduces metabolic pattern classification weight; QC<40 limits interpretation to descriptive findings"
+    },
+
+    "procedure": [
+      "DICOM conversion and preprocessing",
+      "Motion correction (if required)",
+      "Spatial normalization to standard brain template (e.g., MNI)",
+      "Intensity normalization using reference region or global mean",
+      "SUVR computation",
+      "Smoothing",
+      "Voxel-wise Z-score comparison with normative database",
+      "Disease pattern classification modeling"
+    ],
+
+    "outcome": [
+      "Metabolic Z-score map",
+      "Regional SUVR table",
+      "Hypometabolic cluster coordinates",
+      "Disease probability score (pattern-based)",
+      "Global metabolic index",
+      "3D visualization overlay with MRI (if available)"
+    ]
+  },
+
+  "Amyloid_PET": {
+    "title": "아밀로이드 PET 분석 (Amyloid PET)",
+    "modality": "PET",
+    "overview": "알츠하이머병 관련 아밀로이드 단백질 축적 여부를 평가",
+    "description": "아밀로이드 PET은 알츠하이머병과 관련된 베타-아밀로이드 단백질이 뇌에 얼마나 축적되어 있는지를 확인하는 검사입니다. 알츠하이머병에서는 증상이 나타나기 수년 전부터 아밀로이드가 축적되기 시작할 수 있습니다. 이 검사는 뇌 전반의 아밀로이드 침착 정도를 시각적 평가 및 정량 수치(SUVR 또는 Centiloid 점수)로 제공합니다. 결과는 정상 노화와 병적 축적을 구분하는 데 도움을 주며, 인지 저하의 원인을 평가하거나 조기 진단 및 치료 전략 수립에 참고됩니다.",
+    "required_data": [
+      "Amyloid PET DICOM",
+      "Optional T1 MRI for co-registration"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Memory decline",
+      "Mild cognitive impairment",
+      "Progressive cognitive dysfunction"
+    ],
+    "possible_diagnosis": [
+      "Alzheimer disease",
+      "Preclinical AD",
+      "Mild cognitive impairment due to AD"
+    ],
+    "category": "Molecular Imaging",
+
+    "minimum_requirement": [
+      "Approved amyloid tracer used",
+      "SUVR calculable dataset",
+      "Voxel size ≤2.5 mm",
+      "Whole brain coverage"
+    ],
+
+    "recommended_requirement": [
+      "T1 MRI co-registration",
+      "Centiloid conversion compatible",
+      "Motion correction applied"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head motion (mm)",
+        "Reference region stability",
+        "SNR",
+        "SUVR variability"
+      ],
+      "threshold": {
+        "motion_fail": ">5 mm",
+        "reference_fail": "Unstable cerebellar reference",
+        "snr_fail": "Below acceptable PET SNR"
+      },
+      "scoring_method": "Amyloid quantification reliability index (0–100)",
+      "impact_on_confidence": "QC<60 reduces certainty of amyloid positivity classification"
+    },
+
+    "procedure": [
+      "Spatial normalization",
+      "SUVR computation using reference region",
+      "Centiloid conversion (if applicable)",
+      "Regional uptake quantification",
+      "Threshold-based positivity classification"
+    ],
+
+    "outcome": [
+      "Amyloid SUVR map",
+      "Centiloid score",
+      "Regional uptake table",
+      "Amyloid positivity status (positive/negative)",
+      "Global amyloid burden index"
+    ]
+  },
+
+  "Cortical_Thickness": {
+    "title": "대뇌피질 두께 분석 (Cortical Thickness Analysis)",
+    "modality": "MRI",
+    "overview": "대뇌피질 두께를 정량화하여 구조적 위축 여부를 평가",
+    "description": "대뇌피질 두께 분석은 고해상도 T1 MRI 영상을 이용해 뇌 겉면(피질)의 두께를 정밀하게 측정하는 분석입니다. 피질은 기억, 언어, 판단, 감정 조절 등 고차원 기능을 담당하는 중요한 영역으로, 다양한 신경퇴행성 질환이나 정신질환에서 특정 부위가 얇아질 수 있습니다. 이 분석은 눈으로 구분하기 어려운 미세한 위축을 수치로 계산하여 정상 연령대와 비교합니다. 알츠하이머병, 전두측두엽 치매, 조현병, 만성 뇌전증 등에서 특징적인 피질 얇아짐 패턴이 나타날 수 있으며, 질환의 진행 정도를 추적하는 데에도 활용됩니다. 다른 구조·기능 영상 결과와 함께 종합적으로 해석됩니다.",
+    "required_data": [
+      "3D T1-weighted MRI (DICOM)",
+      "Optional FLAIR for lesion masking"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Memory decline",
+      "Executive dysfunction",
+      "Behavior change",
+      "Cognitive impairment"
+    ],
+    "possible_diagnosis": [
+      "Alzheimer disease",
+      "Frontotemporal dementia",
+      "Schizophrenia",
+      "Chronic epilepsy-related cortical thinning"
+    ],
+    "category": "Structural MRI",
+
+    "minimum_requirement": [
+      "3D T1-weighted MRI",
+      "Isotropic voxel ≤1.5 mm",
+      "Whole brain coverage",
+      "Minimal motion artifact"
+    ],
+
+    "recommended_requirement": [
+      "1.0 mm isotropic resolution",
+      "3T MRI or higher",
+      "Standardized acquisition protocol",
+      "High gray-white matter contrast"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head motion artifact score",
+        "Surface reconstruction success rate (%)",
+        "Segmentation error rate (% ROIs flagged)",
+        "White-gray matter contrast ratio",
+        "Topological defect count"
+      ],
+      "threshold": {
+        "reconstruction_fail": "Surface reconstruction failure",
+        "segmentation_fail": ">10% ROI misclassification",
+        "motion_fail": "Severe visible motion artifact",
+        "contrast_fail": "Below acceptable GM/WM contrast"
+      },
+      "scoring_method": "Surface reconstruction integrity index (0–100) combining segmentation, topology, and motion metrics",
+      "impact_on_confidence": "QC<70 reduces cortical thickness statistical confidence; QC<50 limits interpretation to descriptive findings"
+    },
+
+    "procedure": [
+      "Brain extraction (skull stripping)",
+      "Gray/white matter segmentation",
+      "White and pial surface reconstruction",
+      "Cortical thickness computation (distance between surfaces)",
+      "Spatial normalization to template",
+      "ROI-based statistical comparison",
+      "Normative age regression correction",
+      "Z-score surface mapping"
+    ],
+
+    "outcome": [
+      "Cortical thickness surface map",
+      "Regional thinning Z-score table",
+      "Significant thinning cluster coordinates",
+      "Global cortical thinning index",
+      "Brain aging deviation score",
+      "3D surface visualization overlay"
+    ]
+  },
+  "Tau_PET": {
+    "title": "타우 PET 분석 (Tau PET)",
+    "modality": "PET",
+    "overview": "신경섬유다발 단백질(Tau)의 병적 축적 분포 평가",
+    "description": "Tau PET은 알츠하이머병 및 일부 신경퇴행성 질환에서 나타나는 비정상적인 타우 단백질 축적을 측정하는 검사입니다. 타우 단백질은 인지 기능 저하의 진행 정도와 밀접하게 관련되어 있으며, 아밀로이드 PET보다 증상과 더 직접적으로 연관되는 경우가 많습니다. 이 검사는 타우 침착의 해부학적 분포를 시각화하고, 병의 진행 단계와 관련된 패턴을 정량화합니다. 알츠하이머병의 단계 평가, 감별 진단, 질환 진행 추적에 활용됩니다.",
+    "required_data": [
+      "Tau PET DICOM",
+      "Optional T1 MRI for anatomical alignment"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Progressive memory loss",
+      "Executive dysfunction",
+      "Language impairment"
+    ],
+    "possible_diagnosis": [
+      "Alzheimer disease",
+      "Frontotemporal dementia",
+      "Other tauopathy"
+    ],
+    "category": "Molecular Imaging",
+
+    "minimum_requirement": [
+      "Approved tau tracer used",
+      "SUVR calculable dataset",
+      "Voxel size ≤2.5 mm",
+      "Whole brain coverage"
+    ],
+
+    "recommended_requirement": [
+      "High-resolution T1 MRI co-registration",
+      "Motion correction applied",
+      "Region-based staging analysis available"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head motion (mm)",
+        "Off-target binding evaluation",
+        "SNR",
+        "SUVR reproducibility"
+      ],
+      "threshold": {
+        "motion_fail": ">5 mm",
+        "off_target_warning": "High basal ganglia signal",
+        "snr_fail": "Below acceptable level"
+      },
+      "scoring_method": "Tau distribution reliability index (0–100)",
+      "impact_on_confidence": "QC<60 reduces staging certainty"
+    },
+
+    "procedure": [
+      "Spatial normalization",
+      "SUVR computation",
+      "Regional uptake quantification",
+      "Braak stage–related pattern analysis",
+      "Statistical comparison with normative dataset"
+    ],
+
+    "outcome": [
+      "Tau uptake map",
+      "Regional SUVR table",
+      "Estimated Braak stage correlation",
+      "Global tau burden index",
+      "Disease progression support score"
+    ]
+  },
+  "VBM": {
+    "title": "국소 볼륨 분석 (Voxel-Based Morphometry, VBM)",
+    "modality": "MRI",
+    "overview": "뇌 회백질 및 백질의 국소 부피 변화를 정량적으로 분석",
+    "description": "VBM은 고해상도 T1 MRI 영상을 이용해 뇌의 회백질(신경세포 밀집 부위)과 백질의 부피를 전뇌 수준에서 정밀하게 비교하는 분석 방법입니다. 단순히 눈으로 보는 것이 아니라, 각 위치(voxel) 단위로 정상 데이터와 통계적으로 비교하여 미세한 위축이나 부피 증가를 찾아냅니다. 치매, 파킨슨병, 조현병, 전두측두엽 치매, 뇌전증 등 다양한 질환에서 특정 뇌 부위의 구조적 변화가 나타날 수 있으며, VBM은 이러한 변화를 조기에 정량화하는 데 도움을 줍니다. 이 분석은 다른 기능 영상(PET, fMRI)이나 임상 증상과 함께 종합적으로 해석됩니다.",
+    "required_data": [
+      "3D T1-weighted MRI (DICOM)",
+      "Optional T2/FLAIR for lesion masking"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Memory decline",
+      "Cognitive impairment",
+      "Behavior change",
+      "Motor slowing"
+    ],
+    "possible_diagnosis": [
+      "Alzheimer disease",
+      "Frontotemporal dementia",
+      "Parkinson disease",
+      "Schizophrenia",
+      "Epilepsy-related atrophy"
+    ],
+    "category": "Structural MRI",
+
+    "minimum_requirement": [
+      "3D T1-weighted MRI",
+      "Isotropic voxel ≤1.5 mm",
+      "Whole brain coverage",
+      "Minimal motion artifact"
+    ],
+
+    "recommended_requirement": [
+      "1.0 mm isotropic resolution",
+      "3T MRI or higher",
+      "Standardized acquisition protocol",
+      "Bias field correction applicable"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head motion artifact score",
+        "Spatial normalization error (mm)",
+        "Segmentation accuracy (GM/WM classification)",
+        "Bias field inhomogeneity index",
+        "Outlier voxel percentage"
+      ],
+      "threshold": {
+        "registration_fail": ">5 mm template misalignment",
+        "segmentation_fail": ">10% GM misclassification",
+        "motion_fail": "Severe visible motion artifact",
+        "outlier_fail": ">5% extreme voxel deviation"
+      },
+      "scoring_method": "Structural preprocessing integrity index (0–100) combining normalization, segmentation, and artifact measures",
+      "impact_on_confidence": "QC<60 reduces volumetric statistical confidence; QC<40 limits interpretation to descriptive report"
+    },
+
+    "procedure": [
+      "Brain extraction (skull stripping)",
+      "Tissue segmentation (gray matter, white matter, CSF)",
+      "Spatial normalization to standard template (e.g., MNI)",
+      "Modulation to preserve local volume information",
+      "Spatial smoothing",
+      "Voxel-wise statistical comparison with normative database",
+      "Z-score and cluster-based significance mapping"
+    ],
+
+    "outcome": [
+      "Gray matter volume Z-score map",
+      "White matter volume Z-score map",
+      "Significant atrophy cluster coordinates",
+      "Regional volume comparison table",
+      "Global brain volume index",
+      "Brain aging deviation score"
+    ]
+  },
+
+  "Diffusion_Properties": {
+    "title": "확산 지표 정량 분석 (Diffusion Properties, DTI)",
+    "modality": "MRI",
+    "overview": "백질 미세구조 손상 여부를 정량적으로 평가",
+    "description": "확산 MRI(DTI)는 물 분자가 뇌 조직 안에서 얼마나 자유롭게 움직이는지를 측정하는 검사입니다. 정상적인 신경섬유(백질)는 일정한 방향으로 정렬되어 있어 물 분자의 움직임이 방향성을 가지는데, 손상이 생기면 이러한 방향성이 감소합니다. 이 분석은 FA(분수 이방성), MD(평균 확산도), RD, AD 등 다양한 확산 지표를 계산하여 신경 연결의 미세 구조 상태를 수치로 평가합니다. 외상성 뇌손상(TBI), 뇌전증, 치매, 파킨슨병 등에서 육안으로 보이지 않는 백질 손상을 조기에 탐지하는 데 도움을 줍니다.",
+    "required_data": [
+      "DTI DICOM (raw diffusion-weighted images)",
+      "b-value table",
+      "Gradient direction table",
+      "Optional T1 MRI for anatomical reference"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Seizure",
+      "Head trauma",
+      "Cognitive decline",
+      "Motor dysfunction"
+    ],
+    "possible_diagnosis": [
+      "Epilepsy-related white matter abnormality",
+      "Traumatic brain injury (TBI)",
+      "Dementia",
+      "Parkinson disease",
+      "White matter degeneration"
+    ],
+    "category": "Diffusion MRI",
+
+    "minimum_requirement": [
+      "≥30 diffusion directions",
+      "b-value ≥1000 s/mm²",
+      "Isotropic voxel ≤2.5 mm",
+      "Whole brain coverage",
+      "Eddy current correction applicable"
+    ],
+
+    "recommended_requirement": [
+      "≥64 diffusion directions",
+      "Multi-shell acquisition",
+      "Reverse phase encoding correction",
+      "Isotropic voxel ≤2.0 mm",
+      "High SNR"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head motion (mm)",
+        "Eddy current residual error",
+        "Slice dropout rate (%)",
+        "Signal-to-noise ratio (SNR)",
+        "Outlier volume percentage"
+      ],
+      "threshold": {
+        "motion_fail": ">3 mm",
+        "slice_dropout_fail": ">10%",
+        "outlier_fail": ">15%",
+        "snr_fail": "Below normative diffusion threshold"
+      },
+      "scoring_method": "Diffusion data integrity index (0–100) based on motion, SNR, and artifact rate",
+      "impact_on_confidence": "QC<60 reduces diffusion metric reliability; QC<40 limits interpretation to descriptive findings"
+    },
+
+    "procedure": [
+      "Eddy current and motion correction",
+      "Brain extraction",
+      "Tensor model fitting",
+      "FA, MD, RD, AD map computation",
+      "Spatial normalization",
+      "ROI-based and voxel-wise statistical comparison",
+      "Normative Z-score calculation"
+    ],
+
+    "outcome": [
+      "FA map",
+      "MD map",
+      "RD map",
+      "AD map",
+      "White matter abnormality Z-score map",
+      "Regional diffusion metrics table",
+      "White matter integrity index"
+    ]
+  },
+
+  "Tractography": {
+    "title": "신경다발 분석 (Tractography)",
+    "modality": "MRI",
+    "overview": "신경 연결 3D 시각화",
+    "description": "확산 MRI(DTI)로 측정한 정보를 이용해 뇌 속 ‘신경 신호가 지나가는 길(신경다발)’을 3차원으로 그려보는 분석입니다. 뇌는 여러 영역이 신경다발로 연결되어 작동하는데, 병소(예: 뇌전증 의심 부위)가 중요한 신경다발과 얼마나 가깝게 위치하는지 확인하면 수술이나 치료 계획에 도움이 됩니다. 예를 들어 수술이 필요할 때, 운동·언어 기능과 관련된 주요 신경 경로가 손상될 위험이 있는지 미리 평가할 수 있습니다.",
+    "required_data": ["DTI MRI"],
+    "demographics": ["Age"],
+    "symptoms": ["Surgical planning"],
+    "possible_diagnosis": ["Epilepsy surgery planning"],
+    "category": "Diffusion MRI",
+    "minimum_requirement": ["DTI minimum requirements satisfied"],
+    "recommended_requirement": ["High SNR"],
+    "qc": {
+      "metrics": ["Fiber tracking success rate", "Streamline count stability", "Crossing fiber resolution"],
+      "threshold": {
+        "tracking_fail": "Low streamline reconstruction rate",
+        "snr_fail": "Below acceptable diffusion SNR"
+      },
+      "scoring_method": "Fiber reconstruction reliability score (0–100)",
+      "impact_on_confidence": "Low QC reduces tract proximity interpretation reliability"
+    },
+    "procedure": [
+      "Preprocessed diffusion tensor fitting",
+      "Deterministic or probabilistic tracking",
+      "ROI-based fiber extraction",
+      "3D visualization generation"
+    ],
+    "outcome": [
+      "3D tractography model",
+      "Lesion-to-tract distance map",
+      "White matter preservation index"
+    ]
+  },
+
+  "EEG_Spectrum": {
+    "title": "뇌파 스펙트럼 분석",
+    "modality": "EEG",
+    "overview": "뇌파 주파수 강도 분석",
+    "description": "뇌파는 머리 표면에서 측정되기 때문에 ‘어디에서 시작된 신호인지’를 바로 알기 어렵습니다. 뇌파 소스 분석은 뇌 MRI로 만든 개인별 머리·뇌 구조 모델과 뇌파 신호를 함께 사용해, 뇌 속에서 신호가 시작된 것으로 추정되는 위치를 계산합니다. 뇌전증 환자에서는 발작과 관련된 이상 방전이 시작되는 부위를 찾는 데 도움이 되며, 수술 전 평가에서 다른 검사(PET, SPECT, MEG) 결과와 함께 병소 후보를 좁히는 데 활용됩니다.",
+    "required_data": ["Resting EEG"],
+    "demographics": ["Age"],
+    "symptoms": ["Attention deficit", "Insomnia"],
+    "possible_diagnosis": ["Epilepsy", "ADHD"],
+    "category": "Electrophysiology",
+    "minimum_requirement": [
+      "Sampling ≥250 Hz",
+      "≥5 minutes recording"
+    ],
+    "recommended_requirement": [
+      "≥500 Hz sampling",
+      "≥19 channels"
+    ],
+    "qc": {
+      "metrics": ["Artifact ratio (%)", "Impedance stability", "Line noise index"],
+      "threshold": {
+        "artifact_fail": ">50%",
+        "noise_fail": "Excessive 50/60Hz contamination"
+      },
+      "scoring_method": "Spectral reliability index",
+      "impact_on_confidence": "Low QC reduces EEG spectral weight"
+    },
+    "procedure": [
+      "Band-pass filtering",
+      "Artifact rejection (ICA)",
+      "Power spectral density computation",
+      "Band power normalization"
+    ],
+    "outcome": [
+      "Frequency band power map",
+      "Theta/Beta ratio",
+      "Spectral abnormality index"
+    ]
+  },
+
+  "EEG_Connectivity": {
+    "title": "뇌파 연결망 분석 (EEG Functional Connectivity)",
+    "modality": "EEG",
+    "overview": "뇌 영역 간 기능적 연결 강도를 정량적으로 분석",
+    "description": "EEG 연결망 분석은 머리 표면에서 측정한 뇌파 신호를 이용해 서로 다른 뇌 부위가 얼마나 함께 움직이는지를 평가하는 검사입니다. 뇌는 여러 영역이 네트워크를 이루어 동시에 활동하는데, 특정 질환에서는 이 연결 패턴이 정상과 다르게 나타날 수 있습니다. 예를 들어 뇌전증에서는 특정 네트워크가 과도하게 동기화되어 발작이 발생할 수 있으며, 조현병이나 치매에서는 네트워크 효율성이 저하되는 양상이 관찰될 수 있습니다. 이 분석은 단순히 파형을 보는 것을 넘어, 뇌 전체의 연결 구조를 수치와 지도 형태로 제공하여 네트워크 균형 상태를 평가합니다.",
+    "required_data": [
+      "Resting-state EEG (raw continuous data)",
+      "Channel location file (10–20 or extended system)",
+      "Optional T1 MRI for source-level connectivity"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Seizure",
+      "Cognitive decline",
+      "Psychiatric symptoms",
+      "Attention deficit"
+    ],
+    "possible_diagnosis": [
+      "Epilepsy",
+      "Schizophrenia",
+      "Dementia",
+      "Network dysfunction disorder"
+    ],
+    "category": "Electrophysiology",
+
+    "minimum_requirement": [
+      "≥19 channels (10–20 system)",
+      "Sampling rate ≥500 Hz",
+      "Recording duration ≥5 minutes",
+      "Artifact-free data ≥3 minutes",
+      "Impedance ≤10 kΩ"
+    ],
+
+    "recommended_requirement": [
+      "32–64 channels",
+      "High-density EEG (≥64 channels)",
+      "Digitized electrode positions",
+      "Source reconstruction available",
+      "Simultaneous EOG/ECG recording"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Artifact ratio (%)",
+        "Channel rejection rate (%)",
+        "Impedance stability",
+        "Line noise index (50/60 Hz)",
+        "Epoch stability variance"
+      ],
+      "threshold": {
+        "artifact_warning": ">30%",
+        "artifact_fail": ">50%",
+        "channel_fail": ">30% channels rejected",
+        "noise_fail": "Excessive 50/60Hz contamination"
+      },
+      "scoring_method": "Connectivity reliability index (0–100) combining artifact ratio, channel quality, and signal stability",
+      "impact_on_confidence": "QC<60 reduces connectivity metric weight; QC<40 limits interpretation to descriptive reporting"
+    },
+
+    "procedure": [
+      "Raw data preprocessing",
+      "Band-pass filtering by frequency band (delta/theta/alpha/beta/gamma)",
+      "Artifact removal using ICA or automated rejection",
+      "Segmentation into clean epochs",
+      "Connectivity metric computation (coherence, PLV, imaginary coherence, wPLI)",
+      "Adjacency matrix construction",
+      "Graph theory metric extraction (global efficiency, clustering coefficient, small-worldness)",
+      "Statistical comparison with normative dataset"
+    ],
+
+    "outcome": [
+      "Frequency-specific connectivity matrices",
+      "Network graph visualization",
+      "Global efficiency score",
+      "Clustering coefficient",
+      "Small-worldness index",
+      "Hub region identification map",
+      "Connectivity abnormality Z-score map",
+      "Network imbalance index"
+    ]
+  },
+  "EEG_MEM": {
+    "title": "뇌파 비선형 네트워크 분석 (EEG Maximum Entropy Model)",
+    "modality": "EEG",
+    "overview": "뇌파 기반 네트워크의 복잡성·안정성·상태 전이 특성 분석",
+    "description": "EEG MEM(최대 엔트로피 모델) 분석은 뇌파 신호를 이용해 뇌 네트워크가 얼마나 다양한 상태를 오가며 안정적으로 유지되는지를 평가하는 비선형 분석 기법입니다. 일반적인 연결망 분석이 연결 강도만을 보는 것과 달리, MEM은 네트워크 전체가 어떤 '상태 패턴'을 형성하는지, 그리고 그 상태들 사이를 얼마나 쉽게 전환하는지를 수학적으로 모델링합니다. 뇌전증에서는 발작 전 네트워크가 특정 상태에 과도하게 고정되거나, 상태 전환이 불안정해지는 특징이 나타날 수 있습니다. 인지 저하나 정신질환에서도 네트워크 복잡성 감소 또는 비정상적 상태 점유율 변화가 관찰될 수 있습니다.",
+    "required_data": [
+      "Resting-state EEG (continuous raw data)",
+      "Channel location file",
+      "Optional source-reconstructed EEG time-series"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Seizure",
+      "Cognitive fluctuation",
+      "Network instability suspicion"
+    ],
+    "possible_diagnosis": [
+      "Epilepsy network instability",
+      "Cognitive network impairment",
+      "Neural state transition abnormality"
+    ],
+    "category": "Nonlinear Network Analysis",
+
+    "minimum_requirement": [
+      "≥19 channels (10–20 system)",
+      "Sampling rate ≥500 Hz",
+      "Artifact-free data ≥3 minutes",
+      "Band-limited preprocessing applied"
+    ],
+
+    "recommended_requirement": [
+      "≥32 channels",
+      "Source-level time-series extraction",
+      "≥5 minutes clean data",
+      "High-density EEG (≥64 channels)"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Artifact ratio (%)",
+        "Effective time points after rejection",
+        "Model residual error",
+        "Bootstrap parameter stability",
+        "State reproducibility index"
+      ],
+      "threshold": {
+        "artifact_fail": ">40%",
+        "timepoint_fail": "<150 seconds usable",
+        "model_fit_fail": "High residual error",
+        "stability_fail": "Low bootstrap consistency"
+      },
+      "scoring_method": "Energy landscape stability index (0–100)",
+      "impact_on_confidence": "QC<60 reduces confidence in state transition metrics; QC<40 limits interpretation to exploratory findings"
+    },
+
+    "procedure": [
+      "Band-pass filtering and artifact removal",
+      "Epoch segmentation",
+      "Signal binarization or discretization",
+      "Maximum entropy model fitting",
+      "Energy landscape computation",
+      "State transition probability estimation",
+      "Stability and complexity metric extraction"
+    ],
+
+    "outcome": [
+      "Energy landscape map",
+      "State occupancy probability distribution",
+      "State transition matrix",
+      "Network stability index",
+      "Neural flexibility score",
+      "Epileptic instability support index"
+    ]
+  },
+  
+  "EEG_DCM": {
+    "title": "뇌파 실효연결망 분석 (EEG Dynamic Causal Modeling)",
+    "modality": "EEG",
+    "overview": "뇌 영역 간 정보 흐름의 방향성과 영향 강도를 모델 기반으로 분석",
+    "description": "EEG 실효연결망 분석(DCM)은 단순히 뇌 부위가 함께 활성화되는지를 보는 것이 아니라, 어느 부위가 다른 부위의 활동을 유발하거나 조절하는지를 수학적 모델을 통해 추정하는 분석입니다. 즉, '연결 강도'를 넘어 '영향의 방향성'을 평가합니다. 뇌전증에서는 특정 영역이 네트워크를 주도하여 발작을 확산시키는 경우가 있으며, 이 분석은 그러한 네트워크 중심을 찾는 데 도움을 줍니다. 다만 모델 기반 분석이므로 충분한 데이터 품질과 적절한 모델 설정이 중요합니다.",
+    "required_data": [
+      "Resting or event-related EEG",
+      "Channel location file",
+      "T1 MRI for source modeling"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Drug-resistant seizure",
+      "Network dysfunction suspicion"
+    ],
+    "possible_diagnosis": [
+      "Epilepsy network disorder",
+      "Network instability"
+    ],
+    "category": "Effective Connectivity",
+
+    "minimum_requirement": [
+      "≥32 channels",
+      "Sampling rate ≥500 Hz",
+      "Recording ≥5 minutes clean data",
+      "Individual MRI for source modeling"
+    ],
+
+    "recommended_requirement": [
+      "≥64 channels",
+      "High-density EEG",
+      "Digitized electrode positions"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Model convergence status",
+        "Residual variance (%)",
+        "Artifact ratio (%)",
+        "Data length sufficiency"
+      ],
+      "threshold": {
+        "convergence_fail": "Model did not converge",
+        "residual_fail": ">20%",
+        "artifact_fail": ">40%"
+      },
+      "scoring_method": "Model stability index (0–100) combining convergence and residual fit",
+      "impact_on_confidence": "QC<60 reduces directional inference reliability"
+    },
+
+    "procedure": [
+      "Source time-series extraction",
+      "Model structure specification",
+      "Bayesian inversion",
+      "Parameter estimation",
+      "Model comparison (Bayesian model selection)"
+    ],
+
+    "outcome": [
+      "Directional connectivity matrix",
+      "Influence strength parameters",
+      "Model evidence score",
+      "Network driver identification",
+      "Causality index"
+    ]
+  },
+  "MEG_Source": {
+    "title": "뇌자도 소스 분석",
+    "modality": "MEG",
+    "overview": "뇌 자기 신호를 기반으로 이상 활동 발생 위치를 정밀 추정",
+    "description": "MEG(뇌자도)는 뇌의 전기 활동이 만들어내는 매우 미세한 자기장을 측정하는 검사입니다. EEG와 비슷하게 뇌 활동을 보는 검사지만, 두개골의 영향을 덜 받기 때문에 경우에 따라 공간적으로 더 정밀한 위치 추정이 가능합니다. MEG 소스 분석은 측정된 자기 신호를 개인의 MRI 구조 영상과 결합하여, 뇌 속 어느 부위에서 신호가 시작되었는지를 수학적 모델로 계산합니다. 특히 약물에 잘 반응하지 않는 뇌전증 환자에서 발작과 관련된 이상 방전의 시작 위치를 찾는 데 중요한 정보를 제공합니다. EEG, PET, SPECT 등의 결과와 함께 종합하면 병소 후보 영역을 보다 정확히 좁힐 수 있으며, 수술 전 평가에서 중요한 참고 자료가 됩니다.",
+    "required_data": [
+      "Raw MEG data (continuous or epoched)",
+      "Individual T1-weighted MRI"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Drug-resistant seizure",
+      "Focal seizure suspicion",
+      "Pre-surgical evaluation"
+    ],
+    "possible_diagnosis": [
+      "Focal epilepsy",
+      "Temporal lobe epilepsy",
+      "Extratemporal epilepsy"
+    ],
+    "category": "Magnetoencephalography",
+
+    "minimum_requirement": [
+      "Whole-head MEG system",
+      "Sampling rate ≥1000 Hz",
+      "Recording duration ≥5 minutes (resting or interictal)",
+      "Individual T1 MRI (≤1.5 mm slice thickness)",
+      "Head position tracking available"
+    ],
+
+    "recommended_requirement": [
+      "Artifact-free segments ≥3 minutes",
+      "Head position correction applied",
+      "Simultaneous EOG/ECG recording for artifact removal",
+      "Digitized head shape and fiducial points"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head movement (median/max mm)",
+        "Environmental noise floor index",
+        "Artifact ratio (%)",
+        "Beamformer residual variance (%)",
+        "Source localization stability across epochs"
+      ],
+      "threshold": {
+        "head_motion_warning": ">5 mm",
+        "head_motion_fail": ">10 mm",
+        "artifact_fail": ">40%",
+        "residual_fail": ">20%",
+        "stability_fail": "Low inter-epoch consistency"
+      },
+      "scoring_method": "Beamformer confidence index (0–100) weighted by motion, noise, residual variance, and stability",
+      "impact_on_confidence": "QC<60 reduces MEG source contribution by 30%; QC<40 reports localization as low-confidence exploratory finding"
+    },
+
+    "procedure": [
+      "Signal space separation (noise reduction)",
+      "Artifact removal (EOG/ECG/muscle)",
+      "Co-registration with individual MRI",
+      "Forward model computation",
+      "Beamformer or equivalent inverse solution",
+      "Source power estimation",
+      "Cluster-based abnormality detection"
+    ],
+
+    "outcome": [
+      "3D source localization map",
+      "Peak dipole coordinates (MNI and native space)",
+      "Source power Z-score map",
+      "Cluster size and statistical significance",
+      "Lesion probability support index",
+      "Surgical planning overlay visualization"
+    ]
+  },
+  "MEG_Connectivity": {
+    "title": "뇌자도 연결망 분석 (MEG Functional Connectivity)",
+    "modality": "MEG",
+    "overview": "뇌 자기 신호를 기반으로 뇌 영역 간 기능적 연결 상태를 정밀 분석",
+    "description": "MEG(뇌자도) 연결망 분석은 뇌에서 발생하는 미세한 자기 신호를 측정하여, 서로 다른 뇌 영역들이 얼마나 동시에 또는 동기화되어 활동하는지를 평가하는 검사입니다. 뇌는 여러 영역이 네트워크를 형성하여 정보를 처리하는데, 특정 질환에서는 이 네트워크의 연결 패턴이 정상과 달라질 수 있습니다. 예를 들어 뇌전증에서는 발작과 관련된 네트워크가 과도하게 동기화되거나 특정 허브가 비정상적으로 활성화될 수 있습니다. MEG는 EEG보다 공간적 해상도가 우수한 경우가 있어, 네트워크의 위치를 보다 정밀하게 파악하는 데 도움이 됩니다. 이 분석은 단순히 병소 위치를 찾는 것을 넘어, 발작 네트워크의 구조와 확산 경로를 이해하는 데 활용됩니다.",
+    "required_data": [
+      "Raw MEG continuous data",
+      "Head position tracking data",
+      "Optional T1 MRI for source-level connectivity"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Drug-resistant seizure",
+      "Cognitive decline",
+      "Network dysfunction suspicion"
+    ],
+    "possible_diagnosis": [
+      "Epilepsy network abnormality",
+      "Focal epilepsy",
+      "Cognitive network disorder"
+    ],
+    "category": "Magnetoencephalography",
+
+    "minimum_requirement": [
+      "Whole-head MEG system",
+      "Sampling rate ≥1000 Hz",
+      "Recording duration ≥5 minutes",
+      "Artifact-free segments ≥3 minutes",
+      "Head position monitoring available"
+    ],
+
+    "recommended_requirement": [
+      "Source reconstruction available",
+      "Simultaneous EOG/ECG recording",
+      "Head movement correction applied",
+      "High SNR acquisition"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Head movement (median/max mm)",
+        "Environmental noise level",
+        "Artifact ratio (%)",
+        "Number of usable epochs",
+        "Source reconstruction stability"
+      ],
+      "threshold": {
+        "movement_warning": ">5 mm",
+        "movement_fail": ">10 mm",
+        "artifact_fail": ">40%",
+        "usable_epoch_fail": "<2 minutes clean data"
+      },
+      "scoring_method": "MEG connectivity reliability index (0–100) based on motion, noise, artifact rate, and source stability",
+      "impact_on_confidence": "QC<60 reduces connectivity metric weight; QC<40 limits interpretation to descriptive findings"
+    },
+
+    "procedure": [
+      "Noise suppression (e.g., signal space separation)",
+      "Artifact removal (EOG/ECG/muscle)",
+      "Co-registration with MRI (if source-level analysis)",
+      "Source reconstruction (beamformer or equivalent)",
+      "Band-specific filtering",
+      "Connectivity computation (coherence, PLV, wPLI, imaginary coherence)",
+      "Adjacency matrix generation",
+      "Graph theory metric extraction",
+      "Statistical comparison with normative dataset"
+    ],
+
+    "outcome": [
+      "Frequency-specific connectivity matrices",
+      "Source-level connectivity map",
+      "Network hub identification",
+      "Global efficiency and clustering coefficients",
+      "Synchronization index",
+      "Network abnormality Z-score map",
+      "Epilepsy network support score"
+    ]
+  },
+
+  "MEG_DCM": {
+    "title": "뇌자도 실효연결망 분석 (MEG Dynamic Causal Modeling)",
+    "modality": "MEG",
+    "overview": "MEG 기반으로 뇌 네트워크의 방향성 연결과 정보 흐름 분석",
+    "description": "MEG DCM은 뇌자도 데이터를 이용하여 뇌 네트워크 내에서 정보가 어느 방향으로 흐르는지를 모델링하는 분석입니다. MEG는 높은 시간 해상도를 제공하므로, 네트워크 상에서 어느 영역이 먼저 활성화되고 다른 영역에 영향을 주는지를 보다 정밀하게 추정할 수 있습니다. 특히 뇌전증에서 발작 확산 경로와 네트워크 중심을 이해하는 데 중요한 정보를 제공합니다.",
+    "required_data": [
+      "Raw MEG data",
+      "Head position data",
+      "T1 MRI for source reconstruction"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Drug-resistant epilepsy",
+      "Network dysfunction"
+    ],
+    "possible_diagnosis": [
+      "Epilepsy network abnormality",
+      "Focal seizure propagation network"
+    ],
+    "category": "Effective Connectivity",
+
+    "minimum_requirement": [
+      "Whole-head MEG",
+      "Sampling ≥1000 Hz",
+      "≥5 minutes clean recording",
+      "MRI-based source model"
+    ],
+
+    "recommended_requirement": [
+      "Head movement correction",
+      "Source reconstruction stability verified"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Model convergence",
+        "Residual variance",
+        "Head movement stability",
+        "Noise floor level"
+      ],
+      "threshold": {
+        "convergence_fail": "No convergence",
+        "movement_fail": ">10 mm",
+        "residual_fail": ">20%"
+      },
+      "scoring_method": "Directional stability index (0–100)",
+      "impact_on_confidence": "QC<60 reduces confidence in propagation pathway estimation"
+    },
+
+    "procedure": [
+      "Noise reduction",
+      "Source reconstruction",
+      "Time-series extraction",
+      "Model specification",
+      "Bayesian inversion",
+      "Model comparison"
+    ],
+
+    "outcome": [
+      "Directional connectivity matrix",
+      "Propagation pathway map",
+      "Driver node identification",
+      "Model evidence comparison",
+      "Causal influence score"
+    ]
+  },
+
+  "fMRI_Task": {
+    "title": "fMRI 과제 분석 (Task-based fMRI)",
+    "modality": "fMRI",
+    "overview": "특정 과제 수행 중 활성화되는 뇌 영역을 정량 분석",
+    "description": "fMRI 과제 분석은 검사 중에 언어, 손 움직임, 기억, 시각 자극 등 특정 과제를 수행하게 하여, 그때 활성화되는 뇌 부위를 확인하는 검사입니다. 뇌는 활동이 증가한 영역에 혈류가 더 많이 공급되는데, fMRI는 이러한 혈류 변화를 감지해 기능적 활성 지도를 만듭니다. 예를 들어, 언어 과제를 수행하면 좌측 언어 영역이 활성화되고, 손가락을 움직이면 운동 피질이 활성화됩니다. 이 분석은 뇌전증이나 뇌종양 수술 전 평가에서 중요한 기능(언어·운동 등)이 병소 주변에 있는지 확인하는 데 매우 중요합니다. 단순 진단 목적보다는 기능 보존을 위한 수술 계획과 위험도 평가에 활용됩니다.",
+    "required_data": [
+      "Task fMRI DICOM",
+      "Task paradigm timing file (stimulus log)",
+      "T1-weighted MRI for anatomical reference"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Language difficulty",
+      "Motor deficit",
+      "Pre-surgical evaluation",
+      "Functional localization need"
+    ],
+    "possible_diagnosis": [
+      "Functional deficit",
+      "Language lateralization abnormality",
+      "Motor cortex displacement",
+      "Pre-surgical functional mapping"
+    ],
+    "category": "Functional MRI",
+
+    "minimum_requirement": [
+      "Block or event-related task design",
+      "TR ≤3 seconds",
+      "≥100 volumes acquired",
+      "Whole brain coverage",
+      "Head motion ≤3 mm",
+      "Accurate task timing file available"
+    ],
+
+    "recommended_requirement": [
+      "TR ≤2 seconds",
+      "Multiband acquisition",
+      "≥150 volumes",
+      "Physiological noise recording (cardiac/respiratory)",
+      "High-resolution T1 MRI (≤1.2 mm)"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Mean framewise displacement (FD)",
+        "Maximum motion (mm)",
+        "Temporal SNR (tSNR)",
+        "Task compliance rate (%)",
+        "Number of usable volumes",
+        "GLM model fit (R² or beta stability)"
+      ],
+      "threshold": {
+        "fd_warning": "Mean FD >0.3 mm",
+        "fd_fail": "Mean FD >0.5 mm",
+        "max_motion_fail": ">3 mm",
+        "usable_volume_fail": "<80% of volumes",
+        "compliance_fail": "<70% correct task performance"
+      },
+      "scoring_method": "Task activation reliability index (0–100) combining motion, tSNR, and model fit",
+      "impact_on_confidence": "QC<60 reduces activation certainty; QC<40 limits interpretation to descriptive activation map"
+    },
+
+    "procedure": [
+      "DICOM conversion",
+      "Slice timing correction",
+      "Motion correction (realignment)",
+      "Co-registration with T1 MRI",
+      "Spatial normalization to standard space (e.g., MNI)",
+      "Spatial smoothing",
+      "General Linear Model (GLM) analysis using task timing",
+      "Contrast map computation",
+      "Cluster-based statistical thresholding"
+    ],
+
+    "outcome": [
+      "Task activation map (statistical parametric map)",
+      "Peak activation coordinates (MNI and native space)",
+      "Laterality index (e.g., language lateralization)",
+      "Functional ROI delineation",
+      "Activation cluster table with p-values",
+      "3D overlay visualization with anatomical MRI"
+    ]
+  },
+  "fMRI_Connectivity": {
+    "title": "fMRI 뇌연결망 분석",
+    "modality": "fMRI",
+    "overview": "휴지기 상태에서 뇌 영역 간 기능적 연결 상태를 정량 분석",
+    "description": "휴지기 fMRI 연결망 분석은 특별한 과제를 하지 않고 편안히 쉬는 상태에서 촬영한 fMRI 데이터를 이용해, 서로 다른 뇌 영역들이 얼마나 함께 활성화되는지를 분석합니다. 뇌는 쉬는 상태에서도 일정한 네트워크 패턴(예: 기본모드 네트워크, 주의 네트워크 등)을 유지하는데, 치매, 정신질환, 만성 피로, 뇌전증 등에서는 이러한 연결 패턴이 정상 범위와 달라질 수 있습니다. 이 분석은 특정 네트워크가 약해지거나 과도하게 연결되어 있는지, 네트워크 간 균형이 깨졌는지, 특정 영역이 과도한 허브 역할을 하는지 등을 지도와 수치로 제공합니다. 단독 진단 도구가 아니라 다른 영상 및 임상 정보와 함께 종합적으로 해석됩니다.",
+    "required_data": [
+      "Resting-state fMRI DICOM",
+      "Optional T1 MRI for co-registration"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Cognitive decline",
+      "Psychiatric symptoms",
+      "Seizure",
+      "Chronic fatigue"
+    ],
+    "possible_diagnosis": [
+      "Dementia",
+      "Schizophrenia",
+      "Mood disorder",
+      "Epilepsy network abnormality"
+    ],
+    "category": "Functional MRI",
+
+    "minimum_requirement": [
+      "Resting-state acquisition ≥5 minutes",
+      "TR ≤3 sec",
+      "Whole brain coverage",
+      "Motion ≤3 mm"
+    ],
+
+    "recommended_requirement": [
+      "Acquisition ≥10 minutes",
+      "TR ≤2 sec",
+      "Multiband sequence",
+      "Physiological noise recording available"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Mean framewise displacement (FD)",
+        "Maximum motion (mm)",
+        "DVARS stability",
+        "Temporal SNR (tSNR)",
+        "Number of usable volumes after scrubbing",
+        "T1-fMRI registration error (mm)"
+      ],
+      "threshold": {
+        "fd_warning": "Mean FD >0.3 mm",
+        "fd_fail": "Mean FD >0.5 mm",
+        "max_motion_fail": ">3 mm",
+        "usable_volume_fail": "<150 volumes",
+        "registration_fail": ">5 mm"
+      },
+      "scoring_method": "Temporal stability composite index (0–100) combining motion, tSNR, usable volumes",
+      "impact_on_confidence": "QC<60 reduces connectivity weight by 30%; QC<40 limits interpretation to descriptive reporting"
+    },
+
+    "procedure": [
+      "Slice timing correction",
+      "Realignment and motion correction",
+      "Spatial normalization to template",
+      "Physiological and nuisance regression",
+      "Band-pass filtering (0.01–0.1 Hz)",
+      "ROI time-series extraction",
+      "Correlation matrix computation",
+      "Graph theoretical metric calculation"
+    ],
+
+    "outcome": [
+      "Functional connectivity matrix",
+      "Network strength per canonical network (e.g., DMN, FPN)",
+      "Global efficiency score",
+      "Network segregation index",
+      "Hub region identification map",
+      "Connectivity abnormality Z-score map"
+    ]
+  },
+  "fMRI_DCM": {
+    "title": "fMRI 실효연결망 분석 (fMRI Dynamic Causal Modeling)",
+    "modality": "fMRI",
+    "overview": "fMRI 데이터를 이용하여 뇌 영역 간 영향 방향과 강도를 추정",
+    "description": "fMRI 실효연결망 분석은 휴지기 또는 과제 수행 중 fMRI 데이터를 이용해 뇌 영역 간 영향 관계를 모델 기반으로 분석합니다. 단순한 상관관계 분석을 넘어, 어떤 영역이 다른 영역의 활동을 유발하거나 억제하는지를 추정합니다. 치매나 정신질환, 뇌전증 등에서는 네트워크의 조절 기능이 변화할 수 있으며, 이 분석은 네트워크 불균형의 방향성을 이해하는 데 도움을 줍니다.",
+    "required_data": [
+      "Resting or task fMRI",
+      "T1 MRI",
+      "ROI definition file"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Cognitive decline",
+      "Psychiatric symptoms",
+      "Network dysfunction"
+    ],
+    "possible_diagnosis": [
+      "Connectivity imbalance",
+      "Neurodegenerative network disruption",
+      "Epilepsy network alteration"
+    ],
+    "category": "Effective Connectivity",
+
+    "minimum_requirement": [
+      "≥8 minutes acquisition",
+      "TR ≤3 sec",
+      "Motion ≤3 mm",
+      "Valid ROI time-series extraction"
+    ],
+
+    "recommended_requirement": [
+      "Physiological noise regression",
+      "High tSNR",
+      "Multiband acquisition"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Framewise displacement",
+        "Model convergence",
+        "Residual variance",
+        "tSNR"
+      ],
+      "threshold": {
+        "motion_fail": ">3 mm",
+        "convergence_fail": "Model failure",
+        "residual_fail": ">20%"
+      },
+      "scoring_method": "Effective connectivity confidence index (0–100)",
+      "impact_on_confidence": "QC<60 reduces directional inference strength"
+    },
+
+    "procedure": [
+      "Preprocessing and normalization",
+      "ROI time-series extraction",
+      "Model specification",
+      "Bayesian parameter estimation",
+      "Model comparison"
+    ],
+
+    "outcome": [
+      "Directional influence matrix",
+      "Connection strength parameters",
+      "Model evidence score",
+      "Network driver region",
+      "Causality strength index"
+    ]
+  },
+
+  "fMRI_MEM": {
+    "title": "fMRI 비선형 네트워크 분석 (fMRI Maximum Entropy Model)",
+    "modality": "fMRI",
+    "overview": "휴지기 fMRI 기반 네트워크 복잡성과 안정성 평가",
+    "description": "fMRI MEM 분석은 휴지기 fMRI 데이터를 이용하여 뇌 네트워크가 여러 활동 상태 사이를 어떻게 전환하는지를 모델링합니다. 뇌는 다양한 기능 상태를 오가며 균형을 유지하는데, 특정 질환에서는 이 균형이 깨질 수 있습니다. MEM은 네트워크 상태 공간을 수학적으로 구성하여, 특정 상태에 과도하게 머무르는지(고정성 증가), 상태 전환이 과도하게 빈번한지(불안정성 증가), 또는 복잡성이 감소했는지를 정량적으로 분석합니다. 치매 초기 단계, 정신질환, 만성 스트레스, 뇌전증 등에서 네트워크 유연성 변화가 관찰될 수 있으며, 조기 기능 이상을 감지하는 보조 지표로 활용됩니다.",
+    "required_data": [
+      "Resting-state fMRI DICOM",
+      "ROI definition file",
+      "Optional T1 MRI for co-registration"
+    ],
+    "demographics": ["Age", "Sex"],
+    "symptoms": [
+      "Cognitive complaint",
+      "Early memory decline",
+      "Network imbalance suspicion"
+    ],
+    "possible_diagnosis": [
+      "Early functional change",
+      "Network instability disorder",
+      "Neurodegenerative network alteration"
+    ],
+    "category": "Nonlinear Network Analysis",
+
+    "minimum_requirement": [
+      "Resting-state acquisition ≥10 minutes",
+      "≥200 usable time points",
+      "TR ≤2.5 sec",
+      "Motion ≤3 mm"
+    ],
+
+    "recommended_requirement": [
+      "TR ≤1.5 sec",
+      "Multiband acquisition",
+      "Physiological noise regression",
+      "High temporal SNR"
+    ],
+
+    "qc": {
+      "metrics": [
+        "Framewise displacement",
+        "Temporal SNR (tSNR)",
+        "Effective time points after scrubbing",
+        "Model residual error",
+        "State reproducibility (split-half reliability)"
+      ],
+      "threshold": {
+        "motion_fail": ">3 mm",
+        "timepoint_fail": "<200",
+        "model_fit_fail": "High residual error",
+        "reproducibility_fail": "Low split-half consistency"
+      },
+      "scoring_method": "Energy landscape fit index (0–100)",
+      "impact_on_confidence": "QC<60 reduces reliability of instability metrics; QC<40 limits interpretation to descriptive findings"
+    },
+
+    "procedure": [
+      "Preprocessing (realignment, normalization)",
+      "Physiological noise regression",
+      "ROI time-series extraction",
+      "Signal binarization/discretization",
+      "Maximum entropy model fitting",
+      "Energy landscape estimation",
+      "State transition probability computation",
+      "Complexity and stability metric extraction"
+    ],
+
+    "outcome": [
+      "Energy landscape visualization",
+      "State occupancy distribution",
+      "Transition probability matrix",
+      "Network flexibility index",
+      "State stability score",
+      "Network instability Z-score map"
+    ]
+  }
+}

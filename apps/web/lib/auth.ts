@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE } from "@/lib/api";
 
 export interface AuthUser {
   id: string;
@@ -23,7 +22,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ userId: string }>;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
 }
 
 export const AuthContext = createContext<AuthContextValue>({
@@ -32,7 +31,7 @@ export const AuthContext = createContext<AuthContextValue>({
   signIn: async () => {},
   signUp: async () => ({ userId: "" }),
   signOut: async () => {},
-  refreshUser: async () => {},
+  refreshUser: async () => null,
 });
 
 export function useAuth() {
@@ -51,6 +50,24 @@ interface MeResponse {
   expert_status: string | null;
   specialization: string | null;
   onboarding_completed: boolean;
+}
+
+function getStoredToken(): string | null {
+  return typeof window !== "undefined" ? localStorage.getItem("nh-token") : null;
+}
+
+function setStoredToken(token: string) {
+  localStorage.setItem("nh-token", token);
+}
+
+function clearStoredToken() {
+  localStorage.removeItem("nh-token");
+}
+
+function clearCookies() {
+  document.cookie = "nh-user-type=; path=/; max-age=0";
+  document.cookie = "nh-onboarded=; path=/; max-age=0";
+  document.cookie = "nh-expert-status=; path=/; max-age=0";
 }
 
 export function useAuthProvider(): AuthContextValue {
@@ -84,55 +101,72 @@ export function useAuthProvider(): AuthContextValue {
   const refreshUser = useCallback(async () => {
     const authUser = await fetchMe();
     setUser(authUser);
+    return authUser;
   }, [fetchMe]);
 
   useEffect(() => {
-    if (!supabase) {
-      // Dev mode — fetch me with dev headers
+    const token = getStoredToken();
+    if (token) {
       fetchMe().then((u) => {
+        if (!u) {
+          // Token is invalid/expired — clear it
+          clearStoredToken();
+          clearCookies();
+        }
         setUser(u);
         setLoading(false);
       });
-      return;
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session) {
-        const authUser = await fetchMe();
-        setUser(authUser);
+    } else {
+      // No token — check if dev fallback headers are set
+      const devUserId = process.env.NEXT_PUBLIC_DEV_USER_ID;
+      if (devUserId) {
+        fetchMe().then((u) => {
+          setUser(u);
+          setLoading(false);
+        });
       } else {
         setUser(null);
-        document.cookie = "nh-user-type=; path=/; max-age=0";
-        document.cookie = "nh-onboarded=; path=/; max-age=0";
-        document.cookie = "nh-expert-status=; path=/; max-age=0";
+        setLoading(false);
       }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
   }, [fetchMe]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    if (!supabase) throw new Error("Supabase not configured");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-  }, []);
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "로그인 실패" }));
+      throw new Error(err.detail || "로그인 실패");
+    }
+    const data = await res.json();
+    setStoredToken(data.access_token);
+    const authUser = await fetchMe();
+    setUser(authUser);
+  }, [fetchMe]);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    if (!supabase) throw new Error("Supabase not configured");
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-    return { userId: data.user?.id ?? "" };
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "회원가입 실패" }));
+      throw new Error(err.detail || "회원가입 실패");
+    }
+    const data = await res.json();
+    setStoredToken(data.access_token);
+    return { userId: "" };
   }, []);
 
   const signOut = useCallback(async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+    clearStoredToken();
+    clearCookies();
     setUser(null);
-    document.cookie = "nh-user-type=; path=/; max-age=0";
-    document.cookie = "nh-onboarded=; path=/; max-age=0";
-    document.cookie = "nh-expert-status=; path=/; max-age=0";
+    window.location.href = "/login";
   }, []);
 
   return { user, loading, signIn, signUp, signOut, refreshUser };

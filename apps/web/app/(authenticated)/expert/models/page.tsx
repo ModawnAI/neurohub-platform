@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, listArtifacts, type ModelArtifactRead, type ServiceRead } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface GroupedArtifacts {
   service: ServiceRead;
@@ -62,6 +63,7 @@ function BuildChip({ status }: { status: string | null }) {
 }
 
 export default function ExpertModelsPage() {
+  const t = useT();
   const [groups, setGroups] = useState<GroupedArtifacts[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -92,19 +94,19 @@ export default function ExpertModelsPage() {
   return (
     <div className="page-container">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>모델 아티팩트</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>{t("artifacts.title")}</h1>
         <Link href="/expert/models/new" className="btn btn-primary">
-          + 새 아티팩트 업로드
+          + {t("artifacts.newUpload")}
         </Link>
       </div>
 
-      {loading && <p>로딩 중…</p>}
+      {loading && <p>{t("artifacts.loadingText")}</p>}
 
       {!loading && groups.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: 40 }}>
-          <p style={{ color: "var(--color-text-secondary)" }}>업로드된 아티팩트가 없습니다.</p>
+          <p style={{ color: "var(--color-text-secondary)" }}>{t("artifacts.noUploaded")}</p>
           <Link href="/expert/models/new" className="btn btn-primary" style={{ marginTop: 16 }}>
-            첫 아티팩트 업로드하기
+            {t("artifacts.firstUpload")}
           </Link>
         </div>
       )}
@@ -118,12 +120,12 @@ export default function ExpertModelsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ background: "var(--color-surface-secondary)" }}>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>파일명</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>유형</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>크기</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>상태</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>런타임</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>업로드일</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>{t("artifacts.fileName")}</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>{t("artifacts.type")}</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>{t("artifacts.size")}</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>{t("artifacts.status")}</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>{t("artifacts.runtime")}</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600 }}>{t("artifacts.uploadDate")}</th>
                 </tr>
               </thead>
               <tbody>

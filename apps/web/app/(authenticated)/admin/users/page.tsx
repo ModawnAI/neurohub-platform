@@ -33,8 +33,13 @@ export default function AdminUsersPage() {
     : undefined;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-users", filter],
-    queryFn: () => listUsers(params),
+    queryKey: ["admin-users", filter, page],
+    queryFn: () =>
+      listUsers({
+        ...params,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      }),
   });
 
   const approveMut = useMutation({
@@ -47,9 +52,8 @@ export default function AdminUsersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
-  const allUsers = data?.items ?? [];
-  const totalPages = Math.max(1, Math.ceil(allUsers.length / PAGE_SIZE));
-  const users = allUsers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const users = data?.items ?? [];
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
   const handleFilterChange = (key: FilterTab) => {
     setFilter(key);
@@ -65,9 +69,9 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      <div className="filter-tabs">
+      <div className="filter-tabs" role="tablist" aria-label={t("adminUsers.title")}>
         {FILTER_TABS.map((tab) => (
-          <button key={tab.key} className={`filter-tab ${filter === tab.key ? "active" : ""}`} onClick={() => handleFilterChange(tab.key)}>
+          <button type="button" role="tab" aria-selected={filter === tab.key} key={tab.key} className={`filter-tab ${filter === tab.key ? "active" : ""}`} onClick={() => handleFilterChange(tab.key)}>
             {tab.label}
           </button>
         ))}
@@ -120,10 +124,10 @@ export default function AdminUsersPage() {
                       <div className="action-row" onClick={(e) => e.stopPropagation()}>
                         {u.user_type === "EXPERT" && u.expert_status === "PENDING_APPROVAL" && (
                           <>
-                            <button className="btn btn-sm btn-primary" onClick={() => approveMut.mutate(u.id)} disabled={approveMut.isPending}>
+                            <button type="button" className="btn btn-sm btn-primary" onClick={() => approveMut.mutate(u.id)} disabled={approveMut.isPending}>
                               {t("common.approve")}
                             </button>
-                            <button className="btn btn-sm btn-danger" onClick={() => rejectMut.mutate(u.id)} disabled={rejectMut.isPending}>
+                            <button type="button" className="btn btn-sm btn-danger" onClick={() => rejectMut.mutate(u.id)} disabled={rejectMut.isPending}>
                               {t("common.reject")}
                             </button>
                           </>
@@ -140,15 +144,15 @@ export default function AdminUsersPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="pagination" style={{ marginTop: 16 }}>
-              <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+            <nav className="pagination" style={{ marginTop: 16 }} aria-label={t("common.pagination")}>
+              <button type="button" className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
                 <CaretLeft size={14} /> {t("common.paginationPrev")}
               </button>
               <span className="pagination-info">{page + 1} / {totalPages}</span>
-              <button className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+              <button type="button" className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
                 {t("common.paginationNext")} <CaretRight size={14} />
               </button>
-            </div>
+            </nav>
           )}
         </div>
       )}

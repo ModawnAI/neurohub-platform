@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class OnboardingRequest(BaseModel):
@@ -39,3 +39,18 @@ class ProfileUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=30)
     specialization: str | None = Field(default=None, max_length=200)
     bio: str | None = Field(default=None, max_length=2000)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"

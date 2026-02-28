@@ -667,21 +667,9 @@ async def download_report(
         raise HTTPException(status_code=404, detail="PDF report not available")
 
     bucket = settings.storage_bucket_reports
-    url = f"{settings.supabase_url}/storage/v1/object/sign/{bucket}/{report.pdf_storage_path}"
-    headers = {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_anon_key,
-    }
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(url, json={"expiresIn": 900}, headers=headers)
+    from app.services.storage import create_presigned_download as _presign_dl
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="Failed to generate download URL")
-
-    data = resp.json()
-    signed_url = data.get("signedURL", "")
-    if signed_url and not signed_url.startswith("http"):
-        signed_url = f"{settings.supabase_url}/storage/v1{signed_url}"
+    signed_url = await _presign_dl(bucket, report.pdf_storage_path, expires_in=900)
 
     return {
         "download_url": signed_url,
@@ -714,21 +702,9 @@ async def download_watermarked(
         raise HTTPException(status_code=404, detail="Watermarked file not available")
 
     bucket = settings.storage_bucket_outputs
-    url = f"{settings.supabase_url}/storage/v1/object/sign/{bucket}/{report.watermarked_storage_path}"
-    headers = {
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_anon_key,
-    }
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(url, json={"expiresIn": 900}, headers=headers)
+    from app.services.storage import create_presigned_download as _presign_dl
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="Failed to generate download URL")
-
-    data = resp.json()
-    signed_url = data.get("signedURL", "")
-    if signed_url and not signed_url.startswith("http"):
-        signed_url = f"{settings.supabase_url}/storage/v1{signed_url}"
+    signed_url = await _presign_dl(bucket, report.watermarked_storage_path, expires_in=900)
 
     return {
         "download_url": signed_url,

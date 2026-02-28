@@ -3,20 +3,27 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, DownloadSimple, File, FileText } from "phosphor-react";
+import { ArrowLeft, DownloadSimple, File, FileText, Brain, Flask, Eye, CheckCircle } from "phosphor-react";
 import {
   getRequest,
   cancelRequest,
+  confirmRequest,
   listCases,
   listCaseFiles,
   getDownloadUrl,
   getReportDownloadUrl,
   getWatermarkedDownloadUrl,
+  fetchPreQCResults,
+  overridePreQC,
   type RequestStatus,
   type CaseRead,
   type CaseFileRead,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Timeline } from "@/components/timeline";
+import { TechniqueResultsPanel } from "@/components/technique-results-panel";
+import { FusionResultsViewer } from "@/components/fusion-results-viewer";
+import { PreQCViewer } from "@/components/pre-qc-viewer";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/toast";
 
@@ -101,6 +108,94 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
   );
 }
 
+function PreQCSection({ requestId, caseId }: { requestId: string; caseId: string }) {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { addToast } = useToast();
+  const { data, isLoading } = useQuery({
+    queryKey: ["pre-qc", requestId, caseId],
+    queryFn: () => fetchPreQCResults(requestId, caseId),
+  });
+
+  const overrideMut = useMutation({
+    mutationFn: () => overridePreQC(requestId, caseId, { reason: "관리자 재정" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pre-qc", requestId, caseId] });
+      addToast("success", t("preqc.overrideSuccess"));
+    },
+    onError: () => addToast("error", t("toast.genericError")),
+  });
+
+  if (isLoading) return <span className="spinner" />;
+  if (!data || data.items.length === 0) return null;
+
+  const isAdmin = user?.roles?.includes("SYSTEM_ADMIN") || user?.roles?.includes("REVIEWER");
+  const hasFailures = data.items.some((c) => c.status === "FAIL");
+
+  return (
+    <div>
+      <PreQCViewer
+        checks={data.items}
+        canProceed={data.can_proceed}
+        failMessages={data.fail_messages}
+        warnMessages={data.warn_messages}
+      />
+      {/* Admin/Reviewer override button per PDF spec */}
+      {isAdmin && hasFailures && !data.can_proceed && (
+        <button
+          className="btn btn-secondary btn-sm"
+          style={{ marginTop: 8 }}
+          onClick={() => overrideMut.mutate()}
+          disabled={overrideMut.isPending}
+        >
+          {overrideMut.isPending ? <span className="spinner" /> : t("preqc.override")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ViewerConfirmSection({ requestId }: { requestId: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addToast } = useToast();
+
+  const confirmMut = useMutation({
+    mutationFn: () => confirmRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["request", requestId] });
+      addToast("success", t("preqc.viewerConfirmed"));
+    },
+    onError: () => addToast("error", t("toast.genericError")),
+  });
+
+  return (
+    <div className="panel" style={{ background: "var(--color-blue-2)", borderColor: "var(--color-blue-6)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Eye size={18} color="var(--color-blue-11)" />
+        <h3 className="panel-title" style={{ color: "var(--color-blue-11)", margin: 0 }}>
+          {t("preqc.viewerConfirmTitle")}
+        </h3>
+      </div>
+      <p className="muted-text" style={{ fontSize: 13, marginBottom: 12 }}>
+        {t("preqc.viewerConfirmDesc")}
+      </p>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={() => confirmMut.mutate()}
+        disabled={confirmMut.isPending}
+      >
+        {confirmMut.isPending ? <span className="spinner" /> : (
+          <>
+            <CheckCircle size={16} weight="fill" /> {t("preqc.confirmData")}
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function UserRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -135,7 +230,7 @@ export default function UserRequestDetailPage() {
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
   if (!request) return <div className="empty-state"><p className="empty-state-text">{t("requestDetail.notFound")}</p></div>;
 
-  const serviceSnapshot = request.service_snapshot;
+  const serviceSnapshot = request.service_snapshot as { display_name?: string; name?: string } | null | undefined;
   const reportData = request.report;
   const canCancel = CANCELLABLE.includes(request.status);
   const cases: CaseRead[] = casesData?.items ?? [];
@@ -299,6 +394,42 @@ export default function UserRequestDetailPage() {
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowCancel(false)}>{t("common.close")}</button>
               </div>
             </div>
+          )}
+
+          {/* Pre-QC Results (shown after STAGING) */}
+          {cases.length > 0 && !["CREATED", "RECEIVING"].includes(request.status) && (
+            <div className="panel">
+              <h3 className="panel-title-mb" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Flask size={18} /> {t("preqc.title")}
+              </h3>
+              <div className="stack-md">
+                {cases.map((c) => (
+                  <div key={c.id}>
+                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                      {t("requestDetail.caseLabel")} {c.patient_ref}
+                    </p>
+                    <PreQCSection requestId={id} caseId={c.id} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Viewer Confirmation (PDF spec step 5: user_confirm → READY_FOR_ANALYSIS) */}
+          {request.status === "STAGING" && cases.length > 0 && (
+            <ViewerConfirmSection requestId={id} />
+          )}
+
+          {/* Technique Runs + Fusion Results (shown when COMPUTING or later) */}
+          {["COMPUTING", "QC", "REPORTING", "EXPERT_REVIEW", "FINAL"].includes(request.status) && (
+            <>
+              <div className="panel">
+                <TechniqueResultsPanel requestId={id} runId={id} />
+              </div>
+              <div className="panel">
+                <FusionResultsViewer requestId={id} runId={id} />
+              </div>
+            </>
           )}
         </div>
       </div>

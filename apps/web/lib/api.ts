@@ -1,7 +1,7 @@
 import { type Locale, t as translate } from "@/lib/i18n";
-import { supabase } from "@/lib/supabase";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
+const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "20000");
 
 function getLocale(): Locale {
   if (typeof window !== "undefined") {
@@ -89,6 +89,21 @@ export interface ServiceRead {
     volume_discounts: { min_cases: number; discount_percent: number }[];
   } | null;
   output_schema: { fields: { key: string; type: string; label: string }[] } | null;
+  clinical_config: {
+    fusion_method?: string;
+    fusion_type?: string;
+    core_outputs?: string[];
+    qc_policy?: Record<string, unknown>;
+    clinical_intent?: string;
+    clinical_use_level?: string;
+    target_population?: string[];
+    expected_diagnostic_scope?: string[];
+    report_structure?: string[];
+    regulatory_metadata?: Record<string, unknown>;
+    contraindications_or_limits?: string[];
+    minimum_dataset_profiles?: Record<string, unknown>[];
+    technique_count?: number;
+  } | null;
   created_at: string;
 }
 
@@ -102,15 +117,10 @@ export interface PipelineRead {
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  if (typeof window !== "undefined" && supabase) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (session?.access_token) {
-      return {
-        Authorization: `Bearer ${session.access_token}`,
-      };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("nh-token");
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
     }
   }
 
@@ -126,15 +136,32 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders();
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...init?.headers,
-    },
-    cache: "no-store",
-  });
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), API_TIMEOUT_MS);
+  const signal = init?.signal
+    ? AbortSignal.any([init.signal, timeoutController.signal])
+    : timeoutController.signal;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+        ...init?.headers,
+      },
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    if (timeoutController.signal.aborted) {
+      throw new ApiError(408, "TIMEOUT", translate("apiError.timeout", getLocale()));
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let detail = "";
@@ -187,6 +214,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
 export async function listRequests() {
   return apiFetch<{ items: RequestRead[]; total: number }>("/requests");
+}
+
+export async function listRequestsPage(params?: {
+  status?: RequestStatus;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set("status", params.status);
+  if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+  if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
+  const qs = searchParams.toString();
+  return apiFetch<{ items: RequestRead[]; total: number }>(`/requests${qs ? `?${qs}` : ""}`);
 }
 
 export async function getRequest(requestId: string) {
@@ -376,10 +416,17 @@ export interface UserRead {
   last_login_at: string | null;
 }
 
-export async function listUsers(params?: { user_type?: string; expert_status?: string }) {
+export async function listUsers(params?: {
+  user_type?: string;
+  expert_status?: string;
+  offset?: number;
+  limit?: number;
+}) {
   const searchParams = new URLSearchParams();
   if (params?.user_type) searchParams.set("user_type", params.user_type);
   if (params?.expert_status) searchParams.set("expert_status", params.expert_status);
+  if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
+  if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
   const qs = searchParams.toString();
   return apiFetch<{ items: UserRead[]; total: number }>(`/users${qs ? `?${qs}` : ""}`);
 }
@@ -474,9 +521,17 @@ export async function getAdminStats() {
   return apiFetch<AdminStats>("/admin/stats");
 }
 
-export async function listAllRequests(status?: string) {
-  const params = status ? `?status=${status}` : "";
-  return apiFetch<{ items: RequestRead[]; total: number }>(`/admin/requests${params}`);
+export async function listAllRequests(params?: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set("status", params.status);
+  if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+  if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
+  const qs = searchParams.toString();
+  return apiFetch<{ items: RequestRead[]; total: number }>(`/admin/requests${qs ? `?${qs}` : ""}`);
 }
 
 // ── File Upload ──
@@ -1172,8 +1227,7 @@ export async function uploadArtifact(
   runtime: string | null,
   file: File,
 ): Promise<ModelArtifactRead> {
-  const { data: { session } } = await supabase!.auth.getSession();
-  const token = session?.access_token;
+  const token = typeof window !== "undefined" ? localStorage.getItem("nh-token") : null;
   const form = new FormData();
   form.append("service_id", serviceId);
   form.append("artifact_type", artifactType);
@@ -1417,4 +1471,213 @@ export async function getTrainingJobFull(id: string): Promise<TrainingJobFull> {
 
 export async function listAllTrainingJobs(): Promise<{items: TrainingJobFull[]}> {
   return apiFetch<{items: TrainingJobFull[]}>(`/admin/training-jobs`);
+}
+
+// ── Technique Module types ──
+
+export interface TechniqueModuleRead {
+  id: string;
+  key: string;
+  title_ko: string;
+  title_en: string;
+  modality: string;
+  category: string;
+  description: string | null;
+  docker_image: string;
+  version: string;
+  status: string;
+  qc_config: Record<string, unknown> | null;
+  output_schema: Record<string, unknown> | null;
+  resource_requirements: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ServiceTechniqueWeightRead {
+  id: string;
+  service_id: string;
+  technique_module_id: string;
+  technique_key: string | null;
+  base_weight: number;
+  is_required: boolean;
+  override_qc_config: Record<string, unknown> | null;
+}
+
+export interface TechniqueRunRead {
+  id: string;
+  run_id: string;
+  technique_module_id: string;
+  technique_key: string;
+  status: string;
+  job_spec: Record<string, unknown> | null;
+  output_data: Record<string, unknown> | null;
+  qc_score: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_detail: string | null;
+}
+
+export interface FusionResultRead {
+  service_id: string;
+  fusion_engine: string;
+  fusion_version: string;
+  included_modules: string[];
+  excluded_modules: { module: string; reason: string; qc_score: number }[];
+  qc_summary: { mean_qc: number; min_qc: number };
+  results: {
+    probabilities?: Record<string, number>;
+    roi_scores?: Record<string, number>;
+    composite_indices?: Record<string, number>;
+  };
+  probability_maps?: Record<string, string>;
+  confidence_score: number;
+  concordance_score: number;
+}
+
+export interface PreQCCheckRead {
+  id: string;
+  case_file_id: string;
+  case_id: string;
+  modality: string;
+  check_type: string;
+  status: "PASS" | "WARN" | "FAIL";
+  score: number | null;
+  message_ko: string;
+  message_en: string;
+  details: Record<string, unknown>;
+  auto_resolved: boolean;
+}
+
+export interface PreQCResultListResponse {
+  items: PreQCCheckRead[];
+  can_proceed: boolean;
+  fail_messages: string[];
+  warn_messages: string[];
+}
+
+export async function fetchPreQCResults(
+  requestId: string,
+  caseId: string,
+): Promise<PreQCResultListResponse> {
+  return apiFetch(`/requests/${requestId}/cases/${caseId}/pre-qc`);
+}
+
+export async function overridePreQC(
+  requestId: string,
+  caseId: string,
+  body: { check_ids?: string[]; reason: string },
+): Promise<{ overridden_count: number; can_proceed: boolean }> {
+  return apiFetch(`/requests/${requestId}/cases/${caseId}/pre-qc/override`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ── Technique Module API ──
+
+export async function listTechniqueModules(
+  params?: { modality?: string; category?: string },
+): Promise<{ items: TechniqueModuleRead[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.modality) qs.set("modality", params.modality);
+  if (params?.category) qs.set("category", params.category);
+  const q = qs.toString();
+  return apiFetch<{ items: TechniqueModuleRead[]; total: number }>(
+    `/techniques${q ? `?${q}` : ""}`,
+  );
+}
+
+export async function getTechniqueModule(id: string): Promise<TechniqueModuleRead> {
+  return apiFetch<TechniqueModuleRead>(`/techniques/${id}`);
+}
+
+export async function createTechniqueModule(
+  data: Omit<TechniqueModuleRead, "id" | "created_at" | "status">,
+): Promise<TechniqueModuleRead> {
+  return apiFetch<TechniqueModuleRead>("/admin/techniques", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateTechniqueModule(
+  id: string,
+  data: Partial<TechniqueModuleRead>,
+): Promise<TechniqueModuleRead> {
+  return apiFetch<TechniqueModuleRead>(`/admin/techniques/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deprecateTechniqueModule(id: string): Promise<void> {
+  await apiFetch<void>(`/admin/techniques/${id}`, { method: "DELETE" });
+}
+
+// ── Service Technique Weights ──
+
+export async function listServiceTechniqueWeights(
+  serviceId: string,
+): Promise<{ items: ServiceTechniqueWeightRead[]; total: number }> {
+  return apiFetch<{ items: ServiceTechniqueWeightRead[]; total: number }>(
+    `/admin/services/${serviceId}/techniques`,
+  );
+}
+
+export async function addServiceTechniqueWeight(
+  serviceId: string,
+  data: { technique_module_id: string; base_weight: number; is_required?: boolean },
+): Promise<ServiceTechniqueWeightRead> {
+  return apiFetch<ServiceTechniqueWeightRead>(
+    `/admin/services/${serviceId}/techniques`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
+}
+
+export async function bulkSetServiceTechniqueWeights(
+  serviceId: string,
+  weights: { technique_module_id: string; base_weight: number; is_required?: boolean }[],
+): Promise<{ items: ServiceTechniqueWeightRead[]; total: number }> {
+  return apiFetch<{ items: ServiceTechniqueWeightRead[]; total: number }>(
+    `/admin/services/${serviceId}/techniques`,
+    { method: "PUT", body: JSON.stringify(weights) },
+  );
+}
+
+export async function removeServiceTechniqueWeight(
+  serviceId: string,
+  techniqueId: string,
+): Promise<void> {
+  await apiFetch<void>(`/admin/services/${serviceId}/techniques/${techniqueId}`, {
+    method: "DELETE",
+  });
+}
+
+// ── Technique Runs (execution tracking) ──
+
+export async function listTechniqueRuns(
+  requestId: string,
+  runId: string,
+): Promise<{ items: TechniqueRunRead[]; total: number }> {
+  return apiFetch<{ items: TechniqueRunRead[]; total: number }>(
+    `/requests/${requestId}/runs/${runId}/techniques`,
+  );
+}
+
+export async function getTechniqueRun(
+  requestId: string,
+  runId: string,
+  techniqueRunId: string,
+): Promise<TechniqueRunRead> {
+  return apiFetch<TechniqueRunRead>(
+    `/requests/${requestId}/runs/${runId}/techniques/${techniqueRunId}`,
+  );
+}
+
+export async function getFusionResult(
+  requestId: string,
+  runId: string,
+): Promise<FusionResultRead> {
+  return apiFetch<FusionResultRead>(
+    `/requests/${requestId}/runs/${runId}/fusion`,
+  );
 }

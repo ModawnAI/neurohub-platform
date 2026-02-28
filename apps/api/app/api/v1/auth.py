@@ -1,12 +1,21 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
+from app.config import settings
 from app.dependencies import AuthenticatedUser, DbSession
 from app.models.institution import Institution, InstitutionMember
 from app.models.user import User
-from app.schemas.auth import MeResponse, OnboardingRequest, ProfileUpdate
+from app.schemas.auth import (
+    LoginRequest,
+    MeResponse,
+    OnboardingRequest,
+    ProfileUpdate,
+    SignupRequest,
+    TokenResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -15,6 +24,92 @@ USER_TYPE_TO_ROLE = {
     "EXPERT": "REVIEWER",
     "ADMIN": "SYSTEM_ADMIN",
 }
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(body: LoginRequest, db: DbSession):
+    if not settings.use_local_auth:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local auth disabled")
+
+    from app.security.local_jwt import create_access_token, verify_password
+
+    result = await db.execute(select(User).where(User.email == body.email))
+    db_user = result.scalar_one_or_none()
+    if not db_user or not db_user.password_hash:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="잘못된 이메일 또는 비밀번호입니다")
+    if not verify_password(body.password, db_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="잘못된 이메일 또는 비밀번호입니다")
+
+    db_user.last_login_at = datetime.now(timezone.utc)
+
+    # Look up institution + role
+    member_result = await db.execute(
+        select(InstitutionMember).where(InstitutionMember.user_id == db_user.id)
+    )
+    membership = member_result.scalar_one_or_none()
+    institution_id = str(membership.institution_id) if membership else settings.default_institution_id
+    roles = [membership.role_scope] if membership and membership.role_scope else ["PHYSICIAN"]
+
+    token = create_access_token(
+        sub=str(db_user.id),
+        email=db_user.email or "",
+        roles=roles,
+        institution_id=institution_id,
+    )
+    return TokenResponse(access_token=token)
+
+
+@router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def signup(body: SignupRequest, db: DbSession):
+    if not settings.use_local_auth:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local auth disabled")
+
+    from app.security.local_jwt import create_access_token, hash_password
+
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 등록된 이메일입니다")
+
+    user_id = uuid.uuid4()
+    db_user = User(
+        id=user_id,
+        username=body.email,
+        email=body.email,
+        password_hash=hash_password(body.password),
+    )
+    db.add(db_user)
+    await db.flush()
+
+    token = create_access_token(
+        sub=str(user_id),
+        email=body.email,
+        roles=["PHYSICIAN"],
+        institution_id=settings.default_institution_id,
+    )
+    return TokenResponse(access_token=token)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(user: AuthenticatedUser, db: DbSession):
+    if not settings.use_local_auth:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local auth disabled")
+
+    from app.security.local_jwt import create_access_token
+
+    member_result = await db.execute(
+        select(InstitutionMember).where(InstitutionMember.user_id == user.id)
+    )
+    membership = member_result.scalar_one_or_none()
+    institution_id = str(membership.institution_id) if membership else str(user.institution_id)
+    roles = [membership.role_scope] if membership and membership.role_scope else user.roles
+
+    token = create_access_token(
+        sub=str(user.id),
+        email=user.username,
+        roles=roles,
+        institution_id=institution_id,
+    )
+    return TokenResponse(access_token=token)
 
 
 @router.post("/onboarding", response_model=MeResponse, status_code=status.HTTP_201_CREATED)

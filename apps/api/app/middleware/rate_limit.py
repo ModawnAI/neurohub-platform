@@ -124,7 +124,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path.startswith("/api/v1/health") or request.url.path == "/metrics":
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "unknown"
+        # Use X-Forwarded-For when behind SSLH/reverse proxy
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+
+        # Skip rate limiting for loopback (internal services, Next.js proxy)
+        if client_ip in ("127.0.0.1", "::1", "localhost") and not forwarded:
+            return await call_next(request)
+
         has_auth = bool(request.headers.get("authorization") or request.headers.get("x-api-key"))
 
         category = _categorize_request(request.url.path, request.method)

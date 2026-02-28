@@ -127,7 +127,7 @@ export default function AdminRequestDetailPage() {
   if (!request) return <div className="banner banner-warning">{t("requestDetail.notFound")}</div>;
 
   const possibleTransitions = TRANSITIONS[request.status] || [];
-  const serviceSnapshot = request.service_snapshot;
+  const serviceSnapshot = request.service_snapshot as { display_name?: string; name?: string } | null | undefined;
   const cases: CaseRead[] = casesData?.items ?? [];
 
   return (

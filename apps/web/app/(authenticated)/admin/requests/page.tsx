@@ -24,8 +24,13 @@ export default function AdminRequestsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-requests", filter],
-    queryFn: () => listAllRequests(filter === "all" ? undefined : filter),
+    queryKey: ["admin-requests", filter, page],
+    queryFn: () =>
+      listAllRequests({
+        status: filter === "all" ? undefined : filter,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      }),
   });
 
   const advanceMut = useMutation({
@@ -43,9 +48,8 @@ export default function AdminRequestsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-requests"] }),
   });
 
-  const allRequests = data?.items ?? [];
-  const totalPages = Math.max(1, Math.ceil(allRequests.length / PAGE_SIZE));
-  const requests = allRequests.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const requests = data?.items ?? [];
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
   const handleFilterChange = (f: string) => {
     setFilter(f);
@@ -61,10 +65,10 @@ export default function AdminRequestsPage() {
         </div>
       </div>
 
-      <div className="filter-tabs" style={{ overflowX: "auto" }}>
-        <button className={`filter-tab ${filter === "all" ? "active" : ""}`} onClick={() => handleFilterChange("all")}>{t("adminRequests.filterAll")}</button>
+      <div className="filter-tabs" style={{ overflowX: "auto" }} role="tablist" aria-label={t("adminRequests.title")}>
+        <button type="button" role="tab" aria-selected={filter === "all"} className={`filter-tab ${filter === "all" ? "active" : ""}`} onClick={() => handleFilterChange("all")}>{t("adminRequests.filterAll")}</button>
         {ALL_STATUSES.map((s) => (
-          <button key={s} className={`filter-tab ${filter === s ? "active" : ""}`} onClick={() => handleFilterChange(s)}>
+          <button type="button" role="tab" aria-selected={filter === s} key={s} className={`filter-tab ${filter === s ? "active" : ""}`} onClick={() => handleFilterChange(s)}>
             {t(`status.${s}` as any)}
           </button>
         ))}
@@ -104,15 +108,15 @@ export default function AdminRequestsPage() {
                       <td>
                         <div className="action-row" onClick={(e) => e.stopPropagation()}>
                           {next && (
-                            <button className="btn btn-sm btn-primary" onClick={() => advanceMut.mutate({ id: req.id, target: next.target })}>
+                            <button type="button" className="btn btn-sm btn-primary" onClick={() => advanceMut.mutate({ id: req.id, target: next.target })}>
                               {t(next.labelKey)}
                             </button>
                           )}
                           {req.status === "STAGING" && (
-                            <button className="btn btn-sm btn-primary" onClick={() => confirmMut.mutate(req.id)}>{t("common.confirm")}</button>
+                            <button type="button" className="btn btn-sm btn-primary" onClick={() => confirmMut.mutate(req.id)}>{t("common.confirm")}</button>
                           )}
                           {req.status === "READY_TO_COMPUTE" && (
-                            <button className="btn btn-sm btn-primary" onClick={() => submitMut.mutate(req.id)}>{t("common.confirm")}</button>
+                            <button type="button" className="btn btn-sm btn-primary" onClick={() => submitMut.mutate(req.id)}>{t("common.confirm")}</button>
                           )}
                         </div>
                       </td>
@@ -127,15 +131,15 @@ export default function AdminRequestsPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="pagination" style={{ marginTop: 16 }}>
-              <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+            <nav className="pagination" style={{ marginTop: 16 }} aria-label={t("common.pagination")}>
+              <button type="button" className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
                 <CaretLeft size={14} /> {t("common.paginationPrev")}
               </button>
               <span className="pagination-info">{page + 1} / {totalPages}</span>
-              <button className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+              <button type="button" className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
                 {t("common.paginationNext")} <CaretRight size={14} />
               </button>
-            </div>
+            </nav>
           )}
         </div>
       )}

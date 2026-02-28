@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     allow_dev_auth_fallback: bool = True
 
+    # Local JWT auth (self-hosted mode)
+    use_local_auth: bool = False
+    jwt_secret_key: str = ""
+    local_jwt_issuer: str = "neurohub"
+
+    # MinIO / S3-compatible storage
+    minio_endpoint: str = "http://localhost:9000"
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
+    minio_region: str = "us-east-1"
+
     # Storage (Supabase bucket names)
     storage_bucket_inputs: str = "neurohub-inputs"
     storage_bucket_outputs: str = "neurohub-outputs"
@@ -50,6 +61,17 @@ class Settings(BaseSettings):
     container_execution_enabled: bool = False  # When True, uses real containers instead of simulation
     internal_api_key: str = ""  # Shared secret for service→API callbacks
     external_compute_url: str = ""  # For external GPU dispatching
+
+    # Local Docker execution (self-hosted server with native neuroimaging tools)
+    local_docker_enabled: bool = False
+    local_docker_host_mounts: str = ""  # JSON: {"host_path": "container_path", ...}
+
+    # Gemini AI Agent
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3-flash-preview"
+    gemini_enabled: bool = False
+    gemini_max_tokens: int = 4096
+    gemini_timeout_seconds: int = 30
 
     # Compute
     compute_step_timeout: int = 300

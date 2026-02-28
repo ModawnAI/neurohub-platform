@@ -46,7 +46,7 @@ export default function UserRequestsPage() {
         </button>
       </div>
 
-      <div className="filter-tabs">
+      <div className="filter-tabs" role="tablist" aria-label={t("userRequests.title")}>
         {([
           { key: "all" as FilterTab, label: t("userRequests.filterAll") },
           { key: "in_progress" as FilterTab, label: t("userRequests.filterInProgress") },
@@ -55,8 +55,11 @@ export default function UserRequestsPage() {
         ]).map((tab) => (
           <button
             key={tab.key}
+            type="button"
+            role="tab"
             className={`filter-tab ${filter === tab.key ? "active" : ""}`}
             onClick={() => handleFilterChange(tab.key)}
+            aria-selected={filter === tab.key}
           >
             {tab.label}
           </button>
@@ -80,8 +83,9 @@ export default function UserRequestsPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="pagination">
+            <nav className="pagination" aria-label={t("common.pagination")}>
               <button
+                type="button"
                 className="btn btn-sm btn-secondary"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
@@ -90,13 +94,14 @@ export default function UserRequestsPage() {
               </button>
               <span className="pagination-info">{page + 1} / {totalPages}</span>
               <button
+                type="button"
                 className="btn btn-sm btn-secondary"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
               >
                 {t("common.paginationNext")} <CaretRight size={14} />
               </button>
-            </div>
+            </nav>
           )}
         </>
       )}

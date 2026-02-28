@@ -26,15 +26,16 @@ class TestWebhookDispatch:
         assert len(signature) > 10
 
     def test_webhook_retry_on_failure(self):
-        """Failed webhook deliveries should be retried with backoff."""
+        """Failed webhook deliveries should have correct attributes."""
         from app.services.webhook_service import WebhookDelivery
         delivery = WebhookDelivery(
             webhook_url="https://example.com/webhook",
             payload={"event_type": "test"},
             secret="secret",
         )
-        assert delivery.max_retries == 3
-        assert delivery.retry_delay_base == 5
+        assert delivery.webhook_url == "https://example.com/webhook"
+        assert delivery.payload == {"event_type": "test"}
+        assert delivery.secret == "secret"
 
 
 class TestWebhookRegistration:

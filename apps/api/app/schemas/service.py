@@ -193,6 +193,7 @@ class ServiceRead(BaseModel):
     options_schema: dict | None = None
     pricing: dict | None = None
     output_schema: dict | None = None
+    clinical_config: dict | None = None
     created_at: datetime
 
 

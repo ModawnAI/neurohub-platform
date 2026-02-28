@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChartBar, Gear, UploadSimple, Sliders, FileText, CurrencyKrw, Cpu, CloudArrowUp } from "phosphor-react";
+import { ArrowLeft, ChartBar, Gear, UploadSimple, Sliders, FileText, CurrencyKrw, Cpu, CloudArrowUp, Brain } from "phosphor-react";
 import { useState } from "react";
 import { listServices, listRequests, type ServiceRead, type RequestRead } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
@@ -17,8 +17,17 @@ import { ServiceOutputSchema } from "./components/service-output-schema";
 import { ServicePricing } from "./components/service-pricing";
 import { ServicePipelines } from "./components/service-pipelines";
 import { ServiceDeployment } from "./components/service-deployment";
+import { TechniqueWeightEditor } from "@/components/technique-weight-editor";
 
-type TabId = "overview" | "input" | "upload" | "options" | "output" | "pricing" | "pipeline" | "deploy";
+function ServiceTechniqueProfile({ serviceId }: { serviceId: string }) {
+  return (
+    <div className="panel">
+      <TechniqueWeightEditor serviceId={serviceId} />
+    </div>
+  );
+}
+
+type TabId = "overview" | "input" | "upload" | "options" | "output" | "pricing" | "pipeline" | "deploy" | "techniques";
 
 interface Tab {
   id: TabId;
@@ -36,6 +45,7 @@ const TABS: Tab[] = [
   { id: "pricing", label: "가격 설정", labelEn: "Pricing", icon: <CurrencyKrw size={14} /> },
   { id: "pipeline", label: "파이프라인", labelEn: "Pipelines", icon: <Cpu size={14} /> },
   { id: "deploy", label: "배포", labelEn: "Deploy", icon: <CloudArrowUp size={14} /> },
+  { id: "techniques", label: "기법 프로필", labelEn: "Techniques", icon: <Brain size={14} /> },
 ];
 
 export default function ServiceDetailPage() {
@@ -86,7 +96,7 @@ export default function ServiceDetailPage() {
 
   return (
     <div className="stack-lg">
-      <button className="back-link" onClick={() => router.push("/admin/services")}>
+      <button type="button" className="back-link" onClick={() => router.push("/admin/services")}>
         <ArrowLeft size={16} /> {t("serviceDetail.backToList")}
       </button>
 
@@ -136,6 +146,7 @@ export default function ServiceDetailPage() {
           ].map(({ label, count, tab }) => (
             <button
               key={tab}
+              type="button"
               className={`status-chip ${count ? "status-final" : "status-pending"}`}
               style={{ cursor: "pointer", fontSize: 11 }}
               onClick={() => setActiveTab(tab)}
@@ -147,13 +158,16 @@ export default function ServiceDetailPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="filter-tabs">
+      <div className="filter-tabs" role="tablist" aria-label={t("serviceDetail.tabsLabel")}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
+            type="button"
+            role="tab"
             className={`filter-tab ${activeTab === tab.id ? "active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
             style={{ display: "flex", alignItems: "center", gap: 4 }}
+            aria-selected={activeTab === tab.id}
           >
             {tab.icon}
             {ko ? tab.label : tab.labelEn}
@@ -170,6 +184,7 @@ export default function ServiceDetailPage() {
       {activeTab === "pricing" && <ServicePricing service={service} />}
       {activeTab === "pipeline" && <ServicePipelines service={service} />}
       {activeTab === "deploy" && <ServiceDeployment service={service} />}
+      {activeTab === "techniques" && <ServiceTechniqueProfile serviceId={service.id} />}
 
       {/* Recent Requests (always shown below tabs) */}
       {activeTab === "overview" && (

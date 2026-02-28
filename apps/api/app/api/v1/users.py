@@ -40,6 +40,8 @@ async def list_users(
     user_type: str | None = Query(default=None),
     expert_status: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     query = (
         select(User, InstitutionMember, Institution)
@@ -54,7 +56,7 @@ async def list_users(
     if is_active is not None:
         query = query.where(User.is_active == is_active)
 
-    query = query.order_by(User.created_at.desc())
+    query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(query)
     rows = result.all()
 

@@ -30,7 +30,18 @@ export function RequestCard({ request, onClick, showService }: RequestCardProps)
   const serviceName = (request as any).service_snapshot?.display_name || "AI 분석";
 
   return (
-    <div className="request-card" onClick={onClick} role="button" tabIndex={0}>
+    <div
+      className="request-card"
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
       <div className="request-card-body">
         <p className="request-card-title">{showService !== false ? serviceName : `요청 #${request.id.slice(0, 8)}`}</p>
         <p className="request-card-meta">

@@ -192,7 +192,7 @@ export default function GroupStudyDetailPage() {
       </div>
 
       {/* Results */}
-      {study.status === "COMPLETED" && result && (
+      {study.status === "COMPLETED" && Boolean(result) && (
         <div className="space-y-4">
           {/* Summary */}
           {summary && (
@@ -308,10 +308,10 @@ export default function GroupStudyDetailPage() {
         </div>
       )}
 
-      {study.status === "FAILED" && result?.error && (
+      {study.status === "FAILED" && Boolean(result?.error) && (
         <div className="card p-4 bg-red-50 border border-red-200">
           <p className="text-sm text-red-700 font-medium">Analysis failed</p>
-          <p className="text-sm text-red-500 mt-1">{String(result.error)}</p>
+          <p className="text-sm text-red-500 mt-1">{String(result?.error)}</p>
         </div>
       )}
 

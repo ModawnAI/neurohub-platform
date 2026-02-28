@@ -117,7 +117,7 @@ export default function PaymentPage() {
             <div className="panel-header">{t("payment.selectService")}</div>
             <div className="stack-sm" style={{ padding: 16 }}>
               {paidServices.length === 0 ? (
-                <p style={{ color: "var(--muted)" }}>No paid services available</p>
+                <p style={{ color: "var(--muted)" }}>{t("payment.noPaidServices")}</p>
               ) : (
                 paidServices.map((svc) => (
                   <button

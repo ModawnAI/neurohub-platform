@@ -7,10 +7,13 @@
   --surface-2: #f1f5f9;
   --surface-3: #e8edf4;
   --text: #0f172a;
+  --text-primary: #0f172a;
   --text-secondary: #334155;
+  --fg: #0f172a;
   --muted: #64748b;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
+  --hover: #e2e8f0;
   --primary: #0b6bcb;
   --primary-hover: #0858a8;
   --primary-light: #dbeafe;

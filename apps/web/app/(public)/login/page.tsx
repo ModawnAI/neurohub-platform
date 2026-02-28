@@ -24,15 +24,8 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
-      // Wait for auth state to propagate
-      await new Promise((r) => setTimeout(r, 500));
-      await refreshUser();
-      // Read cookie to determine redirect
-      const userType = document.cookie
-        .split("; ")
-        .find((c) => c.startsWith("nh-user-type="))
-        ?.split("=")[1];
-      router.push(getRoleHomePath(userType));
+      const authUser = await refreshUser();
+      window.location.href = getRoleHomePath(authUser?.userType);
     } catch (err: any) {
       setError(err?.message || "로그인에 실패했습니다.");
     } finally {

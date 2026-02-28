@@ -39,14 +39,8 @@ def scan_artifact(self, artifact_id: str):
         db.commit()
 
         try:
-            from app.config import settings
-            url = f"{settings.supabase_url}/storage/v1/object/model-artifacts/{artifact.storage_path}"
-            resp = httpx.get(url, headers={
-                "Authorization": f"Bearer {settings.supabase_service_role_key}",
-                "apikey": settings.supabase_service_role_key,
-            }, timeout=60)
-            resp.raise_for_status()
-            content = resp.content
+            from app.services.storage import get_object_sync
+            content = get_object_sync("model-artifacts", artifact.storage_path)
 
             # Verify checksum
             actual_sha = check_sha256(content)
@@ -212,17 +206,12 @@ def build_service_image(self, artifact_id: str):
 def _download_artifact(artifact, tmpdir, settings):
     import os
 
-    import httpx
+    from app.services.storage import get_object_sync
 
-    url = f"{settings.supabase_url}/storage/v1/object/model-artifacts/{artifact.storage_path}"
-    resp = httpx.get(url, headers={
-        "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "apikey": settings.supabase_service_role_key,
-    }, timeout=120)
-    resp.raise_for_status()
+    content = get_object_sync("model-artifacts", artifact.storage_path)
     dest_path = os.path.join(tmpdir, artifact.file_name)
     with open(dest_path, "wb") as f:
-        f.write(resp.content)
+        f.write(content)
 
 
 def _generate_dockerfile(base_image: str, artifact) -> str:
