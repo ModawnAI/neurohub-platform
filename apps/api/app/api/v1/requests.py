@@ -638,6 +638,260 @@ async def submit_request(
 
 
 # ---------------------------------------------------------------------------
+# Process endpoint — triggers automatic pipeline for uploaded zip files
+# ---------------------------------------------------------------------------
+
+
+@router.post("/requests/{request_id}/process")
+async def process_request(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: AuthenticatedUser,
+    http_request: FastAPIRequest,
+):
+    """Trigger automatic processing pipeline for all cases in a request.
+
+    This endpoint:
+    1. Finds all uploaded zip files for each case
+    2. Transitions the request through STAGING → READY_TO_COMPUTE → COMPUTING
+    3. Dispatches a Celery task per case for the full pipeline:
+       zip extract → DICOM find → BIDS → Pre-QC → technique exec → fusion
+
+    Roles: PHYSICIAN, TECHNICIAN, SYSTEM_ADMIN
+    """
+    from app.models.request import CaseFile
+    from app.worker.celery_app import celery_app
+
+    req = await _load_request_or_404(db, request_id, user.institution_id, for_update=True)
+
+    # Allow processing from CREATED, RECEIVING, STAGING, or READY_TO_COMPUTE
+    allowed_from = {
+        SMStatus.CREATED.value,
+        SMStatus.RECEIVING.value,
+        SMStatus.STAGING.value,
+        SMStatus.READY_TO_COMPUTE.value,
+    }
+    if req.status not in allowed_from:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Request is in {req.status} — cannot process. "
+                   f"Allowed: {', '.join(sorted(allowed_from))}",
+        )
+
+    # Check that we have uploaded files
+    if not req.cases:
+        raise HTTPException(status_code=409, detail="No cases found for this request")
+
+    case_tasks = []
+    for case in req.cases:
+        # Find uploaded zip files for this case
+        file_result = await db.execute(
+            select(CaseFile).where(
+                CaseFile.case_id == case.id,
+                CaseFile.upload_status == "COMPLETED",
+            )
+        )
+        case_files = file_result.scalars().all()
+
+        if not case_files:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Case {case.patient_ref} has no uploaded files",
+            )
+
+        # Find the zip file (or the first file if no zip)
+        zip_file = None
+        for cf in case_files:
+            if cf.file_name and cf.file_name.lower().endswith(".zip"):
+                zip_file = cf
+                break
+        if not zip_file:
+            zip_file = case_files[0]  # Use the first uploaded file
+
+        case_tasks.append({
+            "case_id": str(case.id),
+            "patient_ref": case.patient_ref,
+            "storage_path": zip_file.storage_path,
+        })
+
+        # Mark case as READY
+        case.status = "READY"
+
+    # Advance request to COMPUTING
+    before = {"status": req.status}
+    req.status = SMStatus.COMPUTING.value
+
+    _add_audit(
+        db=db,
+        user_id=user.id,
+        institution_id=user.institution_id,
+        action="PROCESS_REQUEST",
+        entity_type="request",
+        entity_id=req.id,
+        before_state=before,
+        after_state={"status": req.status, "case_count": len(case_tasks)},
+        ip=_client_ip(http_request),
+    )
+    await _notify_request_owner(
+        db,
+        req,
+        event_type="REQUEST_PROCESSING",
+        title="자동 분석 시작",
+        body=f"{len(case_tasks)}건의 케이스에 대해 자동 분석 파이프라인이 시작되었습니다.",
+    )
+
+    # Dispatch outbox event
+    _add_outbox(
+        db=db,
+        event_type="PIPELINE_PROCESS",
+        aggregate_type="request",
+        aggregate_id=req.id,
+        payload={
+            "request_id": str(req.id),
+            "case_tasks": case_tasks,
+        },
+    )
+
+    await db.flush()
+
+    # Dispatch Celery tasks directly (also via outbox for reliability)
+    task_ids = []
+    for ct in case_tasks:
+        task_result = celery_app.send_task(
+            "neurohub.tasks.process_case_upload",
+            args=[str(request_id), ct["case_id"], ct["storage_path"]],
+            queue="compute",
+        )
+        task_ids.append(task_result.id)
+
+    return {
+        "request_id": str(req.id),
+        "status": req.status,
+        "cases_processing": len(case_tasks),
+        "task_ids": task_ids,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Pipeline status & technique runs (simplified query endpoints)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/requests/{request_id}/pipeline-status")
+async def get_pipeline_status(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: AuthenticatedUser,
+):
+    """Get pipeline processing status for a request.
+
+    Returns current run status, technique run statuses, and stage progress.
+    """
+    req = await _load_request_or_404(db, request_id, user.institution_id)
+
+    # Get runs for this request
+    runs_result = await db.execute(
+        select(Run).where(Run.request_id == request_id).order_by(Run.created_at.desc())
+    )
+    runs = runs_result.scalars().all()
+
+    if not runs:
+        return {
+            "request_id": str(request_id),
+            "request_status": req.status,
+            "runs": [],
+            "technique_summary": {"total": 0, "pending": 0, "running": 0, "completed": 0, "failed": 0},
+        }
+
+    from app.models.technique import TechniqueRun
+
+    run_data = []
+    total_stats = {"total": 0, "pending": 0, "running": 0, "completed": 0, "failed": 0}
+
+    for run in runs:
+        tr_result = await db.execute(
+            select(TechniqueRun).where(TechniqueRun.run_id == run.id).order_by(TechniqueRun.created_at)
+        )
+        technique_runs = tr_result.scalars().all()
+
+        tr_list = []
+        for tr in technique_runs:
+            total_stats["total"] += 1
+            status_key = tr.status.lower()
+            if status_key in total_stats:
+                total_stats[status_key] += 1
+            elif status_key in ("queued", "pending"):
+                total_stats["pending"] += 1
+
+            tr_list.append({
+                "id": str(tr.id),
+                "technique_key": tr.technique_key,
+                "status": tr.status,
+                "qc_score": tr.qc_score,
+                "started_at": tr.started_at.isoformat() if tr.started_at else None,
+                "completed_at": tr.completed_at.isoformat() if tr.completed_at else None,
+                "error_detail": tr.error_detail,
+            })
+
+        run_data.append({
+            "id": str(run.id),
+            "case_id": str(run.case_id) if run.case_id else None,
+            "status": run.status,
+            "started_at": run.started_at.isoformat() if run.started_at else None,
+            "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+            "technique_runs": tr_list,
+            "output_data": run.output_data,
+        })
+
+    return {
+        "request_id": str(request_id),
+        "request_status": req.status,
+        "runs": run_data,
+        "technique_summary": total_stats,
+    }
+
+
+@router.get("/requests/{request_id}/technique-runs")
+async def list_request_technique_runs(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: AuthenticatedUser,
+):
+    """List all technique runs for a request (across all runs).
+
+    Simplified endpoint that doesn't require knowing the run_id.
+    """
+    await _load_request_or_404(db, request_id, user.institution_id)
+
+    from app.models.technique import TechniqueRun
+
+    result = await db.execute(
+        select(TechniqueRun, Run.case_id)
+        .join(Run, TechniqueRun.run_id == Run.id)
+        .where(Run.request_id == request_id)
+        .order_by(TechniqueRun.created_at)
+    )
+    rows = result.all()
+
+    items = []
+    for tr, case_id in rows:
+        items.append({
+            "id": str(tr.id),
+            "run_id": str(tr.run_id),
+            "case_id": str(case_id) if case_id else None,
+            "technique_key": tr.technique_key,
+            "status": tr.status,
+            "qc_score": tr.qc_score,
+            "output_data": tr.output_data,
+            "started_at": tr.started_at.isoformat() if tr.started_at else None,
+            "completed_at": tr.completed_at.isoformat() if tr.completed_at else None,
+            "error_detail": tr.error_detail,
+        })
+
+    return {"items": items, "total": len(items)}
+
+
+# ---------------------------------------------------------------------------
 # Download endpoints (PDF report + watermarked file)
 # ---------------------------------------------------------------------------
 

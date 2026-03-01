@@ -287,6 +287,17 @@ export async function cancelRequest(requestId: string, reason: string) {
   });
 }
 
+export async function processRequest(requestId: string) {
+  return apiFetch<{
+    request_id: string;
+    status: RequestStatus;
+    cases_processing: number;
+    task_ids: string[];
+  }>(`/requests/${requestId}/process`, {
+    method: "POST",
+  });
+}
+
 export async function listServices() {
   return apiFetch<{ items: ServiceRead[] }>("/services");
 }
@@ -523,15 +534,74 @@ export async function getAdminStats() {
 
 export async function listAllRequests(params?: {
   status?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }) {
   const searchParams = new URLSearchParams();
   if (params?.status) searchParams.set("status", params.status);
+  if (params?.search) searchParams.set("search", params.search);
   if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
   if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
   const qs = searchParams.toString();
-  return apiFetch<{ items: RequestRead[]; total: number }>(`/admin/requests${qs ? `?${qs}` : ""}`);
+  return apiFetch<{ items: RequestRead[]; total: number; offset: number; limit: number; has_more: boolean }>(`/admin/requests${qs ? `?${qs}` : ""}`);
+}
+
+// ── Pipeline Status ──
+
+export interface TechniqueRunStatus {
+  id: string;
+  technique_key: string;
+  status: string;
+  qc_score: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_detail: string | null;
+}
+
+export interface PipelineRunStatus {
+  id: string;
+  case_id: string | null;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  technique_runs: TechniqueRunStatus[];
+  output_data: Record<string, unknown> | null;
+}
+
+export interface PipelineStatusResponse {
+  request_id: string;
+  request_status: string;
+  runs: PipelineRunStatus[];
+  technique_summary: {
+    total: number;
+    pending: number;
+    running: number;
+    completed: number;
+    failed: number;
+  };
+}
+
+export async function getPipelineStatus(requestId: string): Promise<PipelineStatusResponse> {
+  return apiFetch<PipelineStatusResponse>(`/requests/${requestId}/pipeline-status`);
+}
+
+export async function listRequestTechniqueRuns(requestId: string) {
+  return apiFetch<{
+    items: Array<{
+      id: string;
+      run_id: string;
+      case_id: string | null;
+      technique_key: string;
+      status: string;
+      qc_score: number | null;
+      output_data: Record<string, unknown> | null;
+      started_at: string | null;
+      completed_at: string | null;
+      error_detail: string | null;
+    }>;
+    total: number;
+  }>(`/requests/${requestId}/technique-runs`);
 }
 
 // ── File Upload ──

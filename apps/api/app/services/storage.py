@@ -109,3 +109,20 @@ def create_presigned_download_sync(bucket: str, path: str, *, expires_in: int = 
         Params={"Bucket": bucket, "Key": path},
         ExpiresIn=expires_in,
     )
+
+
+async def download_file(bucket: str, path: str, local_path: str) -> None:
+    """Download a file from storage to local disk."""
+    client = _s3_client()
+    await asyncio.to_thread(
+        client.download_file,
+        Bucket=bucket,
+        Key=path,
+        Filename=local_path,
+    )
+
+
+def download_file_sync(bucket: str, path: str, local_path: str) -> None:
+    """Sync variant: download a file from storage to local disk."""
+    client = _s3_client_sync()
+    client.download_file(Bucket=bucket, Key=path, Filename=local_path)

@@ -10,47 +10,29 @@ import { useT } from "@/lib/i18n";
 import { useState } from "react";
 
 const MODALITY_COLORS: Record<string, string> = {
-  PET: "var(--color-orange-9)",
-  MRI: "var(--color-blue-9)",
-  EEG: "var(--color-green-9)",
-  MEG: "var(--color-purple-9)",
-  fMRI: "var(--color-cyan-9)",
-  SPECT: "var(--color-red-9)",
+  PET: "#ea580c",
+  MRI: "#2563eb",
+  EEG: "#16a34a",
+  MEG: "#9333ea",
+  fMRI: "#0891b2",
+  SPECT: "#dc2626",
+  PSG: "#ca8a04",
 };
 
 function ModalityBadge({ modality }: { modality: string }) {
-  const bg = MODALITY_COLORS[modality] ?? "var(--color-gray-9)";
+  const bg = MODALITY_COLORS[modality] ?? "var(--muted)";
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: "4px",
-        backgroundColor: bg,
-        color: "white",
-        fontSize: "12px",
-        fontWeight: 600,
-      }}
-    >
+    <span className="status-chip" style={{ backgroundColor: bg, color: "white", fontWeight: 600 }}>
       {modality}
     </span>
   );
 }
 
-function StatusChip({ status }: { status: string }) {
+function StatusChip({ status, t }: { status: string; t: (key: string) => string }) {
   const isActive = status === "ACTIVE";
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: "4px",
-        backgroundColor: isActive ? "var(--color-green-3)" : "var(--color-gray-3)",
-        color: isActive ? "var(--color-green-11)" : "var(--color-gray-11)",
-        fontSize: "12px",
-      }}
-    >
-      {isActive ? "활성" : "비활성"}
+    <span className={`status-chip ${isActive ? "status-final" : "status-cancelled"}`}>
+      {isActive ? t("techniques.active") : t("techniques.deprecated")}
     </span>
   );
 }
@@ -75,40 +57,26 @@ export default function TechniquesPage() {
   const modalities = [...new Set(techniques.map((t) => t.modality))].sort();
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700 }}>{t("techniques.title")}</h1>
-        <span style={{ color: "var(--color-gray-11)", fontSize: "14px" }}>
-          {t("common.total")} {data?.total ?? 0}
-        </span>
+    <div className="stack-lg">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">{t("techniques.title")}</h1>
+          <p className="page-subtitle">{t("common.total")} {data?.total ?? 0}</p>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+      <div className="filter-tabs">
         <button
+          className={`filter-tab ${!filterModality ? "active" : ""}`}
           onClick={() => setFilterModality("")}
-          style={{
-            padding: "4px 12px",
-            borderRadius: "6px",
-            border: "1px solid var(--color-gray-6)",
-            backgroundColor: !filterModality ? "var(--color-gray-3)" : "transparent",
-            cursor: "pointer",
-            fontSize: "13px",
-          }}
         >
-          전체
+          {t("adminRequests.filterAll")}
         </button>
         {modalities.map((mod) => (
           <button
             key={mod}
+            className={`filter-tab ${filterModality === mod ? "active" : ""}`}
             onClick={() => setFilterModality(mod)}
-            style={{
-              padding: "4px 12px",
-              borderRadius: "6px",
-              border: "1px solid var(--color-gray-6)",
-              backgroundColor: filterModality === mod ? "var(--color-gray-3)" : "transparent",
-              cursor: "pointer",
-              fontSize: "13px",
-            }}
           >
             {mod}
           </button>
@@ -116,22 +84,17 @@ export default function TechniquesPage() {
       </div>
 
       {isLoading ? (
-        <p>{t("common.loading")}</p>
+        <div className="loading-center"><span className="spinner" /></div>
       ) : techniques.length === 0 ? (
-        <p style={{ color: "var(--color-gray-11)" }}>{t("techniques.noTechniques")}</p>
+        <div className="banner banner-info">{t("techniques.noTechniques")}</div>
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: "16px",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
           {techniques.map((tech) => (
             <TechniqueCard
               key={tech.id}
               technique={tech}
               onDeprecate={() => deprecateMutation.mutate(tech.id)}
+              t={t}
             />
           ))}
         </div>
@@ -143,66 +106,61 @@ export default function TechniquesPage() {
 function TechniqueCard({
   technique,
   onDeprecate,
+  t,
 }: {
   technique: TechniqueModuleRead;
   onDeprecate: () => void;
+  t: (key: string) => string;
 }) {
   const gpu = (technique.resource_requirements as Record<string, unknown>)?.gpu;
   const memGb = (technique.resource_requirements as Record<string, unknown>)?.memory_gb;
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--color-gray-6)",
-        borderRadius: "8px",
-        padding: "16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-      }}
-    >
+    <div className="panel" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {/* Header: key + status */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <code style={{ fontSize: "14px", fontWeight: 600 }}>{technique.key}</code>
-        <StatusChip status={technique.status} />
+        <code style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>{technique.key}</code>
+        <StatusChip status={technique.status} t={t} />
       </div>
 
-      <div style={{ fontSize: "15px" }}>{technique.title_ko}</div>
-      <div style={{ fontSize: "13px", color: "var(--color-gray-11)" }}>{technique.title_en}</div>
+      {/* Titles */}
+      <div>
+        <p style={{ fontSize: "15px", fontWeight: 600, margin: 0 }}>{technique.title_ko}</p>
+        <p className="muted-text" style={{ fontSize: "13px", marginTop: "2px" }}>{technique.title_en}</p>
+      </div>
 
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "4px" }}>
+      {/* Modality + Category */}
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
         <ModalityBadge modality={technique.modality} />
-        <span style={{ fontSize: "12px", color: "var(--color-gray-11)" }}>
-          {technique.category}
-        </span>
+        <span className="muted-text" style={{ fontSize: "12px" }}>{technique.category}</span>
       </div>
 
-      <div style={{ fontSize: "12px", color: "var(--color-gray-11)", marginTop: "4px" }}>
-        <code>{technique.docker_image}</code>
+      {/* Docker image */}
+      <div style={{ padding: "6px 10px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: "12px", fontFamily: "monospace" }}>
+        {technique.docker_image}
       </div>
 
-      <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: "var(--color-gray-11)" }}>
-        <span>v{technique.version}</span>
-        {gpu !== undefined && <span>GPU: {gpu ? "필요" : "불필요"}</span>}
-        {memGb !== undefined && <span>{String(memGb)}GB RAM</span>}
+      {/* Resource info */}
+      <div style={{ display: "flex", gap: "12px", fontSize: "12px", flexWrap: "wrap" }}>
+        <span className="muted-text" style={{ fontWeight: 600 }}>v{technique.version}</span>
+        {gpu !== undefined && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: gpu ? "var(--success)" : "var(--muted)", display: "inline-block" }} />
+            <span className="muted-text">GPU: {gpu ? t("techniques.gpuRequired" as any) : t("techniques.gpuNotRequired" as any)}</span>
+          </span>
+        )}
+        {memGb !== undefined && (
+          <span className="muted-text">{String(memGb)}GB RAM</span>
+        )}
       </div>
 
+      {/* Deprecate action */}
       {technique.status === "ACTIVE" && (
-        <button
-          onClick={onDeprecate}
-          style={{
-            marginTop: "8px",
-            padding: "4px 12px",
-            borderRadius: "6px",
-            border: "1px solid var(--color-red-6)",
-            color: "var(--color-red-11)",
-            backgroundColor: "transparent",
-            cursor: "pointer",
-            fontSize: "12px",
-            alignSelf: "flex-end",
-          }}
-        >
-          비활성화
-        </button>
+        <div style={{ marginTop: "4px", display: "flex", justifyContent: "flex-end" }}>
+          <button className="btn btn-danger btn-sm" onClick={onDeprecate}>
+            {t("techniques.deprecate")}
+          </button>
+        </div>
       )}
     </div>
   );

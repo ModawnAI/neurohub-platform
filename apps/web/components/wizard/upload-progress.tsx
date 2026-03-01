@@ -1,6 +1,7 @@
 "use client";
 
-import { File as FileIcon, CheckCircle, XCircle } from "phosphor-react";
+import { File as FileIcon, CheckCircle, XCircle, ArrowClockwise } from "phosphor-react";
+import { useT } from "@/lib/i18n";
 
 export interface UploadFileState {
   file: File;
@@ -13,6 +14,7 @@ export interface UploadFileState {
 interface UploadProgressProps {
   files: UploadFileState[];
   onRemove?: (index: number) => void;
+  onRetry?: (index: number) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -21,7 +23,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function UploadProgress({ files, onRemove }: UploadProgressProps) {
+export function UploadProgress({ files, onRemove, onRetry }: UploadProgressProps) {
+  const t = useT();
   if (files.length === 0) return null;
 
   return (
@@ -50,15 +53,25 @@ export function UploadProgress({ files, onRemove }: UploadProgressProps) {
               </div>
             )}
           </div>
-          {onRemove && f.status !== "uploading" && (
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={() => onRemove(idx)}
-              style={{ flexShrink: 0 }}
-            >
-              <XCircle size={14} />
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            {onRetry && f.status === "error" && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => onRetry(idx)}
+                title={t("common.retry" as any)}
+              >
+                <ArrowClockwise size={14} />
+              </button>
+            )}
+            {onRemove && f.status !== "uploading" && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => onRemove(idx)}
+              >
+                <XCircle size={14} />
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>

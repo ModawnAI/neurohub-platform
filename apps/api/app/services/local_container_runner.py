@@ -33,6 +33,11 @@ DEFAULT_HOST_MOUNTS: dict[str, str] = {
     "/usr/local/freesurfer/8.0.0": "/opt/freesurfer",
     "/usr/local/fsl": "/opt/fsl",
     "/usr/local/mrtrix3": "/opt/mrtrix3",
+    # FDG-PET analysis (MATLAB/SPM25/neuroan_pet)
+    "/usr/local/MATLAB/R2025b": "/opt/matlab",
+    "/projects4/environment/codes/spm25": "/opt/spm25",
+    "/projects4/environment/codes/neuroan_pet": "/opt/neuroan_pet",
+    "/projects4/NEUROHUB/TEST/DB": "/opt/neuroan_db",
 }
 
 
@@ -64,6 +69,9 @@ class LocalContainerRunner:
     def __init__(self, host_mounts: dict[str, str] | None = None):
         self.host_mounts = host_mounts or parse_host_mounts()
 
+    # Techniques that require --net=host (e.g. for MATLAB license validation)
+    NET_HOST_TECHNIQUES = {"FDG_PET"}
+
     async def execute_technique(
         self,
         technique_key: str,
@@ -75,6 +83,7 @@ class LocalContainerRunner:
         timeout: int = 7200,
         gpu: bool = False,
         extra_mounts: dict[str, str] | None = None,
+        net_host: bool | None = None,
     ) -> LocalRunResult:
         """Execute a technique container and return results.
 
@@ -98,6 +107,13 @@ class LocalContainerRunner:
 
         # Build docker run command
         cmd = ["docker", "run", "--rm"]
+
+        # Host networking for MATLAB license validation
+        use_net_host = net_host if net_host is not None else (
+            technique_key in self.NET_HOST_TECHNIQUES
+        )
+        if use_net_host:
+            cmd.extend(["--net", "host"])
 
         # Mount input/output
         cmd.extend(["-v", f"{input_dir}:/input:ro"])

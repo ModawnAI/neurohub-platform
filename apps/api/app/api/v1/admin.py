@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import String, func, select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DbSession, require_roles
@@ -96,6 +96,7 @@ async def list_all_requests(
     db: DbSession,
     user: CurrentUser = Depends(_require_admin),
     request_status: str | None = Query(default=None, alias="status"),
+    search: str | None = Query(default=None),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
 ):
@@ -105,6 +106,11 @@ async def list_all_requests(
     if request_status:
         query = query.where(Request.status == request_status)
         count_query = count_query.where(Request.status == request_status)
+
+    if search:
+        search_filter = Request.id.cast(String).ilike(f"%{search}%")
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
 
     total = (await db.execute(count_query)).scalar() or 0
     result = await db.execute(

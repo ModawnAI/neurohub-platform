@@ -40,7 +40,7 @@ export default function ExpertDashboard() {
   return (
     <div className="stack-lg">
       <div>
-        <h1 className="greeting">{t("expertDashboard.greeting").replace("{name}", user?.displayName || "전문가")}</h1>
+        <h1 className="greeting">{t("expertDashboard.greeting").replace("{name}", user?.displayName || t("userType.EXPERT"))}</h1>
         <p className="greeting-sub">{t("expertDashboard.subtitle")}</p>
       </div>
 

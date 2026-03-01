@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { listAllRequests, transitionRequest, confirmRequest, submitRequest, type RequestStatus } from "@/lib/api";
@@ -21,15 +21,24 @@ export default function AdminRequestsPage() {
   const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-requests", filter, page],
+    queryKey: ["admin-requests", filter, page, debouncedSearch],
     queryFn: () =>
       listAllRequests({
         status: filter === "all" ? undefined : filter,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
+        search: debouncedSearch || undefined,
       }),
   });
 
@@ -64,6 +73,15 @@ export default function AdminRequestsPage() {
           <p className="page-subtitle">{t("adminRequests.subtitle").replace("{count}", String(data?.total ?? 0))}</p>
         </div>
       </div>
+
+      <input
+        type="search"
+        className="input"
+        style={{ maxWidth: 320 }}
+        placeholder={t("searchSort.searchPlaceholder" as any)}
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+      />
 
       <div className="filter-tabs" style={{ overflowX: "auto" }} role="tablist" aria-label={t("adminRequests.title")}>
         <button type="button" role="tab" aria-selected={filter === "all"} className={`filter-tab ${filter === "all" ? "active" : ""}`} onClick={() => handleFilterChange("all")}>{t("adminRequests.filterAll")}</button>

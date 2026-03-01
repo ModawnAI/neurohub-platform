@@ -8,6 +8,7 @@ import {
   listTrainingJobs,
   getPerformanceMetrics,
 } from "@/lib/api";
+import { useTranslation } from "@/lib/i18n";
 
 interface ServiceOption {
   id: string;
@@ -54,6 +55,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function PerformancePage() {
+  const { t } = useTranslation();
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [selectedService, setSelectedService] = useState<string>("");
   const [stats, setStats] = useState<FeedbackStats | null>(null);
@@ -99,7 +101,7 @@ export default function PerformancePage() {
       const j = await listTrainingJobs(selectedService);
       setJobs(j as TrainingJob[]);
     } catch (e: any) {
-      setJobError(e.message ?? "학습 시작 실패");
+      setJobError(e.message ?? t("expertPerformance.startTrainingFailed"));
     } finally {
       setStartingJob(false);
     }
@@ -112,11 +114,11 @@ export default function PerformancePage() {
 
   return (
     <div>
-      <h1 className="page-title">모델 성능 & 학습 관리</h1>
+      <h1 className="page-title">{t("expertPerformance.pageTitle")}</h1>
 
       {/* Service selector */}
       <div className="form-group" style={{ maxWidth: 320, marginBottom: 24, marginTop: 16 }}>
-        <label className="form-label">서비스 선택</label>
+        <label className="form-label">{t("expertPerformance.serviceSelectLabel")}</label>
         <select
           className="form-control"
           value={selectedService}
@@ -130,34 +132,34 @@ export default function PerformancePage() {
         </select>
       </div>
 
-      {loading && <p className="text-muted">불러오는 중...</p>}
+      {loading && <p className="text-muted">{t("expertPerformance.loading")}</p>}
 
       {/* Stats cards */}
       {stats && (
         <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
           <div className="card stat-card">
             <div className="stat-value">{stats.total_feedback}</div>
-            <div className="stat-label">전체 피드백</div>
+            <div className="stat-label">{t("expertPerformance.statTotalFeedback")}</div>
           </div>
           <div className="card stat-card">
             <div className="stat-value">{stats.unused_feedback}</div>
-            <div className="stat-label">미사용 피드백</div>
+            <div className="stat-label">{t("expertPerformance.statUnusedFeedback")}</div>
           </div>
           <div className="card stat-card">
             <div className="stat-value">{stats.high_quality_feedback}</div>
-            <div className="stat-label">고품질 피드백 (≥0.7)</div>
+            <div className="stat-label">{t("expertPerformance.statHighQuality")}</div>
           </div>
           <div className="card stat-card">
             <div className="stat-value" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {stats.ready_for_training ? (
-                <span className="badge badge-success">학습 준비됨</span>
+                <span className="badge badge-success">{t("expertPerformance.badgeReadyForTraining")}</span>
               ) : (
                 <span className="badge badge-default">
                   {stats.high_quality_feedback}/{stats.threshold}
                 </span>
               )}
             </div>
-            <div className="stat-label">학습 임계값</div>
+            <div className="stat-label">{t("expertPerformance.statTrainingThreshold")}</div>
           </div>
         </div>
       )}
@@ -165,7 +167,7 @@ export default function PerformancePage() {
       {/* Performance chart */}
       {perfData.length > 0 && (
         <div className="card" style={{ marginBottom: 24, overflowX: "auto" }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>정확도 추이</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("expertPerformance.chartTitle")}</h2>
           <svg width={chartWidth} height={chartHeight + 30} style={{ display: "block" }}>
             {/* Y axis lines */}
             {[0, 0.5, 1.0].map((v) => (
@@ -222,7 +224,7 @@ export default function PerformancePage() {
             ))}
           </svg>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-            ● 정확도 (Accuracy)
+            ● {t("expertPerformance.chartAccuracyLabel")}
           </div>
         </div>
       )}
@@ -239,24 +241,24 @@ export default function PerformancePage() {
           onClick={handleStartTraining}
           disabled={startingJob || !selectedService}
         >
-          {startingJob ? "학습 시작 중..." : "🚀 학습 시작"}
+          {startingJob ? t("expertPerformance.startingTraining") : t("expertPerformance.startTraining")}
         </button>
       </div>
 
       {/* Training jobs table */}
       <div className="card">
-        <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>학습 이력</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("expertPerformance.trainingHistoryTitle")}</h2>
         {jobs.length === 0 ? (
-          <p className="text-muted">학습 이력이 없습니다.</p>
+          <p className="text-muted">{t("expertPerformance.trainingHistoryEmpty")}</p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                <th style={{ textAlign: "left", padding: "6px 8px" }}>상태</th>
-                <th style={{ textAlign: "left", padding: "6px 8px" }}>트리거</th>
-                <th style={{ textAlign: "right", padding: "6px 8px" }}>피드백 수</th>
-                <th style={{ textAlign: "left", padding: "6px 8px" }}>시작</th>
-                <th style={{ textAlign: "left", padding: "6px 8px" }}>완료</th>
+                <th style={{ textAlign: "left", padding: "6px 8px" }}>{t("expertPerformance.colStatus")}</th>
+                <th style={{ textAlign: "left", padding: "6px 8px" }}>{t("expertPerformance.colTrigger")}</th>
+                <th style={{ textAlign: "right", padding: "6px 8px" }}>{t("expertPerformance.colFeedbackCount")}</th>
+                <th style={{ textAlign: "left", padding: "6px 8px" }}>{t("expertPerformance.colStarted")}</th>
+                <th style={{ textAlign: "left", padding: "6px 8px" }}>{t("expertPerformance.colCompleted")}</th>
               </tr>
             </thead>
             <tbody>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getReviewDetail, submitFeedback } from "@/lib/api";
+import { useTranslation } from "@/lib/i18n";
 
 interface LabelAnnotation {
   region: string;
@@ -11,6 +12,7 @@ interface LabelAnnotation {
 }
 
 export default function FeedbackDetailPage() {
+  const { t } = useTranslation();
   const { evaluationId } = useParams<{ evaluationId: string }>();
   const router = useRouter();
 
@@ -63,24 +65,24 @@ export default function FeedbackDetailPage() {
       setSuccess(true);
       setTimeout(() => router.push("/expert/feedback"), 1500);
     } catch (e: any) {
-      setError(e.message ?? "제출 실패");
+      setError(e.message ?? t("expertFeedback.submitFailed"));
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) return <p className="text-muted">불러오는 중...</p>;
-  if (!evaluation) return <p className="text-muted">평가를 찾을 수 없습니다.</p>;
+  if (loading) return <p className="text-muted">{t("common.loading")}</p>;
+  if (!evaluation) return <p className="text-muted">{t("expertFeedback.notFound")}</p>;
 
   return (
     <div>
-      <h1 className="page-title">피드백 제출</h1>
+      <h1 className="page-title">{t("expertFeedback.pageTitle")}</h1>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginTop: 24 }}>
         {/* Left: Original output */}
         <div className="card">
-          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>모델 원본 출력</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{t("expertFeedback.sectionOriginalOutput")}</h2>
           <div style={{ marginBottom: 8 }}>
-            <span className="text-muted" style={{ fontSize: 12 }}>평가 ID:</span>{" "}
+            <span className="text-muted" style={{ fontSize: 12 }}>{t("expertFeedback.labelEvaluationId")}</span>{" "}
             <span style={{ fontSize: 12 }}>{evaluation.id}</span>
           </div>
           {evaluation.run_id && (
@@ -90,7 +92,7 @@ export default function FeedbackDetailPage() {
             </div>
           )}
           <div style={{ marginBottom: 8 }}>
-            <span className="text-muted" style={{ fontSize: 12 }}>상태:</span>{" "}
+            <span className="text-muted" style={{ fontSize: 12 }}>{t("expertFeedback.labelStatus")}</span>{" "}
             <span className="badge badge-success" style={{ fontSize: 11 }}>{evaluation.status}</span>
           </div>
           <pre
@@ -110,11 +112,11 @@ export default function FeedbackDetailPage() {
 
         {/* Right: Feedback form */}
         <div className="card">
-          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>피드백 입력</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>{t("expertFeedback.sectionFeedbackForm")}</h2>
 
           {success && (
             <div className="banner banner-success" style={{ marginBottom: 16 }}>
-              피드백이 성공적으로 제출되었습니다!
+              {t("expertFeedback.successMessage")}
             </div>
           )}
           {error && (
@@ -124,22 +126,24 @@ export default function FeedbackDetailPage() {
           )}
 
           <div className="form-group">
-            <label className="form-label">피드백 유형</label>
+            <label className="form-label">{t("expertFeedback.labelFeedbackType")}</label>
             <select
               className="form-control"
               value={feedbackType}
               onChange={(e) => setFeedbackType(e.target.value)}
             >
-              <option value="label_correction">레이블 교정</option>
-              <option value="false_positive">위양성</option>
-              <option value="false_negative">위음성</option>
-              <option value="quality_score">품질 점수</option>
-              <option value="annotation">어노테이션</option>
+              <option value="label_correction">{t("expertFeedback.optionLabelCorrection")}</option>
+              <option value="false_positive">{t("expertFeedback.optionFalsePositive")}</option>
+              <option value="false_negative">{t("expertFeedback.optionFalseNegative")}</option>
+              <option value="quality_score">{t("expertFeedback.optionQualityScore")}</option>
+              <option value="annotation">{t("expertFeedback.optionAnnotation")}</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label className="form-label">품질 점수: {qualityScore.toFixed(2)}</label>
+            <label className="form-label">
+              {t("expertFeedback.labelQualityScore").replace("{score}", qualityScore.toFixed(2))}
+            </label>
             <input
               type="range"
               min={0}
@@ -150,13 +154,13 @@ export default function FeedbackDetailPage() {
               style={{ width: "100%" }}
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-muted)" }}>
-              <span>0.0 (낮음)</span>
-              <span>1.0 (높음)</span>
+              <span>0.0 ({t("expertFeedback.qualityLow")})</span>
+              <span>1.0 ({t("expertFeedback.qualityHigh")})</span>
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">교정된 출력 (JSON)</label>
+            <label className="form-label">{t("expertFeedback.labelCorrectedOutput")}</label>
             <textarea
               className="form-control"
               rows={5}
@@ -168,18 +172,18 @@ export default function FeedbackDetailPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">레이블 어노테이션</label>
+            <label className="form-label">{t("expertFeedback.labelAnnotations")}</label>
             {annotations.map((ann, i) => (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 8 }}>
                 <input
                   className="form-control"
-                  placeholder="영역 (예: hippocampus)"
+                  placeholder={t("expertFeedback.annotationRegionPlaceholder")}
                   value={ann.region}
                   onChange={(e) => updateAnnotation(i, "region", e.target.value)}
                 />
                 <input
                   className="form-control"
-                  placeholder="레이블 (예: atrophy)"
+                  placeholder={t("expertFeedback.annotationLabelPlaceholder")}
                   value={ann.label}
                   onChange={(e) => updateAnnotation(i, "label", e.target.value)}
                 />
@@ -189,7 +193,7 @@ export default function FeedbackDetailPage() {
                   min={0}
                   max={1}
                   step={0.1}
-                  placeholder="신뢰도"
+                  placeholder={t("expertFeedback.annotationConfidencePlaceholder")}
                   value={ann.confidence}
                   onChange={(e) => updateAnnotation(i, "confidence", Number(e.target.value))}
                   style={{ width: 80 }}
@@ -197,16 +201,16 @@ export default function FeedbackDetailPage() {
               </div>
             ))}
             <button className="btn btn-ghost btn-sm" onClick={addAnnotation} type="button">
-              + 어노테이션 추가
+              {t("expertFeedback.addAnnotation")}
             </button>
           </div>
 
           <div className="form-group">
-            <label className="form-label">코멘트</label>
+            <label className="form-label">{t("expertFeedback.labelComments")}</label>
             <textarea
               className="form-control"
               rows={3}
-              placeholder="추가 의견을 입력하세요"
+              placeholder={t("expertFeedback.commentsPlaceholder")}
               value={comments}
               onChange={(e) => setComments(e.target.value)}
             />
@@ -218,7 +222,7 @@ export default function FeedbackDetailPage() {
             disabled={submitting || success}
             style={{ width: "100%" }}
           >
-            {submitting ? "제출 중..." : "피드백 제출"}
+            {submitting ? t("expertFeedback.submitting") : t("expertFeedback.submit")}
           </button>
         </div>
       </div>

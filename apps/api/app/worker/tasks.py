@@ -1002,3 +1002,525 @@ def generate_report(self, request_id: str):
 
         logger.info("Report generated for request %s (status: %s)", request_id, request.status)
         return {"request_id": request_id, "status": "COMPLETED"}
+
+
+# ── Technique Run Execution Task ─────────────────────────────────────────
+
+
+@celery_app.task(
+    name="neurohub.tasks.execute_technique_run",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+    queue="compute",
+)
+def execute_technique_run(self, technique_run_id: str):
+    """Execute a single technique run via LocalContainerRunner.
+
+    1. Load TechniqueRun from DB
+    2. Resolve input/output paths from the parent run's case data
+    3. Execute container via LocalContainerRunner
+    4. Parse NEUROHUB_OUTPUT and update TechniqueRun
+    5. Check if all sibling technique runs are done
+    6. If yes, run fusion and update parent Run
+    """
+    import asyncio
+
+    from app.config import settings as _settings
+    from app.models.technique import TechniqueRun
+
+    logger.info("Starting execute_technique_run: %s", technique_run_id)
+
+    if not _settings.local_docker_enabled:
+        logger.warning(
+            "local_docker_enabled=false, skipping technique run %s", technique_run_id
+        )
+        return {"technique_run_id": technique_run_id, "status": "SKIPPED"}
+
+    with sync_session_factory() as session:
+        tr = session.execute(
+            select(TechniqueRun).where(TechniqueRun.id == uuid.UUID(technique_run_id))
+        ).scalar_one_or_none()
+
+        if not tr:
+            logger.error("TechniqueRun %s not found", technique_run_id)
+            return {"technique_run_id": technique_run_id, "status": "NOT_FOUND"}
+
+        if tr.status not in ("PENDING", "RUNNING"):
+            logger.warning(
+                "TechniqueRun %s in status %s, skipping", technique_run_id, tr.status
+            )
+            return {"technique_run_id": technique_run_id, "status": tr.status}
+
+        # Mark as RUNNING
+        tr.status = "RUNNING"
+        tr.started_at = datetime.now(timezone.utc)
+        tr.celery_task_id = self.request.id
+        session.commit()
+
+        # Get parent run for input/output path resolution
+        run = session.execute(
+            select(Run).where(Run.id == tr.run_id)
+        ).scalar_one_or_none()
+
+        if not run:
+            logger.error("Parent run not found for TechniqueRun %s", technique_run_id)
+            tr.status = "FAILED"
+            tr.error_detail = "Parent run not found"
+            session.commit()
+            return {"technique_run_id": technique_run_id, "status": "FAILED"}
+
+        job_spec = tr.job_spec or {}
+        docker_image = job_spec.get("docker_image", "")
+        technique_key = tr.technique_key
+
+        # Resolve input directory from run's case data
+        # Convention: /data/inputs/{institution_id}/{request_id}/{case_id}/bids/
+        input_dir = _resolve_technique_input_dir(run, session)
+        output_dir = f"/tmp/neurohub/technique_outputs/{technique_run_id}"
+
+    # Execute container
+    try:
+        from app.services.local_container_runner import LocalContainerRunner
+
+        runner = LocalContainerRunner()
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(
+                runner.execute_technique(
+                    technique_key=technique_key,
+                    docker_image=docker_image,
+                    input_dir=input_dir,
+                    output_dir=output_dir,
+                    job_spec=job_spec,
+                    timeout=job_spec.get("timeout", 7200),
+                    gpu=job_spec.get("resource_requirements", {}).get("gpu", False),
+                )
+            )
+        finally:
+            loop.close()
+
+        with sync_session_factory() as session:
+            tr = session.execute(
+                select(TechniqueRun).where(
+                    TechniqueRun.id == uuid.UUID(technique_run_id)
+                )
+            ).scalar_one()
+
+            if result.exit_code == 0 and result.technique_output:
+                tr.status = "COMPLETED"
+                tr.output_data = result.technique_output
+                tr.qc_score = result.technique_output.get("qc_score")
+                tr.completed_at = datetime.now(timezone.utc)
+                logger.info(
+                    "TechniqueRun %s completed: qc=%.1f, features=%d",
+                    technique_run_id,
+                    tr.qc_score or 0,
+                    len(result.technique_output.get("features", {})),
+                )
+            else:
+                tr.status = "FAILED"
+                tr.error_detail = (
+                    f"Container exit={result.exit_code}, "
+                    f"output={'found' if result.technique_output else 'missing'}\n"
+                    f"{result.logs[-500:]}"
+                )
+                tr.completed_at = datetime.now(timezone.utc)
+                logger.error(
+                    "TechniqueRun %s failed: exit=%d",
+                    technique_run_id, result.exit_code,
+                )
+
+            session.commit()
+
+            # Check if all sibling technique runs are done
+            siblings = (
+                session.execute(
+                    select(TechniqueRun).where(TechniqueRun.run_id == tr.run_id)
+                )
+                .scalars()
+                .all()
+            )
+
+            all_done = all(s.status in ("COMPLETED", "FAILED") for s in siblings)
+            if all_done:
+                _finalize_technique_runs(session, tr.run_id, siblings)
+
+        return {"technique_run_id": technique_run_id, "status": tr.status}
+
+    except Exception as exc:
+        logger.exception("TechniqueRun %s execution error: %s", technique_run_id, exc)
+        with sync_session_factory() as session:
+            tr = session.execute(
+                select(TechniqueRun).where(
+                    TechniqueRun.id == uuid.UUID(technique_run_id)
+                )
+            ).scalar_one_or_none()
+            if tr and tr.status == "RUNNING":
+                tr.status = "FAILED"
+                tr.error_detail = str(exc)[:2000]
+                tr.completed_at = datetime.now(timezone.utc)
+                tr.retry_count = (tr.retry_count or 0) + 1
+                session.commit()
+        raise self.retry(exc=exc)
+
+
+def _resolve_technique_input_dir(run: Run, session) -> str:
+    """Resolve the BIDS input directory for a technique run.
+
+    Checks run.job_spec for input_dir override, otherwise builds path from
+    institution/request/case structure.
+    """
+    job_spec = run.job_spec or {}
+
+    # Direct override from job_spec
+    if job_spec.get("input_dir"):
+        return job_spec["input_dir"]
+
+    # Build from case files
+    from app.models.request import Request
+
+    request = session.execute(
+        select(Request).where(Request.id == run.request_id)
+    ).scalar_one_or_none()
+
+    if request:
+        # Convention: data stored in /data/inputs/{inst}/{req}/bids/
+        return (
+            f"/data/inputs/{request.institution_id}/{request.id}/bids"
+        )
+
+    return f"/tmp/neurohub/inputs/{run.id}"
+
+
+def _finalize_technique_runs(session, run_id: uuid.UUID, technique_runs: list) -> None:
+    """After all technique runs complete, run fusion and update parent Run."""
+    from app.services.fusion_engine import FusionConfig, run_fusion
+    from app.services.technique_output import validate_technique_output
+
+    run = session.execute(
+        select(Run).where(Run.id == run_id)
+    ).scalar_one_or_none()
+    if not run:
+        return
+
+    # Collect completed outputs
+    outputs = []
+    for tr in technique_runs:
+        if tr.status == "COMPLETED" and tr.output_data:
+            try:
+                out = validate_technique_output(tr.output_data, tr.technique_key)
+                outputs.append(out)
+            except ValueError as e:
+                logger.warning("Invalid output for technique run %s: %s", tr.id, e)
+
+    completed_count = sum(1 for tr in technique_runs if tr.status == "COMPLETED")
+    failed_count = sum(1 for tr in technique_runs if tr.status == "FAILED")
+
+    if not outputs:
+        # All failed
+        run.status = "FAILED"
+        run.error_detail = f"All {failed_count} technique runs failed"
+        run.completed_at = datetime.now(timezone.utc)
+        logger.error("All technique runs failed for run %s", run_id)
+    else:
+        # Run fusion
+        try:
+            # Build weights from technique run job specs
+            technique_weights = {}
+            for tr in technique_runs:
+                if tr.job_spec and tr.status == "COMPLETED":
+                    technique_weights[tr.technique_key] = tr.job_spec.get(
+                        "base_weight", 1.0 / len(technique_runs)
+                    )
+
+            config = FusionConfig(
+                service_id=str(run.job_spec.get("service_id", "")) if run.job_spec else "",
+                technique_weights=technique_weights,
+            )
+
+            fusion_result = run_fusion(outputs, config)
+
+            run.status = "SUCCEEDED"
+            run.completed_at = datetime.now(timezone.utc)
+            run.result_manifest = {
+                "fusion": fusion_result.to_dict(),
+                "techniques_completed": completed_count,
+                "techniques_failed": failed_count,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            logger.info(
+                "Fusion complete for run %s: %d included, confidence=%.1f",
+                run_id,
+                len(fusion_result.included_modules),
+                fusion_result.confidence_score,
+            )
+        except Exception as e:
+            logger.exception("Fusion failed for run %s: %s", run_id, e)
+            run.status = "SUCCEEDED"  # Still mark succeeded — techniques ran
+            run.completed_at = datetime.now(timezone.utc)
+            run.result_manifest = {
+                "fusion_error": str(e),
+                "techniques_completed": completed_count,
+                "techniques_failed": failed_count,
+            }
+
+    # Transition parent request if applicable
+    request = session.execute(
+        select(Request).where(Request.id == run.request_id)
+    ).scalar_one_or_none()
+
+    if request and request.status == "COMPUTING":
+        all_runs = (
+            session.execute(select(Run).where(Run.request_id == request.id))
+            .scalars()
+            .all()
+        )
+        if all(r.status in ("SUCCEEDED", "FAILED") for r in all_runs):
+            any_succeeded = any(r.status == "SUCCEEDED" for r in all_runs)
+            if any_succeeded:
+                request.status = "QC"
+                _create_sync_notification(
+                    session,
+                    institution_id=request.institution_id,
+                    user_id=request.requested_by,
+                    event_type="COMPUTING_COMPLETE",
+                    title="AI 분석 완료",
+                    body="모든 기법 분석이 완료되었습니다. 품질 검증 단계로 이동합니다.",
+                    entity_type="request",
+                    entity_id=request.id,
+                )
+            else:
+                request.status = "FAILED"
+                request.error_detail = "All runs failed"
+
+    session.commit()
+
+
+# ── Process Case Upload Task ─────────────────────────────────────────────
+
+
+@celery_app.task(
+    name="neurohub.tasks.process_case_upload",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=60,
+    queue="compute",
+)
+def process_case_upload(
+    self,
+    request_id: str,
+    case_id: str,
+    zip_storage_path: str,
+):
+    """Process an uploaded zip file through the full analysis pipeline.
+
+    1. Download zip from storage to local temp dir
+    2. Extract + smart-scan for DICOM/NIfTI files
+    3. Run BIDS conversion, Pre-QC, technique execution, fusion
+    4. Update Run/Request status in DB
+    5. Trigger report generation if all cases complete
+
+    This task is the main entry point for the automated pipeline.
+    It bridges the gap between file upload and analysis results.
+    """
+    import os
+    import tempfile
+
+    logger.info(
+        "Starting process_case_upload: request=%s case=%s zip=%s",
+        request_id, case_id, zip_storage_path,
+    )
+
+    with sync_session_factory() as session:
+        request = session.execute(
+            select(Request).where(Request.id == uuid.UUID(request_id))
+        ).scalar_one_or_none()
+
+        if not request:
+            logger.error("Request %s not found", request_id)
+            return {"status": "NOT_FOUND"}
+
+        from app.models.request import Case
+        case = session.execute(
+            select(Case).where(Case.id == uuid.UUID(case_id))
+        ).scalar_one_or_none()
+
+        if not case:
+            logger.error("Case %s not found", case_id)
+            return {"status": "NOT_FOUND"}
+
+        service_id = str(request.service_id) if request.service_id else None
+        patient_ref = case.patient_ref or "unknown"
+
+    # Create working directory
+    work_dir = tempfile.mkdtemp(prefix=f"neurohub_pipeline_{case_id[:8]}_")
+
+    try:
+        # Download zip from storage
+        zip_path = os.path.join(work_dir, "upload.zip")
+        _download_from_storage(zip_storage_path, zip_path)
+
+        # Run the full pipeline
+        from app.services.pipeline_orchestrator import PipelineOrchestrator
+
+        orchestrator = PipelineOrchestrator(
+            work_dir=work_dir,
+            request_id=request_id,
+            case_id=case_id,
+            service_id=service_id,
+            patient_ref=patient_ref,
+        )
+        result = orchestrator.run_full_pipeline(zip_path)
+
+        # Update DB with results
+        with sync_session_factory() as session:
+            # Update or create Run
+            run = session.execute(
+                select(Run).where(
+                    Run.request_id == uuid.UUID(request_id),
+                    Run.case_id == uuid.UUID(case_id),
+                )
+            ).scalar_one_or_none()
+
+            if not run:
+                # Create a new Run for this case
+                inst_id = session.execute(
+                    select(Request.institution_id).where(
+                        Request.id == uuid.UUID(request_id)
+                    )
+                ).scalar_one()
+
+                run = Run(
+                    institution_id=inst_id,
+                    request_id=uuid.UUID(request_id),
+                    case_id=uuid.UUID(case_id),
+                    status="RUNNING",
+                    started_at=datetime.now(timezone.utc),
+                    celery_task_id=self.request.id,
+                    job_spec={
+                        "pipeline": "auto_process",
+                        "service_id": service_id,
+                        "zip_path": zip_storage_path,
+                    },
+                )
+                session.add(run)
+                session.flush()
+
+            if result.status in ("COMPLETED", "PARTIAL"):
+                run.status = "SUCCEEDED"
+                run.completed_at = datetime.now(timezone.utc)
+                run.result_manifest = result.to_dict()
+                if result.status == "PARTIAL":
+                    run.error_detail = "Pre-QC blocked technique execution"
+            else:
+                run.status = "FAILED"
+                run.completed_at = datetime.now(timezone.utc)
+                run.error_detail = "; ".join(result.errors[:3])
+                run.result_manifest = result.to_dict()
+
+            # Check if all runs for this request are done → advance status
+            request = session.execute(
+                select(Request).where(Request.id == uuid.UUID(request_id))
+            ).scalar_one()
+
+            if request.status == "COMPUTING":
+                all_runs = (
+                    session.execute(
+                        select(Run).where(Run.request_id == uuid.UUID(request_id))
+                    )
+                    .scalars()
+                    .all()
+                )
+                if all(r.status in ("SUCCEEDED", "FAILED") for r in all_runs):
+                    any_succeeded = any(r.status == "SUCCEEDED" for r in all_runs)
+                    if any_succeeded:
+                        request.status = "QC"
+                        _create_sync_notification(
+                            session,
+                            institution_id=request.institution_id,
+                            user_id=request.requested_by,
+                            event_type="COMPUTING_COMPLETE",
+                            title="AI 분석 완료",
+                            body="자동 분석 파이프라인이 완료되었습니다. 품질 검증을 확인해 주세요.",
+                            entity_type="request",
+                            entity_id=request.id,
+                        )
+                    else:
+                        request.status = "FAILED"
+                        request.error_detail = "All pipeline runs failed"
+
+            session.commit()
+
+        return {
+            "status": result.status,
+            "request_id": request_id,
+            "case_id": case_id,
+            "stages": len(result.stages),
+            "modalities": result.modalities_found,
+            "can_proceed": result.can_proceed,
+            "technique_runs": len(result.technique_runs),
+        }
+
+    except Exception as exc:
+        logger.exception("Pipeline failed for case %s: %s", case_id, exc)
+
+        with sync_session_factory() as session:
+            request = session.execute(
+                select(Request).where(Request.id == uuid.UUID(request_id))
+            ).scalar_one_or_none()
+
+            if request and request.status == "COMPUTING":
+                request.status = "FAILED"
+                request.error_detail = f"Pipeline error: {str(exc)[:500]}"
+
+            if request:
+                _create_sync_notification(
+                    session,
+                    institution_id=request.institution_id,
+                    user_id=request.requested_by,
+                    event_type="PIPELINE_FAILED",
+                    title="분석 파이프라인 오류",
+                    body=f"분석 처리 중 오류가 발생했습니다: {str(exc)[:200]}",
+                    entity_type="request",
+                    entity_id=uuid.UUID(request_id),
+                )
+            session.commit()
+
+        raise self.retry(exc=exc)
+
+    finally:
+        # Clean up work directory
+        import shutil as _shutil
+        if os.path.exists(work_dir):
+            try:
+                _shutil.rmtree(work_dir)
+            except Exception:
+                logger.warning("Failed to clean up work dir: %s", work_dir)
+
+
+def _download_from_storage(storage_path: str, local_path: str) -> None:
+    """Download a file from MinIO/Supabase storage to local disk."""
+    import asyncio as _asyncio
+
+    from app.config import settings as _settings
+
+    async def _download():
+        from app.services.storage import download_file
+        await download_file(
+            bucket=_settings.storage_bucket_inputs,
+            path=storage_path,
+            local_path=local_path,
+        )
+
+    try:
+        loop = _asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                pool.submit(_asyncio.run, _download()).result()
+        else:
+            loop.run_until_complete(_download())
+    except RuntimeError:
+        _asyncio.run(_download())

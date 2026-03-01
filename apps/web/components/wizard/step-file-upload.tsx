@@ -153,6 +153,10 @@ export function StepFileUpload({
             return { ...prev, [activeCaseIndex]: arr };
           });
         }}
+        onRetry={(idx) => {
+          const state = fileStates[activeCaseIndex]?.[idx];
+          if (state?.file) handleFiles(activeCaseIndex, [state.file]);
+        }}
       />
 
       {!requestId && (

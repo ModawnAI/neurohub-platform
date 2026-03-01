@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft } from "phosphor-react";
-import { listServices, listPipelines, createRequest, confirmRequest, submitRequest, advanceRequest } from "@/lib/api";
+import { listServices, listPipelines, createRequest, processRequest } from "@/lib/api";
 import { useWizard } from "@/lib/use-wizard";
 import { StepIndicator } from "@/components/wizard/step-indicator";
 import { StepServiceSelect } from "@/components/wizard/step-service-select";
@@ -70,16 +70,12 @@ export default function UserNewRequestPage() {
     onError: (err: any) => setError(err?.message || t("wizard.errorCreateRequest")),
   });
 
-  // Submit: advance through RECEIVING → STAGING → confirm → submit
+  // Submit: trigger automatic processing pipeline
   const submitMut = useMutation({
     mutationFn: async () => {
       if (!requestId) throw new Error(t("wizard.errorNoRequestId"));
-      // Advance to STAGING (from RECEIVING or CREATED)
-      await advanceRequest(requestId, "STAGING");
-      // Confirm: STAGING → READY_TO_COMPUTE
-      await confirmRequest(requestId);
-      // Submit: READY_TO_COMPUTE → COMPUTING
-      return submitRequest(requestId);
+      // One-click processing: upload → auto pipeline
+      return processRequest(requestId);
     },
     onSuccess: () => {
       clearDraft();

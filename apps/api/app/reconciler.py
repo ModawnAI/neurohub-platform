@@ -97,11 +97,24 @@ def _dispatch_watermark_requested(event: OutboxEvent) -> None:
     )
 
 
+def _dispatch_pipeline_process(event: OutboxEvent) -> None:
+    """Dispatch auto-processing pipeline tasks for uploaded zip files."""
+    case_tasks = event.payload.get("case_tasks", [])
+    request_id = event.payload.get("request_id", "")
+    for ct in case_tasks:
+        celery_app.send_task(
+            "neurohub.tasks.process_case_upload",
+            args=[request_id, ct["case_id"], ct["storage_path"]],
+            queue="compute",
+        )
+
+
 EVENT_HANDLERS: dict[str, callable] = {
     "RUN_SUBMITTED": _dispatch_run_submitted,
     "REPORT_REQUESTED": _dispatch_report_requested,
     "RUN_COMPLETED": _dispatch_run_completed,
     "PIPELINE_DISPATCHED": _dispatch_pipeline,
+    "PIPELINE_PROCESS": _dispatch_pipeline_process,
     "WATERMARK_REQUESTED": _dispatch_watermark_requested,
 }
 

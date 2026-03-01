@@ -7,9 +7,11 @@ import { ArrowLeft, DownloadSimple, File } from "phosphor-react";
 import {
   getRequest,
   advanceRequest,
+  processRequest,
   listCases,
   listCaseFiles,
   getDownloadUrl,
+  getPipelineStatus,
   type RequestStatus,
   type CaseRead,
   type CaseFileRead,
@@ -114,6 +116,13 @@ export default function AdminRequestDetailPage() {
     enabled: !!id,
   });
 
+  const { data: pipelineData } = useQuery({
+    queryKey: ["pipeline-status", id],
+    queryFn: () => getPipelineStatus(id),
+    enabled: !!id && ["COMPUTING", "QC", "REPORTING", "EXPERT_REVIEW", "FINAL", "FAILED"].includes(request?.status ?? ""),
+    refetchInterval: request?.status === "COMPUTING" ? 5000 : false,
+  });
+
   const transitionMut = useMutation({
     mutationFn: (targetStatus: string) => advanceRequest(id, targetStatus),
     onSuccess: () => {
@@ -121,6 +130,15 @@ export default function AdminRequestDetailPage() {
       addToast("success", t("toast.transitionSuccess"));
     },
     onError: () => addToast("error", t("toast.transitionError")),
+  });
+
+  const processMut = useMutation({
+    mutationFn: () => processRequest(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-request", id] });
+      addToast("success", `${t("pipeline.startProcessing" as any)}: ${data.cases_processing}${t("common.unitCount")}`);
+    },
+    onError: (err: any) => addToast("error", err?.message || t("toast.genericError")),
   });
 
   if (isLoading) return <div className="loading-center"><span className="spinner" /></div>;
@@ -153,7 +171,7 @@ export default function AdminRequestDetailPage() {
             <div className="stack-md">
               <div><p className="detail-label">{t("adminRequests.requestId")}</p><p className="detail-value" style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{request.id}</p></div>
               <div><p className="detail-label">{t("requestDetail.service")}</p><p className="detail-value">{serviceSnapshot?.display_name || "-"}</p></div>
-              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}"건"</p></div>
+              <div><p className="detail-label">{t("requestDetail.caseCount")}</p><p className="detail-value">{request.case_count}{t("common.unitCount")}</p></div>
               <div><p className="detail-label">{t("adminRequests.priority")}</p><p className="detail-value">{request.priority}</p></div>
               <div><p className="detail-label">{t("requestDetail.createdDate")}</p><p className="detail-value">{new Date(request.created_at).toLocaleString(dateLocale)}</p></div>
               {request.updated_at && <div><p className="detail-label">{t("adminRequests.lastModified")}</p><p className="detail-value">{new Date(request.updated_at).toLocaleString(dateLocale)}</p></div>}
@@ -169,6 +187,108 @@ export default function AdminRequestDetailPage() {
                   <AdminCaseFiles key={c.id} requestId={id} caseItem={c} />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Pipeline Monitoring Panel */}
+          {pipelineData && pipelineData.runs.length > 0 && (
+            <div className="panel">
+              <h2 className="panel-title-mb">{t("pipeline.monitorTitle" as any)}</h2>
+
+              {/* Technique summary bar */}
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, alignSelf: "center", marginRight: 4 }}>
+                  {t("pipeline.summary" as any)}:
+                </span>
+                <span className="status-chip status-created" style={{ fontSize: 12 }}>
+                  {t("pipeline.total" as any)} {pipelineData.technique_summary.total}
+                </span>
+                {pipelineData.technique_summary.pending > 0 && (
+                  <span className="status-chip status-staging" style={{ fontSize: 12 }}>
+                    {t("pipeline.pending" as any)} {pipelineData.technique_summary.pending}
+                  </span>
+                )}
+                {pipelineData.technique_summary.running > 0 && (
+                  <span className="status-chip status-computing" style={{ fontSize: 12 }}>
+                    {t("pipeline.running" as any)} {pipelineData.technique_summary.running}
+                  </span>
+                )}
+                {pipelineData.technique_summary.completed > 0 && (
+                  <span className="status-chip status-final" style={{ fontSize: 12 }}>
+                    {t("pipeline.completed" as any)} {pipelineData.technique_summary.completed}
+                  </span>
+                )}
+                {pipelineData.technique_summary.failed > 0 && (
+                  <span className="status-chip status-failed" style={{ fontSize: 12 }}>
+                    {t("pipeline.failed" as any)} {pipelineData.technique_summary.failed}
+                  </span>
+                )}
+              </div>
+
+              {/* Per-run details */}
+              <div className="stack-sm">
+                {pipelineData.runs.map((run) => (
+                  <div key={run.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "0.75rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                      <span style={{ fontSize: 13, fontFamily: "monospace", color: "var(--muted)" }}>
+                        {t("pipeline.runId" as any)}: {run.id.slice(0, 8)}
+                        {run.case_id && ` · case: ${run.case_id.slice(0, 8)}`}
+                      </span>
+                      <span className={`status-chip status-${run.status.toLowerCase()}`} style={{ fontSize: 11 }}>
+                        {t(`status.${run.status}` as any) || run.status}
+                      </span>
+                    </div>
+
+                    {run.technique_runs.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", paddingLeft: "0.5rem" }}>
+                        {run.technique_runs.map((tr) => (
+                          <div
+                            key={tr.id}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              fontSize: 13,
+                              padding: "0.25rem 0",
+                              borderTop: "1px solid var(--border)",
+                            }}
+                          >
+                            <span style={{ fontWeight: 500 }}>{tr.technique_key}</span>
+                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                              {tr.qc_score !== null && (
+                                <span style={{ fontSize: 12, color: tr.qc_score >= 60 ? "var(--success, #22c55e)" : "var(--danger, #ef4444)" }}>
+                                  QC {tr.qc_score.toFixed(1)}
+                                </span>
+                              )}
+                              <span className={`status-chip status-${tr.status.toLowerCase()}`} style={{ fontSize: 11 }}>
+                                {t(`status.${tr.status}` as any) || tr.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Auto-process button — available when files are uploaded */}
+          {["CREATED", "RECEIVING", "STAGING", "READY_TO_COMPUTE"].includes(request.status) && (
+            <div className="panel">
+              <h2 className="panel-title-mb">{t("pipeline.title" as any)}</h2>
+              <p className="muted-text" style={{ marginBottom: "0.75rem" }}>
+                {t("pipeline.description" as any)}
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => processMut.mutate()}
+                disabled={processMut.isPending}
+              >
+                {processMut.isPending ? t("pipeline.processing" as any) : t("pipeline.startProcessing" as any)}
+              </button>
+              {processMut.isError && <p className="error-text" style={{ marginTop: 8 }}>{(processMut.error as Error).message}</p>}
             </div>
           )}
 
