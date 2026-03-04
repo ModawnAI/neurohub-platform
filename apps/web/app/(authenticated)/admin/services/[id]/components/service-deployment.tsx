@@ -183,9 +183,9 @@ export function ServiceDeployment({ service }: Props) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <CheckCircle size={18} weight="fill" style={{ color: "var(--success)" }} />
               <div>
-                <p style={{ fontSize: 13, fontWeight: 600 }}>{packageInfo.file_name}</p>
+                <p style={{ fontSize: 13, fontWeight: 600 }}>{packageInfo.file_name ?? "package"}</p>
                 <p className="muted-text" style={{ fontSize: 11 }}>
-                  {formatBytes(packageInfo.file_size)} &middot; {new Date(packageInfo.uploaded_at).toLocaleString(ko ? "ko-KR" : "en-US")}
+                  {formatBytes(packageInfo.file_size ?? 0)} &middot; {new Date(packageInfo.uploaded_at ?? Date.now()).toLocaleString(ko ? "ko-KR" : "en-US")}
                 </p>
               </div>
             </div>

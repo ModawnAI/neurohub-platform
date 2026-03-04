@@ -711,6 +711,10 @@ export const en: TranslationKeys = {
     description: "Description",
     recentRequests: "Recent Requests",
     noRequests: "No requests have used this service yet.",
+    tabSettings: "Settings",
+    tabSchema: "Schema",
+    tabExecution: "Execution",
+    tabAnalytics: "Analytics",
   },
   qcScore: {
     label: "QC Score",

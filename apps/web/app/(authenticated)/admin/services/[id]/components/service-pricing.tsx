@@ -29,11 +29,12 @@ export function ServicePricing({ service }: Props) {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
 
-  const existing: PricingData = service.pricing ?? {
-    base_price: 0,
-    per_case_price: 0,
-    currency: "KRW",
-    volume_discounts: [],
+  const raw = service.pricing as Partial<PricingData> | null | undefined;
+  const existing: PricingData = {
+    base_price: raw?.base_price ?? 0,
+    per_case_price: raw?.per_case_price ?? 0,
+    currency: raw?.currency ?? "KRW",
+    volume_discounts: raw?.volume_discounts ?? [],
   };
   const [pricing, setPricing] = useState<PricingData>(existing);
 

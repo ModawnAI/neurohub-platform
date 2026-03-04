@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, PencilSimple, ArrowSquareOut, Cube } from "phosphor-react";
+import { Plus, PencilSimple, ArrowSquareOut, Cube, Trash, Warning } from "phosphor-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { listServices, updateService, type ServiceRead } from "@/lib/api";
+import { listServices, updateService, deleteService, type ServiceRead } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
 
 export default function AdminServicesPage() {
@@ -23,6 +23,10 @@ export default function AdminServicesPage() {
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editVersion, setEditVersion] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
+
+  // Delete dialog state
+  const [deletingService, setDeletingService] = useState<ServiceRead | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   function openEdit(svc: ServiceRead) {
     setEditingService(svc);
@@ -50,6 +54,15 @@ export default function AdminServicesPage() {
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       updateService(id, { status: status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["services"] }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteService(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      setDeletingService(null);
+      setDeleteConfirmText("");
+    },
   });
 
   return (
@@ -150,9 +163,15 @@ export default function AdminServicesPage() {
                   className={`btn btn-sm ${svc.status === "ACTIVE" ? "btn-danger" : "btn-primary"}`}
                   onClick={() => toggleMut.mutate({ id: svc.id, status: svc.status })}
                   disabled={toggleMut.isPending}
-                  style={{ marginLeft: "auto" }}
                 >
                   {svc.status === "ACTIVE" ? t("common.deactivate") : t("common.activate")}
+                </button>
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => { setDeletingService(svc); setDeleteConfirmText(""); deleteMut.reset(); }}
+                  style={{ marginLeft: "auto" }}
+                >
+                  <Trash size={14} />
                 </button>
               </div>
             </div>
@@ -188,6 +207,69 @@ export default function AdminServicesPage() {
                   {updateMut.isPending ? <span className="spinner" /> : t("common.save")}
                 </button>
               </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      {/* Delete Confirmation Dialog */}
+      <Dialog.Root open={!!deletingService} onOpenChange={(open) => { if (!open) { setDeletingService(null); setDeleteConfirmText(""); deleteMut.reset(); } }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content className="dialog-content" style={{ maxWidth: 440 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", backgroundColor: "var(--danger-light, #fef2f2)",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <Warning size={22} weight="fill" style={{ color: "var(--danger)" }} />
+              </div>
+              <Dialog.Title className="dialog-title" style={{ margin: 0 }}>
+                {ko ? "서비스 삭제" : "Delete Service"}
+              </Dialog.Title>
+            </div>
+
+            <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, backgroundColor: "var(--danger-light, #fef2f2)", border: "1px solid var(--danger-border, #fecaca)" }}>
+              <p style={{ fontSize: 13, color: "var(--danger)", fontWeight: 600, marginBottom: 4 }}>
+                {ko ? "이 작업은 되돌릴 수 없습니다." : "This action cannot be undone."}
+              </p>
+              <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                {ko
+                  ? "서비스와 관련된 파이프라인, 기법 가중치, 평가자 설정이 모두 삭제됩니다. 이 서비스를 참조하는 분석 요청이 있으면 삭제할 수 없습니다."
+                  : "All pipelines, technique weights, and evaluator assignments for this service will be deleted. Deletion is blocked if any requests reference this service."}
+              </p>
+            </div>
+
+            <p style={{ fontSize: 13, marginBottom: 6 }}>
+              {ko
+                ? <>확인을 위해 서비스명 <strong>{deletingService?.name}</strong>을 입력하세요:</>
+                : <>Type <strong>{deletingService?.name}</strong> to confirm:</>}
+            </p>
+            <input
+              className="input"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={deletingService?.name ?? ""}
+              autoFocus
+            />
+
+            {deleteMut.isError && (
+              <p className="error-text" style={{ marginTop: 8 }}>
+                {(deleteMut.error as Error).message}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <Dialog.Close asChild>
+                <button className="btn btn-secondary">{t("common.cancel")}</button>
+              </Dialog.Close>
+              <button
+                className="btn btn-danger"
+                disabled={deleteConfirmText !== deletingService?.name || deleteMut.isPending}
+                onClick={() => deletingService && deleteMut.mutate(deletingService.id)}
+              >
+                {deleteMut.isPending ? <span className="spinner" /> : <Trash size={14} />}
+                {ko ? " 삭제" : " Delete"}
+              </button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>

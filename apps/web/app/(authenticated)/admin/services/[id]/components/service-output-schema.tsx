@@ -58,24 +58,16 @@ export function ServiceOutputSchema({ service }: Props) {
   const isDirty = JSON.stringify(fields) !== JSON.stringify(existingFields);
 
   return (
-    <div className="panel">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div>
-          <h3 className="panel-title">{ko ? "출력 스키마" : "Output Schema"}</h3>
-          <p className="muted-text" style={{ fontSize: 12, marginTop: 2 }}>
-            {ko ? "AI 분석 결과로 생성될 출력 형식을 정의합니다" : "Define expected output fields from AI analysis"}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary btn-sm" onClick={addField}>
-            <Plus size={14} /> {ko ? "출력 추가" : "Add Output"}
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
+        <button className="btn btn-secondary btn-sm" onClick={addField}>
+          <Plus size={14} /> {ko ? "출력 추가" : "Add Output"}
+        </button>
+        {isDirty && (
+          <button className="btn btn-primary btn-sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <span className="spinner" /> : ko ? "저장" : "Save"}
           </button>
-          {isDirty && (
-            <button className="btn btn-primary btn-sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-              {saveMut.isPending ? <span className="spinner" /> : ko ? "저장" : "Save"}
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {fields.length === 0 ? (
@@ -83,30 +75,39 @@ export function ServiceOutputSchema({ service }: Props) {
           {ko ? "정의된 출력 필드가 없습니다." : "No output fields defined."}
         </p>
       ) : (
-        <div className="stack-sm">
-          {fields.map((field, idx) => (
-            <div key={idx} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: 12 }}>
-              <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr auto" }}>
-                <label className="field">
-                  {ko ? "키" : "Key"}
-                  <input className="input" value={field.key} onChange={(e) => updateField(idx, { key: e.target.value.replace(/[^a-z0-9_]/g, "") })} placeholder="brain_map" />
-                </label>
-                <label className="field">
-                  {ko ? "타입" : "Type"}
-                  <select className="input" value={field.type} onChange={(e) => updateField(idx, { type: e.target.value })}>
-                    {OUTPUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </label>
-                <label className="field">
-                  {ko ? "라벨" : "Label"}
-                  <input className="input" value={field.label} onChange={(e) => updateField(idx, { label: e.target.value })} placeholder={ko ? "뇌 영상 지도" : "Brain Map"} />
-                </label>
-                <button className="btn btn-danger btn-sm" style={{ marginTop: 20 }} onClick={() => removeField(idx)}>
-                  <Trash size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{ko ? "키" : "Key"}</th>
+                <th style={{ width: 100 }}>{ko ? "타입" : "Type"}</th>
+                <th>{ko ? "라벨" : "Label"}</th>
+                <th style={{ width: 60, textAlign: "center" }}>{ko ? "작업" : "Actions"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fields.map((field, idx) => (
+                <tr key={idx}>
+                  <td>
+                    <input className="input" value={field.key} onChange={(e) => updateField(idx, { key: e.target.value.replace(/[^a-z0-9_]/g, "") })} placeholder="brain_map" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }} />
+                  </td>
+                  <td>
+                    <select className="input" value={field.type} onChange={(e) => updateField(idx, { type: e.target.value })} style={{ fontSize: 12 }}>
+                      {OUTPUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <input className="input" value={field.label} onChange={(e) => updateField(idx, { label: e.target.value })} placeholder={ko ? "뇌 영상 지도" : "Brain Map"} style={{ fontSize: 12 }} />
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    <button className="btn btn-danger" style={{ padding: "2px 4px" }} onClick={() => removeField(idx)}>
+                      <Trash size={12} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

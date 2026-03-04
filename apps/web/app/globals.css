@@ -394,6 +394,41 @@ a {
   border-bottom: none;
 }
 
+.data-table .detail-row td {
+  background: var(--surface-2, #f8f9fb);
+  border-bottom: 2px solid var(--primary-light);
+  padding: 16px 14px;
+}
+
+.data-table .detail-row:hover {
+  background: var(--surface-2, #f8f9fb);
+}
+
+/* ── Collapsible Panel Header ── */
+
+.panel-collapse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  padding: 14px 18px;
+}
+
+.panel-collapse-header:hover {
+  opacity: 0.85;
+}
+
+.chevron-toggle {
+  transition: transform 0.2s;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.chevron-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
 /* ── Stacks ── */
 
 .stack-lg {

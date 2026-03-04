@@ -709,6 +709,10 @@ export const ko = {
     description: "설명",
     recentRequests: "최근 요청",
     noRequests: "아직 이 서비스를 사용한 요청이 없습니다.",
+    tabSettings: "기본 설정",
+    tabSchema: "입출력 스키마",
+    tabExecution: "실행 환경",
+    tabAnalytics: "사용 현황",
   },
   qcScore: {
     label: "QC 점수",

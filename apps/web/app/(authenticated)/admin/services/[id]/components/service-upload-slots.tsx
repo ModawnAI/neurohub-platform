@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash } from "phosphor-react";
+import { Plus, Trash, PencilSimple } from "phosphor-react";
 import { updateServiceDefinition, type ServiceRead } from "@/lib/api";
 import type { UploadSlot } from "@/components/dynamic-form/types";
 import { useTranslation } from "@/lib/i18n";
@@ -69,24 +69,16 @@ export function ServiceUploadSlots({ service }: Props) {
   const isDirty = JSON.stringify(slots) !== JSON.stringify(existingSlots);
 
   return (
-    <div className="panel">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div>
-          <h3 className="panel-title">{ko ? "업로드 슬롯" : "Upload Slots"}</h3>
-          <p className="muted-text" style={{ fontSize: 12, marginTop: 2 }}>
-            {ko ? "파일 업로드 슬롯을 정의합니다 (DICOM, NIfTI 등)" : "Define file upload slots (DICOM, NIfTI, etc.)"}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary btn-sm" onClick={addSlot}>
-            <Plus size={14} /> {ko ? "슬롯 추가" : "Add Slot"}
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
+        <button className="btn btn-secondary btn-sm" onClick={addSlot}>
+          <Plus size={14} /> {ko ? "슬롯 추가" : "Add Slot"}
+        </button>
+        {isDirty && (
+          <button className="btn btn-primary btn-sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <span className="spinner" /> : ko ? "저장" : "Save"}
           </button>
-          {isDirty && (
-            <button className="btn btn-primary btn-sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-              {saveMut.isPending ? <span className="spinner" /> : ko ? "저장" : "Save"}
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {slots.length === 0 ? (
@@ -94,82 +86,101 @@ export function ServiceUploadSlots({ service }: Props) {
           {ko ? "정의된 업로드 슬롯이 없습니다." : "No upload slots defined."}
         </p>
       ) : (
-        <div className="stack-sm">
-          {slots.map((slot, idx) => (
-            <div
-              key={idx}
-              style={{
-                border: `1px solid ${editIdx === idx ? "var(--primary)" : "var(--border)"}`,
-                borderRadius: "var(--radius-sm)",
-                padding: 12,
-                background: editIdx === idx ? "var(--primary-subtle)" : "transparent",
-                cursor: "pointer",
-              }}
-              onClick={() => setEditIdx(editIdx === idx ? null : idx)}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="mono-cell" style={{ fontSize: 11, color: "var(--muted)" }}>{slot.key || "—"}</span>
-                  <span style={{ fontWeight: 500, fontSize: 13 }}>{slot.label || (ko ? "라벨 없음" : "No label")}</span>
-                  <span className="muted-text" style={{ fontSize: 11 }}>{(slot.accepted_types || []).join(", ")}</span>
-                  {slot.required && <span style={{ color: "var(--danger)", fontSize: 11, fontWeight: 600 }}>*</span>}
-                </div>
-                <button className="btn btn-danger" style={{ padding: "2px 4px" }} onClick={(e) => { e.stopPropagation(); removeSlot(idx); }}>
-                  <Trash size={12} />
-                </button>
-              </div>
-
-              {editIdx === idx && (
-                <div className="stack-sm" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-                  <div className="form-grid">
-                    <label className="field">
-                      {ko ? "키 (영문)" : "Key"}
-                      <input className="input" value={slot.key} onChange={(e) => updateSlot(idx, { key: e.target.value.replace(/[^a-z0-9_]/g, "") })} placeholder="mri_t1" />
-                    </label>
-                    <label className="field">
-                      {ko ? "라벨" : "Label"}
-                      <input className="input" value={slot.label} onChange={(e) => updateSlot(idx, { label: e.target.value })} placeholder={ko ? "MRI T1 영상" : "MRI T1 Image"} />
-                    </label>
-                  </div>
-                  <div className="form-grid">
-                    <label className="field">
-                      {ko ? "최소 파일 수" : "Min Files"}
-                      <input className="input" type="number" min={0} value={slot.min_files ?? 1} onChange={(e) => updateSlot(idx, { min_files: Number(e.target.value) })} />
-                    </label>
-                    <label className="field">
-                      {ko ? "최대 파일 수" : "Max Files"}
-                      <input className="input" type="number" min={1} value={slot.max_files ?? 500} onChange={(e) => updateSlot(idx, { max_files: Number(e.target.value) })} />
-                    </label>
-                  </div>
-                  <div>
-                    <p className="detail-label" style={{ marginBottom: 6 }}>{ko ? "허용 파일 타입" : "Accepted Types"}</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {ACCEPTED_TYPES.map((type) => (
-                        <button
-                          key={type}
-                          className={`btn btn-sm ${(slot.accepted_types || []).includes(type) ? "btn-primary" : "btn-secondary"}`}
-                          style={{ fontSize: 11, padding: "3px 8px" }}
-                          onClick={() => toggleType(idx, type)}
-                        >
-                          {type}
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ width: 130 }}>{ko ? "키" : "Key"}</th>
+                <th>{ko ? "라벨" : "Label"}</th>
+                <th>{ko ? "허용 타입" : "Types"}</th>
+                <th style={{ width: 90, textAlign: "center" }}>{ko ? "파일 수" : "Files"}</th>
+                <th style={{ width: 50, textAlign: "center" }}>{ko ? "필수" : "Req"}</th>
+                <th style={{ width: 80, textAlign: "center" }}>{ko ? "작업" : "Actions"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slots.map((slot, idx) => (
+                <>
+                  <tr key={`row-${idx}`} style={{ cursor: "pointer" }} onClick={() => setEditIdx(editIdx === idx ? null : idx)}>
+                    <td className="mono-cell" style={{ fontSize: 12 }}>{slot.key || "—"}</td>
+                    <td style={{ fontSize: 13 }}>{slot.label || <span className="muted-text">{ko ? "라벨 없음" : "No label"}</span>}</td>
+                    <td>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {(slot.accepted_types || []).map((t) => (
+                          <span key={t} className="status-chip" style={{ fontSize: 10, padding: "1px 5px" }}>{t}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "center", fontSize: 12 }}>{slot.min_files ?? 1}–{slot.max_files ?? 500}</td>
+                    <td style={{ textAlign: "center" }}>{slot.required ? <span style={{ color: "var(--danger)", fontWeight: 600 }}>*</span> : "—"}</td>
+                    <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: "flex", gap: 2, justifyContent: "center" }}>
+                        <button className="btn btn-secondary" style={{ padding: "2px 4px" }} onClick={() => setEditIdx(editIdx === idx ? null : idx)}>
+                          <PencilSimple size={12} />
                         </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="form-grid">
-                    <label className="field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <input type="checkbox" checked={slot.required ?? true} onChange={(e) => updateSlot(idx, { required: e.target.checked })} />
-                      {ko ? "필수" : "Required"}
-                    </label>
-                  </div>
-                  <label className="field">
-                    {ko ? "설명" : "Description"}
-                    <input className="input" value={slot.description || ""} onChange={(e) => updateSlot(idx, { description: e.target.value || undefined })} />
-                  </label>
-                </div>
-              )}
-            </div>
-          ))}
+                        <button className="btn btn-danger" style={{ padding: "2px 4px" }} onClick={() => removeSlot(idx)}>
+                          <Trash size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {editIdx === idx && (
+                    <tr key={`detail-${idx}`} className="detail-row">
+                      <td colSpan={6}>
+                        <div className="stack-sm" onClick={(e) => e.stopPropagation()}>
+                          <div className="form-grid">
+                            <label className="field">
+                              {ko ? "키 (영문)" : "Key"}
+                              <input className="input" value={slot.key} onChange={(e) => updateSlot(idx, { key: e.target.value.replace(/[^a-z0-9_]/g, "") })} placeholder="mri_t1" />
+                            </label>
+                            <label className="field">
+                              {ko ? "라벨" : "Label"}
+                              <input className="input" value={slot.label} onChange={(e) => updateSlot(idx, { label: e.target.value })} placeholder={ko ? "MRI T1 영상" : "MRI T1 Image"} />
+                            </label>
+                          </div>
+                          <div className="form-grid">
+                            <label className="field">
+                              {ko ? "최소 파일 수" : "Min Files"}
+                              <input className="input" type="number" min={0} value={slot.min_files ?? 1} onChange={(e) => updateSlot(idx, { min_files: Number(e.target.value) })} />
+                            </label>
+                            <label className="field">
+                              {ko ? "최대 파일 수" : "Max Files"}
+                              <input className="input" type="number" min={1} value={slot.max_files ?? 500} onChange={(e) => updateSlot(idx, { max_files: Number(e.target.value) })} />
+                            </label>
+                          </div>
+                          <div>
+                            <p className="detail-label" style={{ marginBottom: 6 }}>{ko ? "허용 파일 타입" : "Accepted Types"}</p>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {ACCEPTED_TYPES.map((type) => (
+                                <button
+                                  key={type}
+                                  className={`btn btn-sm ${(slot.accepted_types || []).includes(type) ? "btn-primary" : "btn-secondary"}`}
+                                  style={{ fontSize: 11, padding: "3px 8px" }}
+                                  onClick={() => toggleType(idx, type)}
+                                >
+                                  {type}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="form-grid">
+                            <label className="field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <input type="checkbox" checked={slot.required ?? true} onChange={(e) => updateSlot(idx, { required: e.target.checked })} />
+                              {ko ? "필수" : "Required"}
+                            </label>
+                          </div>
+                          <label className="field">
+                            {ko ? "설명" : "Description"}
+                            <input className="input" value={slot.description || ""} onChange={(e) => updateSlot(idx, { description: e.target.value || undefined })} />
+                          </label>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

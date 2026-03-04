@@ -209,6 +209,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new ApiError(response.status, errorCode || `HTTP_${response.status}`, message, detail);
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -843,6 +844,10 @@ export async function createPipeline(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function deleteService(serviceId: string) {
+  return apiFetch<void>(`/admin/services/${serviceId}`, { method: "DELETE" });
 }
 
 export async function updateService(

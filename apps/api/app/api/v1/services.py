@@ -267,6 +267,68 @@ async def publish_service(
     return _service_to_read(service)
 
 
+@router.delete("/admin/services/{service_id}", status_code=204)
+async def delete_service(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Permanently delete a service. Blocked if any requests reference it."""
+    from app.models.request import Request
+
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    # Check for existing requests
+    from sqlalchemy import func
+
+    req_count = (
+        await db.execute(
+            select(func.count()).where(Request.service_id == service_id)
+        )
+    ).scalar() or 0
+    if req_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete: {req_count} request(s) reference this service",
+        )
+
+    # Delete related records first
+    from app.models.technique import ServiceTechniqueWeight
+
+    await db.execute(
+        select(ServiceTechniqueWeight)
+        .where(ServiceTechniqueWeight.service_id == service_id)
+    )
+    from sqlalchemy import delete as sa_delete
+
+    await db.execute(
+        sa_delete(ServiceTechniqueWeight).where(
+            ServiceTechniqueWeight.service_id == service_id
+        )
+    )
+    await db.execute(
+        sa_delete(PipelineDefinition).where(
+            PipelineDefinition.service_id == service_id
+        )
+    )
+    await db.execute(
+        sa_delete(ServiceEvaluator).where(
+            ServiceEvaluator.service_id == service_id
+        )
+    )
+
+    await db.delete(service)
+    await db.flush()
+
+
 @router.patch("/admin/services/{service_id}/deprecate", response_model=ServiceRead)
 async def deprecate_service(
     service_id: uuid.UUID,

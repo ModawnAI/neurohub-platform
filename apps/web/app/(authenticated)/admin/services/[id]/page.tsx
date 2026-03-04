@@ -2,32 +2,23 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChartBar, Gear, UploadSimple, Sliders, FileText, CurrencyKrw, Cpu, CloudArrowUp, Brain } from "phosphor-react";
+import { ArrowLeft, ChartBar, Gear, FileText, Cpu, Trash, Warning, ChartLine } from "phosphor-react";
 import { useState } from "react";
-import { listServices, listRequests, type ServiceRead, type RequestRead } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import * as Dialog from "@radix-ui/react-dialog";
+import { listServices, listRequests, deleteService, type ServiceRead, type RequestRead } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
 import { SkeletonCards } from "@/components/skeleton";
 import { EmptyState } from "@/components/empty-state";
 
 import { ServiceBasicInfo } from "./components/service-basic-info";
-import { ServiceInputSchema } from "./components/service-input-schema";
-import { ServiceUploadSlots } from "./components/service-upload-slots";
-import { ServiceOptionsSchema } from "./components/service-options-schema";
-import { ServiceOutputSchema } from "./components/service-output-schema";
 import { ServicePricing } from "./components/service-pricing";
+import { ServiceSchemaEditor } from "./components/service-schema-editor";
 import { ServicePipelines } from "./components/service-pipelines";
 import { ServiceDeployment } from "./components/service-deployment";
 import { TechniqueWeightEditor } from "@/components/technique-weight-editor";
 
-function ServiceTechniqueProfile({ serviceId }: { serviceId: string }) {
-  return (
-    <div className="panel">
-      <TechniqueWeightEditor serviceId={serviceId} />
-    </div>
-  );
-}
-
-type TabId = "overview" | "input" | "upload" | "options" | "output" | "pricing" | "pipeline" | "deploy" | "techniques";
+type TabId = "settings" | "schema" | "execution" | "analytics";
 
 interface Tab {
   id: TabId;
@@ -37,15 +28,10 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: "overview", label: "기본 정보", labelEn: "Overview", icon: <Gear size={14} /> },
-  { id: "input", label: "입력 스키마", labelEn: "Input Schema", icon: <FileText size={14} /> },
-  { id: "upload", label: "업로드 슬롯", labelEn: "Upload Slots", icon: <UploadSimple size={14} /> },
-  { id: "options", label: "분석 옵션", labelEn: "Options", icon: <Sliders size={14} /> },
-  { id: "output", label: "출력 스키마", labelEn: "Output", icon: <FileText size={14} /> },
-  { id: "pricing", label: "가격 설정", labelEn: "Pricing", icon: <CurrencyKrw size={14} /> },
-  { id: "pipeline", label: "파이프라인", labelEn: "Pipelines", icon: <Cpu size={14} /> },
-  { id: "deploy", label: "배포", labelEn: "Deploy", icon: <CloudArrowUp size={14} /> },
-  { id: "techniques", label: "기법 프로필", labelEn: "Techniques", icon: <Brain size={14} /> },
+  { id: "settings", label: "기본 설정", labelEn: "Settings", icon: <Gear size={14} /> },
+  { id: "schema", label: "입출력 스키마", labelEn: "Schema", icon: <FileText size={14} /> },
+  { id: "execution", label: "실행 환경", labelEn: "Execution", icon: <Cpu size={14} /> },
+  { id: "analytics", label: "사용 현황", labelEn: "Analytics", icon: <ChartLine size={14} /> },
 ];
 
 export default function ServiceDetailPage() {
@@ -54,7 +40,18 @@ export default function ServiceDetailPage() {
   const { t, locale } = useTranslation();
   const dateLocale = locale === "ko" ? "ko-KR" : "en-US";
   const ko = locale === "ko";
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<TabId>("settings");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const deleteMut = useMutation({
+    mutationFn: () => deleteService(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      router.push("/admin/services");
+    },
+  });
 
   const { data: servicesData, isLoading } = useQuery({
     queryKey: ["services"],
@@ -100,7 +97,7 @@ export default function ServiceDetailPage() {
         <ArrowLeft size={16} /> {t("serviceDetail.backToList")}
       </button>
 
-      {/* Header */}
+      {/* Compact Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">{service.display_name}</h1>
@@ -110,26 +107,12 @@ export default function ServiceDetailPage() {
           <span className={`status-chip ${service.status === "ACTIVE" ? "status-final" : "status-cancelled"}`}>
             {service.status === "ACTIVE" ? t("common.active") : t("common.inactive")}
           </span>
-        </div>
-      </div>
-
-      {/* Stats Row */}
-      <div className="stats-grid" aria-label={t("serviceDetail.usageStats")}>
-        <div className="panel stat-card">
-          <p className="detail-label">{t("serviceDetail.totalRequests")}</p>
-          <p className="stat-value">{totalRequests}</p>
-        </div>
-        <div className="panel stat-card">
-          <p className="detail-label">{t("serviceDetail.completed")}</p>
-          <p className="stat-value" style={{ color: "var(--success)" }}>{completedRequests}</p>
-        </div>
-        <div className="panel stat-card">
-          <p className="detail-label">{t("serviceDetail.inProgress")}</p>
-          <p className="stat-value" style={{ color: "var(--primary)" }}>{inProgressRequests}</p>
-        </div>
-        <div className="panel stat-card">
-          <p className="detail-label">{t("serviceDetail.failed")}</p>
-          <p className="stat-value" style={{ color: "var(--danger)" }}>{failedRequests}</p>
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => { setShowDeleteDialog(true); setDeleteConfirmText(""); deleteMut.reset(); }}
+          >
+            <Trash size={14} /> {ko ? "삭제" : "Delete"}
+          </button>
         </div>
       </div>
 
@@ -138,14 +121,14 @@ export default function ServiceDetailPage() {
         <p className="detail-label" style={{ marginBottom: 8 }}>{ko ? "서비스 구성 현황" : "Configuration Status"}</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {[
-            { label: ko ? "입력 필드" : "Input Fields", count: hasInput, tab: "input" as TabId },
-            { label: ko ? "업로드 슬롯" : "Upload Slots", count: hasUpload, tab: "upload" as TabId },
-            { label: ko ? "분석 옵션" : "Options", count: hasOptions, tab: "options" as TabId },
-            { label: ko ? "출력 필드" : "Output Fields", count: hasOutput, tab: "output" as TabId },
-            { label: ko ? "가격" : "Pricing", count: hasPricing ? 1 : 0, tab: "pricing" as TabId },
+            { label: ko ? "입력 필드" : "Input Fields", count: hasInput, tab: "schema" as TabId },
+            { label: ko ? "업로드 슬롯" : "Upload Slots", count: hasUpload, tab: "schema" as TabId },
+            { label: ko ? "분석 옵션" : "Options", count: hasOptions, tab: "schema" as TabId },
+            { label: ko ? "출력 필드" : "Output Fields", count: hasOutput, tab: "schema" as TabId },
+            { label: ko ? "가격" : "Pricing", count: hasPricing ? 1 : 0, tab: "settings" as TabId },
           ].map(({ label, count, tab }) => (
             <button
-              key={tab}
+              key={label}
               type="button"
               className={`status-chip ${count ? "status-final" : "status-pending"}`}
               style={{ cursor: "pointer", fontSize: 11 }}
@@ -157,7 +140,7 @@ export default function ServiceDetailPage() {
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — 4 tabs */}
       <div className="filter-tabs" role="tablist" aria-label={t("serviceDetail.tabsLabel")}>
         {TABS.map((tab) => (
           <button
@@ -176,55 +159,150 @@ export default function ServiceDetailPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "overview" && <ServiceBasicInfo service={service} />}
-      {activeTab === "input" && <ServiceInputSchema service={service} />}
-      {activeTab === "upload" && <ServiceUploadSlots service={service} />}
-      {activeTab === "options" && <ServiceOptionsSchema service={service} />}
-      {activeTab === "output" && <ServiceOutputSchema service={service} />}
-      {activeTab === "pricing" && <ServicePricing service={service} />}
-      {activeTab === "pipeline" && <ServicePipelines service={service} />}
-      {activeTab === "deploy" && <ServiceDeployment service={service} />}
-      {activeTab === "techniques" && <ServiceTechniqueProfile serviceId={service.id} />}
-
-      {/* Recent Requests (always shown below tabs) */}
-      {activeTab === "overview" && (
-        <div className="panel">
-          <h3 className="panel-title-mb">{t("serviceDetail.recentRequests")}</h3>
-          {serviceRequests.length === 0 ? (
-            <div className="empty-state" style={{ padding: "2rem 0" }}>
-              <ChartBar size={32} weight="light" style={{ color: "var(--muted)" }} />
-              <p className="muted-text">{t("serviceDetail.noRequests")}</p>
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table className="table" aria-label={t("serviceDetail.recentRequests")}>
-                <thead>
-                  <tr>
-                    <th scope="col">{t("reports.tableId")}</th>
-                    <th scope="col">{t("reports.tableStatus")}</th>
-                    <th scope="col">{t("reports.tableCases")}</th>
-                    <th scope="col">{t("reports.tableDate")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {serviceRequests.slice(0, 10).map((req) => (
-                    <tr key={req.id}>
-                      <td className="mono-cell">{req.id.slice(0, 8)}</td>
-                      <td>
-                        <span className={`status-chip status-${req.status.toLowerCase()}`}>
-                          {t(`status.${req.status}`)}
-                        </span>
-                      </td>
-                      <td>{req.case_count}{ko ? "건" : ""}</td>
-                      <td>{new Date(req.created_at).toLocaleDateString(dateLocale)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {activeTab === "settings" && (
+        <div className="stack-lg">
+          <ServiceBasicInfo service={service} />
+          <ServicePricing service={service} />
         </div>
       )}
+
+      {activeTab === "schema" && <ServiceSchemaEditor service={service} />}
+
+      {activeTab === "execution" && (
+        <div className="stack-lg">
+          <ServicePipelines service={service} />
+          <ServiceDeployment service={service} />
+          <div className="panel">
+            <TechniqueWeightEditor serviceId={service.id} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === "analytics" && (
+        <div className="stack-lg">
+          {/* Stats Row */}
+          <div className="stats-grid" aria-label={t("serviceDetail.usageStats")}>
+            <div className="panel stat-card">
+              <p className="detail-label">{t("serviceDetail.totalRequests")}</p>
+              <p className="stat-value">{totalRequests}</p>
+            </div>
+            <div className="panel stat-card">
+              <p className="detail-label">{t("serviceDetail.completed")}</p>
+              <p className="stat-value" style={{ color: "var(--success)" }}>{completedRequests}</p>
+            </div>
+            <div className="panel stat-card">
+              <p className="detail-label">{t("serviceDetail.inProgress")}</p>
+              <p className="stat-value" style={{ color: "var(--primary)" }}>{inProgressRequests}</p>
+            </div>
+            <div className="panel stat-card">
+              <p className="detail-label">{t("serviceDetail.failed")}</p>
+              <p className="stat-value" style={{ color: "var(--danger)" }}>{failedRequests}</p>
+            </div>
+          </div>
+
+          {/* Recent Requests */}
+          <div className="panel">
+            <h3 className="panel-title-mb">{t("serviceDetail.recentRequests")}</h3>
+            {serviceRequests.length === 0 ? (
+              <div className="empty-state" style={{ padding: "2rem 0" }}>
+                <ChartBar size={32} weight="light" style={{ color: "var(--muted)" }} />
+                <p className="muted-text">{t("serviceDetail.noRequests")}</p>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table className="table" aria-label={t("serviceDetail.recentRequests")}>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("reports.tableId")}</th>
+                      <th scope="col">{t("reports.tableStatus")}</th>
+                      <th scope="col">{t("reports.tableCases")}</th>
+                      <th scope="col">{t("reports.tableDate")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceRequests.slice(0, 10).map((req) => (
+                      <tr key={req.id}>
+                        <td className="mono-cell">{req.id.slice(0, 8)}</td>
+                        <td>
+                          <span className={`status-chip status-${req.status.toLowerCase()}`}>
+                            {t(`status.${req.status}`)}
+                          </span>
+                        </td>
+                        <td>{req.case_count}{ko ? "건" : ""}</td>
+                        <td>{new Date(req.created_at).toLocaleDateString(dateLocale)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog.Root open={showDeleteDialog} onOpenChange={(open) => { if (!open) { setShowDeleteDialog(false); setDeleteConfirmText(""); deleteMut.reset(); } }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content className="dialog-content" style={{ maxWidth: 440 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", backgroundColor: "var(--danger-light, #fef2f2)",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <Warning size={22} weight="fill" style={{ color: "var(--danger)" }} />
+              </div>
+              <Dialog.Title className="dialog-title" style={{ margin: 0 }}>
+                {ko ? "서비스 삭제" : "Delete Service"}
+              </Dialog.Title>
+            </div>
+
+            <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, backgroundColor: "var(--danger-light, #fef2f2)", border: "1px solid var(--danger-border, #fecaca)" }}>
+              <p style={{ fontSize: 13, color: "var(--danger)", fontWeight: 600, marginBottom: 4 }}>
+                {ko ? "이 작업은 되돌릴 수 없습니다." : "This action cannot be undone."}
+              </p>
+              <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                {ko
+                  ? "서비스와 관련된 파이프라인, 기법 가중치, 평가자 설정이 모두 삭제됩니다. 이 서비스를 참조하는 분석 요청이 있으면 삭제할 수 없습니다."
+                  : "All pipelines, technique weights, and evaluator assignments will be deleted. Deletion is blocked if any requests reference this service."}
+              </p>
+            </div>
+
+            <p style={{ fontSize: 13, marginBottom: 6 }}>
+              {ko
+                ? <>확인을 위해 서비스명 <strong>{service.name}</strong>을 입력하세요:</>
+                : <>Type <strong>{service.name}</strong> to confirm:</>}
+            </p>
+            <input
+              className="input"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={service.name}
+              autoFocus
+            />
+
+            {deleteMut.isError && (
+              <p className="error-text" style={{ marginTop: 8 }}>
+                {(deleteMut.error as Error).message}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <Dialog.Close asChild>
+                <button className="btn btn-secondary">{t("common.cancel")}</button>
+              </Dialog.Close>
+              <button
+                className="btn btn-danger"
+                disabled={deleteConfirmText !== service.name || deleteMut.isPending}
+                onClick={() => deleteMut.mutate()}
+              >
+                {deleteMut.isPending ? <span className="spinner" /> : <Trash size={14} />}
+                {ko ? " 삭제" : " Delete"}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
