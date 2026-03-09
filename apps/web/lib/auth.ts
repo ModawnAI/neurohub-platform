@@ -20,7 +20,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<{ userId: string }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ userId: string }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
 }
@@ -29,7 +29,7 @@ export const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   signIn: async () => {},
-  signUp: async () => ({ userId: "" }),
+  signUp: async (_e, _p, _n?) => ({ userId: "" }),
   signOut: async () => {},
   refreshUser: async () => null,
 });
@@ -147,15 +147,23 @@ export function useAuthProvider(): AuthContextValue {
     setUser(authUser);
   }, [fetchMe]);
 
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string, name?: string) => {
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...(name ? { name } : {}) }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "회원가입 실패" }));
-      throw new Error(err.detail || "회원가입 실패");
+      const err = await res.json().catch(() => ({}));
+      const msg =
+        (typeof err.detail === "string" && err.detail) ||
+        (typeof err.message === "string" && err.message) ||
+        "회원가입 실패";
+      // 409 = email already exists → try logging in instead
+      if (res.status === 409) {
+        throw new Error("이미 등록된 이메일입니다. 로그인 페이지에서 로그인해 주세요.");
+      }
+      throw new Error(msg);
     }
     const data = await res.json();
     setStoredToken(data.access_token);

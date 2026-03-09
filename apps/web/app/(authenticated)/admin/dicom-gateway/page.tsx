@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 import {
   X,
   Link as LinkIcon,
@@ -97,6 +98,7 @@ function StatCard({
 
 export default function DicomGatewayPage() {
   const t = useT();
+  const { addToast } = useToast();
   const [studies, setStudies] = useState<DicomStudyRead[]>([]);
   const [total, setTotal] = useState(0);
   const [activeTab, setActiveTab] = useState<StatusTab>("All");
@@ -147,7 +149,7 @@ export default function DicomGatewayPage() {
       setLinkRequestId("");
       await fetchStudies();
     } catch (e: any) {
-      alert(`${t("dicom.linkFailed")} ${e.message || String(e)}`);
+      addToast("error", `${t("dicom.linkFailed")} ${e.message || String(e)}`);
     } finally {
       setLinkLoading(false);
     }
@@ -162,7 +164,7 @@ export default function DicomGatewayPage() {
       setCreateServiceId("");
       await fetchStudies();
     } catch (e: any) {
-      alert(`${t("dicom.createFailed")} ${e.message || String(e)}`);
+      addToast("error", `${t("dicom.createFailed")} ${e.message || String(e)}`);
     } finally {
       setCreateLoading(false);
     }
@@ -338,7 +340,7 @@ export default function DicomGatewayPage() {
             fontSize: 12,
             color: "var(--muted)",
           }}>
-            <span>{total}개 스터디 · {totalInstances.toLocaleString()}개 인스턴스</span>
+            <span>{t("dicom.studyCount").replace("{count}", String(total))} · {totalInstances.toLocaleString()} {t("dicom.instances")}</span>
           </div>
         </div>
       )}

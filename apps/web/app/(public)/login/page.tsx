@@ -27,7 +27,7 @@ export default function LoginPage() {
       const authUser = await refreshUser();
       window.location.href = getRoleHomePath(authUser?.userType);
     } catch (err: any) {
-      setError(err?.message || "로그인에 실패했습니다.");
+      setError(err?.message || t("auth.loginFailed"));
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,7 @@ import { FusionResultsViewer } from "@/components/fusion-results-viewer";
 import { PreQCViewer } from "@/components/pre-qc-viewer";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/toast";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 const CANCELLABLE: RequestStatus[] = ["CREATED", "RECEIVING", "STAGING", "READY_TO_COMPUTE"];
 
@@ -38,6 +39,7 @@ function formatBytes(bytes: number | null): string {
 
 function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
   const { t } = useTranslation();
+  const { addToast } = useToast();
   const [expanded, setExpanded] = useState(false);
 
   const { data: filesData, isLoading } = useQuery({
@@ -51,7 +53,7 @@ function CaseFilesSection({ requestId, caseItem }: { requestId: string; caseItem
       const { url } = await getDownloadUrl(requestId, caseItem.id, file.id);
       window.open(url, "_blank");
     } catch {
-      alert(t("requestDetail.errorDownloadUrl"));
+      addToast("error", t("requestDetail.errorDownloadUrl"));
     }
   };
 
@@ -248,9 +250,12 @@ export default function UserRequestDetailPage() {
 
   return (
     <div className="stack-lg">
-      <button className="back-link" onClick={() => router.push("/user/requests")}>
-        <ArrowLeft size={16} /> {t("requestDetail.backToRequests")}
-      </button>
+      <Breadcrumb
+        items={[
+          { label: t("userRequests.title"), href: "/user/requests" },
+          { label: `${serviceSnapshot?.display_name || t("requestDetail.analysisRequest")} #${id.slice(0, 8)}` },
+        ]}
+      />
 
       <div className="page-header">
         <div>

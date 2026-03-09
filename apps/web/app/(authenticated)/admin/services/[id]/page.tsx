@@ -10,6 +10,7 @@ import { listServices, listRequests, deleteService, type ServiceRead, type Reque
 import { useTranslation } from "@/lib/i18n";
 import { SkeletonCards } from "@/components/skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 import { ServiceBasicInfo } from "./components/service-basic-info";
 import { ServicePricing } from "./components/service-pricing";
@@ -93,9 +94,13 @@ export default function ServiceDetailPage() {
 
   return (
     <div className="stack-lg">
-      <button type="button" className="back-link" onClick={() => router.push("/admin/services")}>
-        <ArrowLeft size={16} /> {t("serviceDetail.backToList")}
-      </button>
+      <Breadcrumb
+        items={[
+          { label: ko ? "관리자" : "Admin", href: "/admin/dashboard" },
+          { label: t("adminServices.title"), href: "/admin/services" },
+          { label: service.display_name },
+        ]}
+      />
 
       {/* Compact Header */}
       <div className="page-header">

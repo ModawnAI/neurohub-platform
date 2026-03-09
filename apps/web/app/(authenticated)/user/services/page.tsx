@@ -3,6 +3,7 @@
 import { listServices, type ServiceRead } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { MagnifyingGlass, Cube, ArrowRight, Brain, Lightning, Heartbeat } from "phosphor-react";
+import { SkeletonCards } from "@/components/skeleton";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
@@ -89,11 +90,11 @@ export default function ServiceCatalogPage() {
       </div>
 
       {isLoading ? (
-        <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
+        <SkeletonCards count={6} />
       ) : filtered.length === 0 ? (
         <div className="empty-state">
-          <Cube size={48} />
-          <p>{t("serviceCatalog.noServices")}</p>
+          <div className="empty-state-icon"><Cube size={48} weight="light" /></div>
+          <h3 className="empty-state-title">{t("serviceCatalog.noServices")}</h3>
         </div>
       ) : (
         <div
@@ -110,7 +111,7 @@ export default function ServiceCatalogPage() {
             const hasClinical = !!cc;
 
             return (
-              <div key={svc.id} className="panel" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div key={svc.id} className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -173,13 +174,6 @@ export default function ServiceCatalogPage() {
                     )}
                   </div>
                 )}
-
-                {/* Price */}
-                {svc.pricing?.base_price ? (
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--primary)" }}>
-                    {formatPrice(svc.pricing)}
-                  </p>
-                ) : null}
 
                 {/* CTA */}
                 <button

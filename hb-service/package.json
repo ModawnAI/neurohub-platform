@@ -1,0 +1,31 @@
+{
+  "name": "hypoxic-burden-service",
+  "version": "2.0.0",
+  "description": "Web service to compute Hypoxic Burden from SpO2, Hypnogram, and EventList files - Pure JavaScript implementation",
+  "type": "module",
+  "main": "hb-api-server.js",
+  "scripts": {
+    "start": "node hb-api-server.js",
+    "dev": "NODE_ENV=development node hb-api-server.js",
+    "start:old": "node server.js"
+  },
+  "dependencies": {
+    "d3-dsv": "^3.0.1",
+    "express": "^4.21.2",
+    "mathjs": "^15.0.0",
+    "morgan": "^1.10.1",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "form-data": "^4.0.4"
+  },
+  "keywords": [
+    "hypoxic-burden",
+    "sleep-apnea",
+    "polysomnography",
+    "spo2",
+    "medical"
+  ],
+  "author": "Hae-Jeong Park",
+  "license": "MIT"
+}

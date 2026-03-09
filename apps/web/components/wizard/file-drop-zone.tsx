@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { UploadSimple, WarningCircle } from "phosphor-react";
 import { useT } from "@/lib/i18n";
 
-const ALLOWED_EXTENSIONS = [".zip", ".dcm", ".nii", ".nii.gz", ".dicom", ".ima"];
+const ALLOWED_EXTENSIONS = [".zip", ".dcm", ".nii", ".nii.gz", ".dicom", ".ima", ".json", ".csv", ".tsv", ".txt", ".edf"];
 const MAX_FILE_SIZE_MB = 500;
 
 function getFileExtension(name: string): string {

@@ -15,6 +15,7 @@ import { Timeline } from "@/components/timeline";
 import { useTranslation } from "@/lib/i18n";
 import { SkeletonCards } from "@/components/skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "—";
@@ -118,9 +119,12 @@ export default function ReportDetailPage() {
     <div className="stack-lg print-report">
       {/* Navigation - hidden in print */}
       <div className="no-print">
-        <button className="back-link" onClick={() => router.push("/user/reports")}>
-          <ArrowLeft size={16} /> {t("reports.backToList")}
-        </button>
+        <Breadcrumb
+          items={[
+            { label: t("reports.title"), href: "/user/reports" },
+            { label: `${serviceSnapshot?.display_name || t("requestDetail.analysisRequest")} #${id.slice(0, 8)}` },
+          ]}
+        />
       </div>
 
       {/* Header */}

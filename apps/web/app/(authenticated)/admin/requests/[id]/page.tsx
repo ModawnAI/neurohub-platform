@@ -19,6 +19,7 @@ import {
 import { Timeline } from "@/components/timeline";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/toast";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 const TRANSITIONS: Record<string, string[]> = {
   CREATED: ["RECEIVING"],
@@ -41,6 +42,7 @@ function formatBytes(bytes: number | null): string {
 
 function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: CaseRead }) {
   const { t } = useTranslation();
+  const { addToast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const { data: filesData, isLoading } = useQuery({
     queryKey: ["case-files", requestId, caseItem.id],
@@ -53,7 +55,7 @@ function AdminCaseFiles({ requestId, caseItem }: { requestId: string; caseItem: 
       const { url } = await getDownloadUrl(requestId, caseItem.id, file.id);
       window.open(url, "_blank");
     } catch {
-      alert(t("adminRequests.errorDownloadFailed"));
+      addToast("error", t("adminRequests.errorDownloadFailed"));
     }
   };
 
@@ -150,9 +152,12 @@ export default function AdminRequestDetailPage() {
 
   return (
     <div className="stack-lg">
-      <button className="back-link" onClick={() => router.push("/admin/requests")}>
-        <ArrowLeft size={16} /> {t("adminRequests.backToList")}
-      </button>
+      <Breadcrumb
+        items={[
+          { label: t("adminRequests.title"), href: "/admin/requests" },
+          { label: `${t("adminRequests.requestDetail")} #${id.slice(0, 8)}` },
+        ]}
+      />
 
       <div className="page-header">
         <div>

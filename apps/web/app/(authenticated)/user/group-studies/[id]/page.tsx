@@ -8,10 +8,13 @@ import {
   addStudyMember,
   removeStudyMember,
   runGroupAnalysis,
+  listRequests,
   type GroupStudyRead,
   type GroupStudyMemberRead,
+  type RequestRead,
 } from "@/lib/api";
-import { listRequests, type RequestRead } from "@/lib/api";
+import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/toast";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -22,6 +25,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function GroupStudyDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t, locale } = useTranslation();
+  const { addToast } = useToast();
   const [study, setStudy] = useState<GroupStudyRead | null>(null);
   const [requests, setRequests] = useState<RequestRead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +68,7 @@ export default function GroupStudyDetailPage() {
   }
 
   async function handleRemoveMember(member: GroupStudyMemberRead) {
-    if (!confirm("Remove this member from the study?")) return;
+    if (!confirm(t("groupStudy.confirmRemoveMember" as any))) return;
     try {
       await removeStudyMember(id, member.request_id);
       setStudy((prev) =>
@@ -75,7 +80,7 @@ export default function GroupStudyDetailPage() {
   }
 
   async function handleRunAnalysis() {
-    if (!confirm("Run group analysis? This will aggregate all member results.")) return;
+    if (!confirm(t("groupStudy.confirmRunAnalysis" as any))) return;
     setRunning(true);
     setError(null);
     try {

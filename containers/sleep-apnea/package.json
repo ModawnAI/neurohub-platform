@@ -1,0 +1,9 @@
+{
+  "name": "neurohub-sleep-apnea",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "d3-dsv": "^3.0.1",
+    "mathjs": "^15.0.0"
+  }
+}

@@ -73,16 +73,16 @@ export function ServiceDeployment({ service }: Props) {
       refetchDeploy();
       setShowDeploy(false);
       setDeployImage("");
-      addToast("success", ko ? "배포 완료" : "Deployed successfully");
+      addToast("success", t("serviceDeployment.deploySuccess" as any));
     },
-    onError: (err) => addToast("error", `${ko ? "배포 실패" : "Deploy failed"}: ${(err as Error).message}`),
+    onError: (err) => addToast("error", `${t("serviceDeployment.deployFailed" as any)}: ${(err as Error).message}`),
   });
 
   const undeployMut = useMutation({
     mutationFn: () => undeployService(service.id),
     onSuccess: () => {
       refetchDeploy();
-      addToast("success", ko ? "배포 해제 완료" : "Undeployed");
+      addToast("success", t("serviceDeployment.undeploySuccess" as any));
     },
     onError: () => addToast("error", t("toast.genericError")),
   });
@@ -92,7 +92,7 @@ export function ServiceDeployment({ service }: Props) {
     const allowed = [".zip", ".tar.gz", ".tgz", ".py", ".whl"];
     const isAllowed = allowed.some((ext) => file.name.toLowerCase().endsWith(ext));
     if (!isAllowed) {
-      addToast("error", ko ? `허용된 파일: ${allowed.join(", ")}` : `Allowed: ${allowed.join(", ")}`);
+      addToast("error", `${t("serviceDeployment.allowedFiles" as any)}: ${allowed.join(", ")}`);
       return;
     }
 
@@ -118,9 +118,9 @@ export function ServiceDeployment({ service }: Props) {
       });
 
       refetchPackage();
-      addToast("success", ko ? `${file.name} 업로드 완료` : `${file.name} uploaded`);
+      addToast("success", `${file.name} ${t("serviceDeployment.uploadComplete" as any)}`);
     } catch (err) {
-      addToast("error", `${ko ? "업로드 실패" : "Upload failed"}: ${(err as Error).message}`);
+      addToast("error", `${t("serviceDeployment.uploadFailed" as any)}: ${(err as Error).message}`);
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -145,7 +145,7 @@ export function ServiceDeployment({ service }: Props) {
       const { download_url } = await getPackageDownloadUrl(service.id);
       window.open(download_url, "_blank");
     } catch {
-      addToast("error", ko ? "다운로드 실패" : "Download failed");
+      addToast("error", t("serviceDeployment.downloadFailed" as any));
     }
   };
 
@@ -158,12 +158,10 @@ export function ServiceDeployment({ service }: Props) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <h3 className="panel-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Package size={18} /> {ko ? "서비스 패키지" : "Service Package"}
+              <Package size={18} /> {t("serviceDeployment.packageTitle" as any)}
             </h3>
             <p className="muted-text" style={{ fontSize: 12, marginTop: 2 }}>
-              {ko
-                ? "AI 모델 코드, 스크립트, 또는 ZIP 패키지를 업로드합니다"
-                : "Upload your AI model code, scripts, or ZIP package"}
+              {t("serviceDeployment.packageSubtitle" as any)}
             </p>
           </div>
         </div>
@@ -190,7 +188,7 @@ export function ServiceDeployment({ service }: Props) {
               </div>
             </div>
             <button className="btn btn-secondary btn-sm" onClick={handleDownload}>
-              <DownloadSimple size={14} /> {ko ? "다운로드" : "Download"}
+              <DownloadSimple size={14} /> {t("common.download" as any)}
             </button>
           </div>
         )}
@@ -223,7 +221,7 @@ export function ServiceDeployment({ service }: Props) {
             <div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
                 <span className="spinner" />
-                <span style={{ fontSize: 13, fontWeight: 500 }}>{ko ? "업로드 중..." : "Uploading..."} {uploadProgress}%</span>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>{t("serviceDeployment.uploading" as any)} {uploadProgress}%</span>
               </div>
               <div style={{ height: 4, background: "var(--surface-2)", borderRadius: 2, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${uploadProgress}%`, background: "var(--primary)", transition: "width 0.2s" }} />
@@ -233,12 +231,10 @@ export function ServiceDeployment({ service }: Props) {
             <>
               <UploadSimple size={32} weight="light" style={{ color: "var(--muted)", marginBottom: 8 }} />
               <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-                {ko ? "파일을 드래그하거나 클릭하여 업로드" : "Drag & drop or click to upload"}
+                {t("serviceDeployment.dragOrClick" as any)}
               </p>
               <p className="muted-text" style={{ fontSize: 11 }}>
-                {ko
-                  ? "지원 형식: .zip, .tar.gz, .py, .whl (AI 모델 코드 또는 패키지)"
-                  : "Supported: .zip, .tar.gz, .py, .whl (AI model code or package)"}
+                {t("serviceDeployment.supportedFormats" as any)}
               </p>
             </>
           )}
@@ -247,10 +243,10 @@ export function ServiceDeployment({ service }: Props) {
         {/* Accepted file types guide */}
         <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           {[
-            { ext: ".zip", desc: ko ? "프로젝트 ZIP" : "Project ZIP" },
-            { ext: ".tar.gz", desc: ko ? "압축 패키지" : "Compressed Package" },
-            { ext: ".py", desc: ko ? "Python 스크립트" : "Python Script" },
-            { ext: ".whl", desc: ko ? "Python Wheel" : "Python Wheel" },
+            { ext: ".zip", desc: t("serviceDeployment.projectZip" as any) },
+            { ext: ".tar.gz", desc: t("serviceDeployment.compressedPackage" as any) },
+            { ext: ".py", desc: "Python Script" },
+            { ext: ".whl", desc: "Python Wheel" },
           ].map(({ ext, desc }) => (
             <div key={ext} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: 11 }}>
               <File size={12} style={{ color: "var(--muted)" }} />
@@ -266,26 +262,26 @@ export function ServiceDeployment({ service }: Props) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <h3 className="panel-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <CloudArrowUp size={18} /> {ko ? "컨테이너 배포" : "Container Deployment"}
+              <CloudArrowUp size={18} /> {t("serviceDeployment.containerDeployment" as any)}
             </h3>
             <p className="muted-text" style={{ fontSize: 12, marginTop: 2 }}>
-              {ko ? "Fly.io에 서비스 컨테이너를 배포하고 관리합니다" : "Deploy and manage service containers on Fly.io"}
+              {t("serviceDeployment.containerSubtitle" as any)}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => refetchDeploy()} title={ko ? "새로고침" : "Refresh"}>
+            <button className="btn btn-secondary btn-sm" onClick={() => refetchDeploy()} title={t("serviceDeployment.refresh" as any)}>
               <ArrowClockwise size={14} />
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowDeploy(!showDeploy)}>
-              <CloudArrowUp size={16} /> {ko ? "배포" : "Deploy"}
+              <CloudArrowUp size={16} /> {t("serviceDeployment.deploy" as any)}
             </button>
             {machineCount > 0 && (
               <button
                 className="btn btn-danger btn-sm"
-                onClick={() => { if (confirm(ko ? "모든 머신을 중지하시겠습니까?" : "Stop all machines?")) undeployMut.mutate(); }}
+                onClick={() => { if (confirm(t("confirmDialog.undeployTitle" as any))) undeployMut.mutate(); }}
                 disabled={undeployMut.isPending}
               >
-                <Trash size={14} /> {ko ? "배포 해제" : "Undeploy"}
+                <Trash size={14} /> {t("serviceDeployment.undeploy" as any)}
               </button>
             )}
           </div>
@@ -295,7 +291,7 @@ export function ServiceDeployment({ service }: Props) {
         {showDeploy && (
           <div className="stack-md" style={{ marginBottom: 16, padding: 16, background: "var(--primary-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--primary-light)" }}>
             <label className="field">
-              {ko ? "컨테이너 이미지" : "Container Image"}
+              {t("serviceDeployment.containerImage" as any)}
               <input
                 className="input"
                 value={deployImage}
@@ -304,12 +300,12 @@ export function ServiceDeployment({ service }: Props) {
                 style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}
               />
               <span className="muted-text" style={{ fontSize: 11 }}>
-                {ko ? "비어있으면 기본 레지스트리 태그 사용" : "Leave empty for default registry tag"}
+                {t("serviceDeployment.defaultRegistryHint" as any)}
               </span>
             </label>
             <div className="form-grid">
               <label className="field">
-                {ko ? "메모리 (GB)" : "Memory (GB)"}
+                {t("serviceDeployment.memoryGb" as any)}
                 <select className="input" value={memoryGb} onChange={(e) => setMemoryGb(Number(e.target.value))}>
                   <option value={0.5}>512 MB</option>
                   <option value={1}>1 GB</option>
@@ -331,9 +327,9 @@ export function ServiceDeployment({ service }: Props) {
             </div>
             <div className="action-row">
               <button className="btn btn-primary" onClick={() => deployMut.mutate()} disabled={deployMut.isPending}>
-                {deployMut.isPending ? <span className="spinner" /> : ko ? "배포 시작" : "Start Deploy"}
+                {deployMut.isPending ? <span className="spinner" /> : t("serviceDeployment.startDeploy" as any)}
               </button>
-              <button className="btn btn-secondary" onClick={() => setShowDeploy(false)}>{ko ? "취소" : "Cancel"}</button>
+              <button className="btn btn-secondary" onClick={() => setShowDeploy(false)}>{t("common.cancel")}</button>
             </div>
           </div>
         )}
@@ -345,7 +341,7 @@ export function ServiceDeployment({ service }: Props) {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <p className="detail-label">
-                {ko ? "실행 중인 머신" : "Running Machines"}: <strong>{machineCount}</strong>
+                {t("serviceDeployment.runningMachines" as any)}: <strong>{machineCount}</strong>
               </p>
               <span className="mono-cell" style={{ fontSize: 11 }}>{deployment?.app_name}</span>
             </div>
@@ -353,9 +349,9 @@ export function ServiceDeployment({ service }: Props) {
               <table className="table" style={{ fontSize: 12 }}>
                 <thead>
                   <tr>
-                    <th>{ko ? "머신 ID" : "Machine ID"}</th>
-                    <th>{ko ? "상태" : "State"}</th>
-                    <th>{ko ? "이미지" : "Image"}</th>
+                    <th>{t("serviceDeployment.machineId" as any)}</th>
+                    <th>{t("serviceDeployment.machineState" as any)}</th>
+                    <th>{t("serviceDeployment.machineImage" as any)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -378,10 +374,10 @@ export function ServiceDeployment({ service }: Props) {
           <div style={{ textAlign: "center", padding: "24px 0" }}>
             <CloudArrowUp size={32} weight="light" style={{ color: "var(--muted)", marginBottom: 8 }} />
             <p className="muted-text" style={{ fontSize: 13 }}>
-              {ko ? "배포된 컨테이너가 없습니다" : "No containers deployed"}
+              {t("serviceDeployment.noContainers" as any)}
             </p>
             <p className="muted-text" style={{ fontSize: 12 }}>
-              {ko ? "패키지를 업로드한 후 배포하세요" : "Upload a package, then deploy"}
+              {t("serviceDeployment.uploadThenDeploy" as any)}
             </p>
           </div>
         )}
@@ -390,12 +386,10 @@ export function ServiceDeployment({ service }: Props) {
       {/* SDK Guide */}
       <div className="panel">
         <h3 className="panel-title" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <Warning size={16} style={{ color: "var(--warning)" }} /> {ko ? "고급: SDK로 빌드 & 배포" : "Advanced: Build & Deploy with SDK"}
+          <Warning size={16} style={{ color: "var(--warning)" }} /> {t("serviceDeployment.advancedSdk" as any)}
         </h3>
         <p className="muted-text" style={{ fontSize: 12, marginBottom: 12 }}>
-          {ko
-            ? "커스텀 컨테이너가 필요한 경우 SDK를 사용하여 로컬에서 빌드하고 배포할 수 있습니다."
-            : "For custom containers, use the SDK to build and deploy locally."}
+          {t("serviceDeployment.advancedSdkDesc" as any)}
         </p>
         <pre style={{
           fontSize: 11,
@@ -407,23 +401,23 @@ export function ServiceDeployment({ service }: Props) {
           padding: 12,
           borderRadius: "var(--radius-sm)",
         }}>
-{`# ${ko ? "SDK 설치 및 서비스 초기화" : "Install SDK and initialize service"}
+{`# ${t("serviceDeployment.sdkComment1" as any)}
 pip install neurohub-sdk
 neurohub init ${service.name}
 cd ${service.name}
 
-# ${ko ? "service.py에 AI 모델 코드 작성" : "Write your AI model code in service.py"}
-# ${ko ? "예시:" : "Example:"}
+# ${t("serviceDeployment.sdkComment2" as any)}
+# ${t("serviceDeployment.sdkComment3" as any)}
 from neurohub_sdk import BaseService, InputContext, OutputContext
 
 class MyService(BaseService):
     async def predict(self, ctx: InputContext) -> OutputContext:
-        # ${ko ? "여기에 AI 모델 코드를 작성하세요" : "Your AI model code here"}
+        # ${t("serviceDeployment.sdkComment4" as any)}
         out = OutputContext()
         out.set("result", {"prediction": "..."})
         return out
 
-# ${ko ? "빌드 및 배포" : "Build and deploy"}
+# ${t("serviceDeployment.sdkComment5" as any)}
 neurohub build
 neurohub deploy`}
         </pre>

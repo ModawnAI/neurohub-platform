@@ -8,7 +8,7 @@ import type { UploadSlot } from "@/components/dynamic-form/types";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/toast";
 
-const ACCEPTED_TYPES = ["DICOM", "NIfTI", "EEG", "EDF", "SET", "CSV", "PDF", "ZIP", "PNG", "JPEG"];
+const ACCEPTED_TYPES = ["DICOM", "NIfTI", "EEG", "EDF", "SET", "CSV", "PDF", "JSON", "ZIP", "PNG", "JPEG"];
 
 const EMPTY_SLOT: UploadSlot = {
   key: "",

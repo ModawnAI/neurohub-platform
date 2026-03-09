@@ -2,18 +2,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Spinner, CheckCircle, XCircle, PlusCircle } from "phosphor-react";
+import { Spinner, CheckCircle, XCircle, PlusCircle, FolderOpen } from "phosphor-react";
 import { listRequests } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { MetricCard } from "@/components/metric-card";
 import { RequestCard } from "@/components/request-card";
+import { SkeletonMetricCards } from "@/components/skeleton";
 
 export default function UserDashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const t = useT();
-  const { data } = useQuery({ queryKey: ["requests"], queryFn: listRequests });
+  const { data, isLoading } = useQuery({ queryKey: ["requests"], queryFn: listRequests });
 
   const requests = data?.items ?? [];
   const inProgress = requests.filter((r) => !["FINAL", "FAILED", "CANCELLED"].includes(r.status)).length;
@@ -24,33 +25,37 @@ export default function UserDashboard() {
   return (
     <div className="stack-lg">
       <div>
-        <h1 className="greeting">{t("userDashboard.greeting").replace("{name}", user?.displayName || "사용자")}</h1>
+        <h1 className="greeting">{t("userDashboard.greeting").replace("{name}", user?.displayName || t("sidebar.user"))}</h1>
         <p className="greeting-sub">{t("userDashboard.subtitle")}</p>
       </div>
 
-      <div className="grid-3">
-        <MetricCard
-          icon={<Spinner size={20} />}
-          label={t("userDashboard.inProgress")}
-          value={inProgress}
-          iconBg="var(--primary-light)"
-          iconColor="var(--primary)"
-        />
-        <MetricCard
-          icon={<CheckCircle size={20} />}
-          label={t("userDashboard.completed")}
-          value={completed}
-          iconBg="var(--success-light)"
-          iconColor="var(--success)"
-        />
-        <MetricCard
-          icon={<XCircle size={20} />}
-          label={t("userDashboard.failed")}
-          value={failed}
-          iconBg="var(--danger-light)"
-          iconColor="var(--danger)"
-        />
-      </div>
+      {isLoading ? (
+        <SkeletonMetricCards count={3} />
+      ) : (
+        <div className="grid-3">
+          <MetricCard
+            icon={<Spinner size={20} />}
+            label={t("userDashboard.inProgress")}
+            value={inProgress}
+            iconBg="var(--primary-light)"
+            iconColor="var(--primary)"
+          />
+          <MetricCard
+            icon={<CheckCircle size={20} />}
+            label={t("userDashboard.completed")}
+            value={completed}
+            iconBg="var(--success-light)"
+            iconColor="var(--success)"
+          />
+          <MetricCard
+            icon={<XCircle size={20} />}
+            label={t("userDashboard.failed")}
+            value={failed}
+            iconBg="var(--danger-light)"
+            iconColor="var(--danger)"
+          />
+        </div>
+      )}
 
       <div className="cta-card" onClick={() => router.push("/user/new-request")}>
         <div className="cta-card-icon"><PlusCircle size={32} /></div>
@@ -67,6 +72,7 @@ export default function UserDashboard() {
         </div>
         {recent.length === 0 ? (
           <div className="empty-state">
+            <div className="empty-state-icon"><FolderOpen size={40} weight="light" /></div>
             <p className="empty-state-text">{t("userDashboard.emptyRequests")}</p>
           </div>
         ) : (

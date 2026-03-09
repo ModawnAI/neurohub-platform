@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Chart</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div id="chart2"></div>
+    <script>
+        // Test data similar to what we have
+        const testData = {
+            avg: [96.52, 96.44, 96.52, 96.44, 96.52],
+            filt: [96.48, 96.47, 96.46, 96.45, 96.44],
+            duravg: 34,
+            winstart: -34,
+            HBWinStart: -5,
+            HBWinFinish: 45,
+            nadirx: 2,
+            nadiry: 96.44,
+            events: [{Start: 100, Duration: 30}]
+        };
+
+        function renderChart2(data) {
+            if (!data.avg || data.avg.length === 0) return;
+
+            const duravg = data.duravg || 34;
+            const winstart = data.winstart || -34;
+            const hbWinStart = data.HBWinStart || -5;
+            const hbWinFinish = data.HBWinFinish || 45;
+            const nadirx = data.nadirx || 0;
+            const nadiry = data.nadiry || 0;
+            const baselineOffset = -10;
+
+            const n = data.avg.length;
+            const xStart = winstart + duravg + baselineOffset;
+            const x = Array.from({length: n}, (_, i) => xStart + i);
+
+            // Safe index calculation with bounds checking
+            const eventStartIdx = Math.max(0, Math.min(n - 1, Math.round(0 - xStart)));
+            const eventEndIdx = Math.max(0, Math.min(n - 1, Math.round(duravg - xStart)));
+            const winFinishIdx = n - 1;
+
+            // Safe array access function
+            const getSafeValue = (arr, idx) => arr[Math.max(0, Math.min(arr.length - 1, idx))];
+
+            const traces = [
+                {
+                    x: x, y: data.avg,
+                    type: 'scatter', mode: 'lines',
+                    name: 'Average SpO₂',
+                    line: { color: '#3b82f6', width: 2 }
+                },
+                {
+                    x: x, y: data.filt,
+                    type: 'scatter', mode: 'lines',
+                    name: 'Filtered (12-pt MA)',
+                    line: { color: '#10b981', width: 2.5 }
+                },
+                {
+                    x: [x[0]], y: [getSafeValue(data.filt, 0)],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Baseline',
+                    marker: { size: 10, color: '#6b7280', symbol: 'circle' }
+                },
+                {
+                    x: [0], y: [getSafeValue(data.filt, eventStartIdx)],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Event Start',
+                    marker: { size: 12, color: '#10b981', symbol: 'triangle-up' }
+                },
+                {
+                    x: [nadirx], y: [nadiry],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Nadir',
+                    marker: { size: 12, color: '#3b82f6', symbol: 'triangle-down' }
+                },
+                {
+                    x: [duravg], y: [getSafeValue(data.filt, eventEndIdx)],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Event End',
+                    marker: { size: 12, color: '#ef4444', symbol: 'triangle-down' }
+                },
+                {
+                    x: [x[winFinishIdx]], y: [getSafeValue(data.filt, winFinishIdx)],
+                    type: 'scatter', mode: 'markers',
+                    name: 'WinFinish',
+                    marker: { size: 12, color: '#8b5cf6', symbol: 'triangle-up' }
+                }
+            ];
+
+            const shapes = [
+                { type: 'line', x0: 0, x1: 0, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(16, 185, 129, 0.6)', width: 2, dash: 'dash' } },
+                { type: 'line', x0: duravg, x1: duravg, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(107, 114, 128, 0.4)', width: 2, dash: 'dot' } },
+                { type: 'line', x0: hbWinStart + duravg, x1: hbWinStart + duravg, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(132, 204, 22, 0.6)', width: 2, dash: 'dash' } },
+                { type: 'line', x0: hbWinFinish + duravg, x1: hbWinFinish + duravg, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(217, 70, 239, 0.6)', width: 2, dash: 'dash' } }
+            ];
+
+            // Safe y-axis range calculation
+            const validAvg = data.avg.filter(v => Number.isFinite(v) && !isNaN(v));
+            const yMin = validAvg.length > 0 ? Math.min(...validAvg) : 90;
+            const yMax = validAvg.length > 0 ? Math.max(...validAvg) : 100;
+
+            const layout = {
+                title: 'Average SpO₂ Response Around Events (n=' + (data.events?.length || 0) + ' events)',
+                xaxis: { 
+                    title: 'Time from Event Start (seconds)',
+                    zeroline: true, zerolinecolor: '#000', zerolinewidth: 2
+                },
+                yaxis: { 
+                    title: 'SpO₂ (%)',
+                    range: [yMin - 2, yMax + 2]
+                },
+                shapes: shapes,
+                showlegend: true,
+                height: 500
+            };
+
+            Plotly.newPlot('chart2', traces, layout, { responsive: true });
+            console.log('Chart rendered successfully');
+        }
+
+        // Wait for page load then render
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                renderChart2(testData);
+            }, 100);
+        });
+    </script>
+</body>
+</html>

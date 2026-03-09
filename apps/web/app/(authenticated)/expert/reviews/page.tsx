@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { CaretRight } from "phosphor-react";
+import { CaretRight, CheckCircle } from "phosphor-react";
 import { listReviewQueue, type ReviewQueueItem } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 
@@ -61,6 +61,7 @@ export default function ExpertReviewsPage() {
         <div className="loading-center"><span className="spinner" /></div>
       ) : items.length === 0 ? (
         <div className="empty-state">
+          <div className="empty-state-icon"><CheckCircle size={48} weight="light" /></div>
           <p className="empty-state-text">{t("expertReviews.noPending")}</p>
         </div>
       ) : (

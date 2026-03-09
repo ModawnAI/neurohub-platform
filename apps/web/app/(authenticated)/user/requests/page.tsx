@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { listRequests, type RequestStatus } from "@/lib/api";
 import { RequestCard } from "@/components/request-card";
-import { CaretLeft, CaretRight } from "phosphor-react";
+import { CaretLeft, CaretRight, FolderOpen } from "phosphor-react";
 import { useT } from "@/lib/i18n";
 
 type FilterTab = "all" | "in_progress" | "completed" | "failed";
@@ -70,6 +70,7 @@ export default function UserRequestsPage() {
         <div className="loading-center"><span className="spinner" /></div>
       ) : requests.length === 0 ? (
         <div className="empty-state">
+          <div className="empty-state-icon"><FolderOpen size={48} weight="light" /></div>
           <p className="empty-state-text">
             {filter === "all" ? t("userRequests.emptyAll") : t("userRequests.emptyFiltered")}
           </p>

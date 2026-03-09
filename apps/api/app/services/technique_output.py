@@ -32,6 +32,10 @@ def validate_technique_output(raw: dict, expected_module: str) -> TechniqueOutpu
 
     Raises ValueError on missing/invalid fields or module mismatch.
     """
+    # Accept both "module" and "module_key" for compatibility
+    if "module_key" in raw and "module" not in raw:
+        raw["module"] = raw["module_key"]
+
     missing = [k for k in ("module", "module_version", "qc_score") if k not in raw]
     if missing:
         raise ValueError(f"Missing required fields: {', '.join(missing)}")

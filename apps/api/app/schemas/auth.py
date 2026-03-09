@@ -49,6 +49,7 @@ class LoginRequest(BaseModel):
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
+    name: str | None = Field(default=None, max_length=100)
 
 
 class TokenResponse(BaseModel):

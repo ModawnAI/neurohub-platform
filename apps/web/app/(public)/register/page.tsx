@@ -35,9 +35,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await signUp(email, password);
+      await signUp(email, password, name || undefined);
       const user = await refreshUser();
-      const dest = user ? getRoleHomePath(user.userType) : "/onboarding";
+      const dest = user ? getRoleHomePath(user.userType) : "/user/dashboard";
       window.location.href = dest;
     } catch (err: any) {
       setError(err?.message || t("auth.errorSignUpFailed"));

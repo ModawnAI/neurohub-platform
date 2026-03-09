@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/toast";
+import { useTranslation } from "@/lib/i18n";
 
 interface OptimisticMutationOptions<TData, TVariables> {
   mutationFn: (variables: TVariables) => Promise<TData>;
@@ -15,9 +16,12 @@ export function useOptimisticMutation<TData, TVariables>({
   mutationFn,
   queryKey,
   onOptimisticUpdate,
-  successMessage = "저장되었습니다",
-  errorMessage = "오류가 발생했습니다",
+  successMessage,
+  errorMessage,
 }: OptimisticMutationOptions<TData, TVariables>) {
+  const { t } = useTranslation();
+  const resolvedSuccess = successMessage ?? t("toast.saveSuccess");
+  const resolvedError = errorMessage ?? t("toast.genericError");
   const queryClient = useQueryClient();
   const { addToast } = useToast();
 
@@ -39,10 +43,10 @@ export function useOptimisticMutation<TData, TVariables>({
       if (context?.previousData) {
         queryClient.setQueryData(queryKey, context.previousData);
       }
-      addToast("error", errorMessage);
+      addToast("error", resolvedError);
     },
     onSuccess: () => {
-      addToast("success", successMessage);
+      addToast("success", resolvedSuccess);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { listServices, type ServiceRead } from "@/lib/api";
 import { Brain, ArrowRight, Lightning, Heartbeat, ShoppingCart, Tag } from "phosphor-react";
+import { SkeletonCards } from "@/components/skeleton";
 
 type Category = "All" | "MRI" | "PET" | "EEG" | "fMRI" | "Multi-modal" | "PSG";
 const CATEGORIES: Category[] = ["All", "Multi-modal", "PET", "MRI", "EEG", "fMRI", "PSG"];
@@ -89,15 +90,13 @@ function ModelCard({ service, onSelect }: { service: ServiceRead; onSelect: () =
             <Heartbeat size={12} /> QC-가중 융합
           </span>
         )}
-        {price ? (
-          <span style={{
+        <span style={{
             display: "inline-flex", alignItems: "center", gap: 3,
             padding: "2px 8px", borderRadius: 4,
-            backgroundColor: "#fef3c7", color: "#92400e",
+            backgroundColor: "#f0fdf4", color: "#16a34a",
           }}>
-            <Tag size={12} /> {price.toLocaleString("ko-KR")}원
+            무료
           </span>
-        ) : null}
       </div>
 
       {/* Diagnostic scope tags */}
@@ -165,7 +164,7 @@ export default function MarketplacePage() {
       </div>
 
       {isLoading ? (
-        <div className="loading-center"><span className="spinner" /></div>
+        <SkeletonCards count={6} />
       ) : services.length === 0 ? (
         <div className="empty-state">
           <Brain size={40} style={{ marginBottom: 12, opacity: 0.3 }} />

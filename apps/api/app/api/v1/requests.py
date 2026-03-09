@@ -266,10 +266,15 @@ async def create_request(
         )
         db.add(idempotency_record)
 
+    from sqlalchemy import or_
+
     svc_result = await db.execute(
         select(ServiceDefinition).where(
             ServiceDefinition.id == body.service_id,
-            ServiceDefinition.institution_id == user.institution_id,
+            or_(
+                ServiceDefinition.institution_id == user.institution_id,
+                ServiceDefinition.status == "PUBLISHED",
+            ),
         )
     )
     service = svc_result.scalar_one_or_none()
@@ -342,6 +347,7 @@ async def create_request(
         idempotency_record.resource_id = str(req.id)
         idempotency_record.response_status = 201
         idempotency_record.response_body = response_payload.model_dump(mode="json")
+        await db.flush()
 
     return response_payload
 
@@ -454,6 +460,17 @@ async def transition_request(
         title=f"요청 상태 변경: {to_state.value}",
         body=f"요청이 {from_state.value}에서 {to_state.value}(으)로 전환되었습니다.",
     )
+
+    # Auto-trigger report generation when transitioning to REPORTING
+    if to_state == SMStatus.REPORTING:
+        _add_outbox(
+            db=db,
+            event_type="REPORT_REQUESTED",
+            aggregate_type="request",
+            aggregate_id=req.id,
+            payload={"request_id": str(req.id)},
+        )
+
     await db.flush()
     await db.refresh(req)
     return _to_read(req)
@@ -635,6 +652,180 @@ async def submit_request(
     )
     await db.flush()
     return {"request_id": str(req.id), "status": req.status, "run_ids": run_ids}
+
+
+# ---------------------------------------------------------------------------
+# Execute endpoint — triggers technique container execution for a request
+# ---------------------------------------------------------------------------
+
+
+@router.post("/requests/{request_id}/execute")
+async def execute_request(
+    request_id: uuid.UUID,
+    db: DbSession,
+    user: AuthenticatedUser,
+    http_request: FastAPIRequest,
+):
+    """Trigger technique container execution for all cases in a request.
+
+    This endpoint:
+    1. Validates the request is in READY_TO_COMPUTE (or STAGING/CREATED for convenience)
+    2. Creates Run records with technique fan-out
+    3. Transitions the request to COMPUTING
+    4. Dispatches technique execution tasks via Celery (local Docker containers)
+
+    Unlike /submit (which creates generic pipeline Run+RunStep records for
+    Fly.io container execution), this endpoint uses the technique-based
+    execution model with LocalContainerRunner.
+
+    Roles: PHYSICIAN, TECHNICIAN, SYSTEM_ADMIN
+    """
+    from app.models.technique import ServiceTechniqueWeight, TechniqueModule
+
+    req = await _load_request_or_404(db, request_id, user.institution_id, for_update=True)
+
+    # Allow from CREATED, RECEIVING, STAGING, or READY_TO_COMPUTE
+    allowed_from = {
+        SMStatus.CREATED.value,
+        SMStatus.RECEIVING.value,
+        SMStatus.STAGING.value,
+        SMStatus.READY_TO_COMPUTE.value,
+    }
+    if req.status not in allowed_from:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Request is in {req.status} — cannot execute. "
+                   f"Allowed: {', '.join(sorted(allowed_from))}",
+        )
+
+    if not req.cases:
+        raise HTTPException(status_code=409, detail="No cases found for this request")
+
+    # Look up techniques for this service
+    technique_result = await db.execute(
+        select(ServiceTechniqueWeight, TechniqueModule)
+        .join(TechniqueModule, ServiceTechniqueWeight.technique_module_id == TechniqueModule.id)
+        .where(
+            ServiceTechniqueWeight.service_id == req.service_id,
+            TechniqueModule.status == "ACTIVE",
+        )
+        .order_by(ServiceTechniqueWeight.base_weight.desc())
+    )
+    techniques = technique_result.all()
+
+    if not techniques:
+        raise HTTPException(
+            status_code=409,
+            detail="No active techniques configured for this service",
+        )
+
+    # Create Runs and TechniqueRuns for each case
+    from app.models.technique import TechniqueRun
+
+    run_ids: list[str] = []
+    technique_run_ids: list[str] = []
+
+    for case in req.cases:
+        run = Run(
+            institution_id=req.institution_id,
+            request_id=req.id,
+            case_id=case.id,
+            status="PENDING",
+            priority=req.priority,
+            job_spec={
+                "run_id": None,
+                "request_id": str(req.id),
+                "case_id": str(case.id),
+                "service_id": str(req.service_id),
+                "pipeline": req.pipeline_snapshot,
+                "execution_mode": "technique_containers",
+            },
+        )
+        db.add(run)
+        await db.flush()
+
+        run.job_spec = {**run.job_spec, "run_id": str(run.id)}
+        run_ids.append(str(run.id))
+        req.current_run_id = run.id
+
+        # Create TechniqueRun for each active technique
+        for weight, technique in techniques:
+            tr = TechniqueRun(
+                run_id=run.id,
+                technique_module_id=technique.id,
+                technique_key=technique.key,
+                status="PENDING",
+                job_spec={
+                    "docker_image": technique.docker_image,
+                    "technique_key": technique.key,
+                    "modality": technique.modality,
+                    "base_weight": weight.base_weight,
+                    "resource_requirements": technique.resource_requirements or {},
+                },
+            )
+            db.add(tr)
+            await db.flush()
+            technique_run_ids.append(str(tr.id))
+
+    # Transition to COMPUTING
+    before = {"status": req.status}
+    req.status = SMStatus.COMPUTING.value
+
+    _add_outbox(
+        db=db,
+        event_type="RUN_SUBMITTED",
+        aggregate_type="request",
+        aggregate_id=req.id,
+        payload={"request_id": str(req.id), "run_ids": run_ids},
+    )
+    _add_audit(
+        db=db,
+        user_id=user.id,
+        institution_id=user.institution_id,
+        action="EXECUTE_REQUEST",
+        entity_type="request",
+        entity_id=req.id,
+        before_state=before,
+        after_state={
+            "status": req.status,
+            "run_ids": run_ids,
+            "technique_run_ids": technique_run_ids,
+        },
+        ip=_client_ip(http_request),
+    )
+    await _notify_request_owner(
+        db,
+        req,
+        event_type="REQUEST_COMPUTING",
+        title="기법 분석 시작",
+        body=f"{len(req.cases)}건의 케이스에 대해 {len(techniques)}개 기법 컨테이너 실행이 시작되었습니다.",
+    )
+    # Commit BEFORE dispatching Celery tasks — the worker uses a separate
+    # sync DB session, so TechniqueRun records must be visible (committed)
+    # before the task is picked up.
+    await db.commit()
+
+    # Dispatch technique execution tasks via Celery
+    from app.worker.celery_app import celery_app
+
+    dispatched_task_ids = []
+    for tr_id in technique_run_ids:
+        task_result = celery_app.send_task(
+            "neurohub.tasks.execute_technique_run",
+            args=[tr_id],
+            queue="compute",
+        )
+        dispatched_task_ids.append(task_result.id)
+
+    return {
+        "request_id": str(req.id),
+        "status": req.status,
+        "run_ids": run_ids,
+        "technique_run_ids": technique_run_ids,
+        "technique_count": len(techniques),
+        "case_count": len(req.cases),
+        "task_ids": dispatched_task_ids,
+    }
 
 
 # ---------------------------------------------------------------------------

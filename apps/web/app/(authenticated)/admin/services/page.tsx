@@ -8,6 +8,7 @@ import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { listServices, updateService, deleteService, type ServiceRead } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n";
+import { SkeletonCards } from "@/components/skeleton";
 
 export default function AdminServicesPage() {
   const { t, locale } = useTranslation();
@@ -80,15 +81,15 @@ export default function AdminServicesPage() {
       </div>
 
       {isLoading ? (
-        <div className="loading-center"><span className="spinner" /></div>
+        <SkeletonCards count={4} />
       ) : services.length === 0 ? (
         /* Empty state */
-        <div className="panel" style={{ textAlign: "center", padding: "48px 24px" }}>
-          <Cube size={48} weight="light" style={{ color: "var(--muted)", marginBottom: 12 }} />
-          <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+        <div className="empty-state">
+          <div className="empty-state-icon"><Cube size={48} weight="light" /></div>
+          <h3 className="empty-state-title">
             {ko ? "등록된 서비스가 없습니다" : "No services registered"}
-          </p>
-          <p className="muted-text" style={{ fontSize: 13, marginBottom: 16 }}>
+          </h3>
+          <p className="empty-state-description">
             {ko ? "새 AI 분석 서비스를 등록하여 시작하세요" : "Get started by registering a new AI analysis service"}
           </p>
           <Link href="/admin/services/new">

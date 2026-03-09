@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypoxic Burden Analysis</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        .upload-section {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 2px dashed #cbd5e0;
+        }
+        .file-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .file-input-group {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .file-input-group label {
+            display: block;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+        .file-input-group input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .results-section {
+            display: none;
+            margin-top: 40px;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .metric-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .metric-unit {
+            font-size: 0.4em;
+            opacity: 0.9;
+            display: block;
+            margin-top: 5px;
+        }
+        .chart {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .loading.active {
+            display: block;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+        .error.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🫀Hypoxic Burden Analysis</h1>
+        <p class="subtitle">Upload your sleep study data to calculate hypoxic burden and visualize results</p>
+
+        <!-- Methodology Section -->
+        <div style="background: #f7fafc; border-radius: 12px; padding: 25px; margin-bottom: 30px; border-left: 4px solid #667eea;">
+            <h3 style="color: #2d3748; margin-bottom: 15px; font-size: 1.3em;">👩‍⚕️About Hypoxic Burden</h3>
+            <p style="color: #4a5568; line-height: 1.8; margin-bottom: 12px;">
+                <strong>Hypoxic Burden (HB)</strong> quantifies the cumulative oxygen desaturation load during sleep by integrating 
+                both the depth and duration of SpO₂ drops. Unlike simple event counts (AHI), HB captures the actual physiological 
+                stress of intermittent hypoxia on cardiovascular and neural systems.
+            </p>
+            <p style="color: #4a5568; line-height: 1.8; margin-bottom: 12px;">
+                <strong>Calculation:</strong> HB = Σ (desaturation area below baseline) / total sleep hours → unit: %·min/hr
+            </p>
+            <p style="color: #718096; font-size: 0.95em; line-height: 1.7;">
+                This implementation follows the methodology by <strong>Sutherland et al. (Sleep, 2022)</strong>, 
+                validated across multiple sleep cohorts. HB has proven to be a stronger predictor of cardiovascular 
+                outcomes than traditional metrics, as demonstrated by <strong>Azarbarzin et al. (AJRCCM, 2019)</strong>.
+                We provide this tool for research use, but do not guarantee regulatory compliance.
+            </p>
+            <p style="color: #718096; font-size: 0.95em; line-height: 1.7;">
+                An example of the analysis result is shown below. For more details, please refer to the original publications.
+                <img src="/static/img/result.png" 
+                     alt="Example Hypoxic Burden Figure" 
+                     style="width:100%; max-width:700px; margin-top:15px; border:1px solid #e2e8f0; border-radius:8px;">
+            
+                    </p>
+            <p style="color: #718096; font-size: 0.95em; line-height: 1.7; margin-top: 10px;">
+                <a href="/static/example/report.html" style="color: #667eea; text-decoration: none; font-weight: 500;">
+                    📄 View Example HTML Report
+                </a>
+            </p>
+
+        </div>
+
+        <div class="upload-section">
+            <div class="file-inputs">
+                <div class="file-input-group">
+                    <label>SpO₂ Data (CSV) *</label>
+                    <input type="file" id="spo2File" accept=".csv" required>
+                </div>
+                <div class="file-input-group">
+                    <label>Event List (TXT/TSV) *</label>
+                    <input type="file" id="eventFile" accept=".txt,.tsv" required>
+                </div>
+                <div class="file-input-group">
+                    <label>Hypnogram (CSV)</label>
+                    <input type="file" id="hypnFile" accept=".csv">
+                </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.95em;color:#4a5568;">
+                    <input type="checkbox" id="showAhi" checked>
+                    <span>Include AHI in display & report</span>
+                </label>
+                <button class="btn" onclick="processFiles()" style="flex:1;">Analyze Data</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing sleep study data...</p>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="results-section" id="results">
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-label">Hypoxic Burden</div>
+                    <div class="metric-value" id="hbValue">--</div>
+                    <span class="metric-unit">%·min/hr</span>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Sleep Duration</div>
+                    <div class="metric-value" id="sleepHours">--</div>
+                    <span class="metric-unit">hours</span>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Events Detected</div>
+                    <div class="metric-value" id="eventCount">--</div>
+                    <span class="metric-unit">apneas/hypopneas</span>
+                </div>
+                <div class="metric-card" id="ahiCard">
+                    <div class="metric-label">AHI</div>
+                    <div class="metric-value" id="ahiValue">--</div>
+                    <span class="metric-unit">events/hr</span>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">SpO₂ Samples</div>
+                    <div class="metric-value" id="sampleCount">--</div>
+                    <span class="metric-unit">data points</span>
+                </div>
+            </div>
+
+            <div style="margin: 30px 0; text-align: center;">
+                <button class="btn" onclick="downloadHTML()" style="margin-right: 15px; background: #667eea;">
+                    📄 Download HTML Report
+                </button>
+                <button class="btn" onclick="downloadPDF()" style="background: #48bb78;">
+                    📑 Download PDF Report
+                </button>
+            </div>
+
+            <div class="chart">
+                <div id="spo2Chart"></div>
+            </div>
+
+            <div class="chart">
+                <div id="avgResponseChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function processFiles() {
+            const spo2File = document.getElementById('spo2File').files[0];
+            const eventFile = document.getElementById('eventFile').files[0];
+            const hypnFile = document.getElementById('hypnFile').files[0];
+
+            if (!spo2File || !eventFile) {
+                showError('Please select both SpO₂ and Event List files');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('spo2', spo2File);
+            formData.append('eventlist', eventFile);
+            if (hypnFile) {
+                formData.append('hypn', hypnFile);
+            }
+
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('error').classList.remove('active');
+            document.getElementById('results').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/hb', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const resultData = await response.json();
+                displayResults(resultData);
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+        }
+
+        function displayResults(data) {
+            // Store data globally for download functions
+            currentResultData = data;
+
+            // Update metrics
+            document.getElementById('hbValue').textContent = data.HB?.toFixed(3) || '--';
+            document.getElementById('sleepHours').textContent = data.SleepHour?.toFixed(2) || '--';
+            document.getElementById('eventCount').textContent = data.events?.length || 0;
+            // Compute AHI if not provided by backend
+            const ahi = Number.isFinite(data.AHI) ? data.AHI : (data.SleepHour ? (data.events?.length || 0) / data.SleepHour : NaN);
+            document.getElementById('ahiValue').textContent = Number.isFinite(ahi) ? ahi.toFixed(2) : '--';
+            // Show or hide AHI card based on user option
+            try {
+                const show = document.getElementById('showAhi')?.checked;
+                const ahiCard = document.getElementById('ahiCard');
+                if (ahiCard) ahiCard.style.display = show ? 'block' : 'none';
+            } catch (e) {
+                // ignore if DOM not available (e.g., report generation context)
+            }
+            document.getElementById('sampleCount').textContent = data.spo2?.length || 0;
+
+            // Show results
+            document.getElementById('results').style.display = 'block';
+
+            // Create charts
+            plotSpO2Chart(data);
+            plotAvgResponseChart(data);
+
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function plotSpO2Chart(data) {
+            const t_hours = data.t.map(t => t / 3600);
+            
+            const traces = [
+                {
+                    x: t_hours,
+                    y: data.spo2,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'SpO₂',
+                    line: { color: '#3b82f6', width: 1 },
+                    yaxis: 'y'
+                }
+            ];
+
+            // Add hypnogram on secondary y-axis
+            if (data.sleep_t && data.sleep_t.length > 0) {
+                const sleep_t_hours = data.sleep_t.map(t => t / 3600);
+                traces.push({
+                    x: sleep_t_hours,
+                    y: data.sleep_a,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Sleep Stage',
+                    line: { color: '#8b5cf6', width: 1.5, shape: 'hv' },
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(139, 92, 246, 0.1)',
+                    yaxis: 'y2'
+                });
+            }
+
+            const shapes = [];
+            
+            // Add vertical lines for event start and end
+            if (data.events) {
+                data.events.forEach(e => {
+                    const startHours = e.Start / 3600;
+                    const endHours = (e.Start + e.Duration) / 3600;
+                    
+                    // Start line
+                    shapes.push({
+                        type: 'line',
+                        x0: startHours,
+                        x1: startHours,
+                        y0: 0,
+                        y1: 1,
+                        yref: 'paper',
+                        line: { color: 'rgba(239, 68, 68, 0.3)', width: 1, dash: 'dot' }
+                    });
+                    
+                    // End line
+                    shapes.push({
+                        type: 'line',
+                        x0: endHours,
+                        x1: endHours,
+                        y0: 0,
+                        y1: 1,
+                        yref: 'paper',
+                        line: { color: 'rgba(239, 68, 68, 0.3)', width: 1, dash: 'dot' }
+                    });
+                });
+
+                // Add event markers
+                const apneas = data.events.filter(e => e.Type === 'Apnea');
+                const hypopneas = data.events.filter(e => e.Type === 'Hypopnea');
+                const desats = data.events.filter(e => e.Type === 'Desaturation');
+
+                if (apneas.length > 0) {
+                    traces.push({
+                        x: apneas.map(e => e.Start / 3600),
+                        y: apneas.map(() => 75),
+                        type: 'scatter',
+                        mode: 'markers',
+                        name: 'Apnea',
+                        marker: { color: '#ef4444', size: 8, symbol: 'triangle-down' },
+                        yaxis: 'y'
+                    });
+                }
+
+                if (hypopneas.length > 0) {
+                    traces.push({
+                        x: hypopneas.map(e => e.Start / 3600),
+                        y: hypopneas.map(() => 77),
+                        type: 'scatter',
+                        mode: 'markers',
+                        name: 'Hypopnea',
+                        marker: { color: '#f59e0b', size: 8, symbol: 'circle' },
+                        yaxis: 'y'
+                    });
+                }
+
+                if (desats.length > 0) {
+                    traces.push({
+                        x: desats.map(e => e.Start / 3600),
+                        y: desats.map(() => 79),
+                        type: 'scatter',
+                        mode: 'markers',
+                        name: 'Desaturation',
+                        marker: { color: '#06b6d4', size: 8, symbol: 'square' },
+                        yaxis: 'y'
+                    });
+                }
+            }
+
+            const layout = {
+                title: 'SpO₂ Time Series with Respiratory Events & Sleep Stages',
+                xaxis: { title: 'Time (hours)' },
+                yaxis: { 
+                    title: 'SpO₂ (%)', 
+                    range: [70, 100],
+                    side: 'left'
+                },
+                yaxis2: {
+                    title: 'Sleep Stage',
+                    overlaying: 'y',
+                    side: 'right',
+                    range: [-0.5, 6.5],
+                    tickmode: 'array',
+                    tickvals: [0, 1, 2, 3, 4, 5, 6],
+                    ticktext: data.desc || ['Wake', 'Stage 1', 'Stage 2', 'Stage 3', 'Stage 4', 'REM', 'Indet']
+                },
+                shapes: shapes,
+                hovermode: 'closest',
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'top',
+                    y: -0.15,
+                    xanchor: 'center',
+                    x: 0.5
+                },
+                height: 400
+            };
+
+            Plotly.newPlot('spo2Chart', traces, layout, { responsive: true });
+        }
+
+        function plotSleepStageChart(data) {
+            if (!data.sleep_t || data.sleep_t.length === 0) {
+                document.getElementById('sleepStageChart').innerHTML = '<p style="text-align:center;padding:40px;color:#999;">No sleep stage data available</p>';
+                return;
+            }
+
+            const t_hours = data.sleep_t.map(t => t / 3600);
+            
+            const trace = {
+                x: t_hours,
+                y: data.sleep_a,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Sleep Stage',
+                line: { color: '#8b5cf6', width: 2, shape: 'hv' },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(139, 92, 246, 0.1)'
+            };
+
+            const layout = {
+                title: 'Sleep Stage Hypnogram',
+                xaxis: { title: 'Time (hours)' },
+                yaxis: {
+                    title: 'Sleep Stage',
+                    tickvals: data.codes || [0, 1, 2, 3, 4, 5, 6],
+                    ticktext: data.desc || ['Wake', 'Stage 1', 'Stage 2', 'Stage 3', 'Stage 4', 'REM', 'Unknown']
+                },
+                hovermode: 'closest',
+                height: 300
+            };
+
+            Plotly.newPlot('spo2Chart', traces, layout, { responsive: true });
+        }
+
+        function plotAvgResponseChart(data) {
+            if (!data.avg || data.avg.length === 0) {
+                document.getElementById('avgResponseChart').innerHTML = '<p style="text-align:center;padding:40px;color:#999;">No average response data available</p>';
+                return;
+            }
+
+            const n = data.avg.length;
+            const duravg = data.duravg || 30;
+            const winStart = data.winstart || 0;  // e.g., -34 (relative to event END)
+            
+            // We want event START at t=0, so shift everything by +duravg
+            // winStart=-34 relative to event end → -34+34=0 relative to event start
+            // Display window: start at -10s before event start
+            const baselineOffset = -10; // seconds before event start to display
+            const xStart = winStart + duravg + baselineOffset; // e.g., -34+34-10 = -10
+            const x = Array.from({ length: n }, (_, i) => xStart + i);
+
+            const traces = [
+                {
+                    x: x,
+                    y: data.avg,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Average SpO₂',
+                    line: { color: '#3b82f6', width: 2 }
+                },
+                {
+                    x: x,
+                    y: data.filt,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Filtered',
+                    line: { color: '#ef4444', width: 3 }
+                }
+            ];
+
+            // Add standard deviation bands
+            if (data.std && data.std.length === n) {
+                const upper = data.filt.map((v, i) => v + (data.std[i] || 0));
+                const lower = data.filt.map((v, i) => v - (data.std[i] || 0));
+                
+                traces.push({
+                    x: x,
+                    y: upper,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: '+1 SD',
+                    line: { color: '#94a3b8', width: 1, dash: 'dash' },
+                    showlegend: false
+                });
+                traces.push({
+                    x: x,
+                    y: lower,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: '-1 SD',
+                    line: { color: '#94a3b8', width: 1, dash: 'dash' },
+                    fill: 'tonexty',
+                    fillcolor: 'rgba(148, 163, 184, 0.2)',
+                    showlegend: false
+                });
+            }
+
+            // Add markers for key time points
+            // All positions relative to event START (t=0)
+            const markers = [];
+            
+            // 1. Baseline marker at -10s (first point in array)
+            markers.push({
+                x: [baselineOffset],
+                y: [data.filt[0] || 97],
+                mode: 'markers',
+                marker: { size: 10, color: '#64748b', symbol: 'circle' },
+                name: 'Baseline',
+                showlegend: true,
+                hovertemplate: 'Baseline<br>Time: %{x}s<br>SpO₂: %{y:.1f}%<extra></extra>'
+            });
+            
+            // 2. Event Start at t=0
+            // Array index for event start: 0 - xStart (e.g., 0 - (-10) = 10)
+            const eventStartIdx = Math.round(0 - xStart);
+            if (eventStartIdx >= 0 && eventStartIdx < data.filt.length) {
+                markers.push({
+                    x: [0],
+                    y: [data.filt[eventStartIdx]],
+                    mode: 'markers',
+                    marker: { size: 12, color: '#22c55e', symbol: 'triangle-up' },
+                    name: 'Event Start',
+                    showlegend: true,
+                    hovertemplate: 'Event Start<br>Time: %{x}s<br>SpO₂: %{y:.1f}%<extra></extra>'
+                });
+            }
+            
+            // 3. Nadir point (if provided)
+            if (data.nadirx !== undefined && data.nadiry !== undefined) {
+                // nadirx is an index in the original array, need to convert to time
+                const nadirTime = (data.nadirx - 0) + xStart; // Convert array index to x-axis time
+                const nadirIdx = data.nadirx;
+                markers.push({
+                    x: [nadirTime],
+                    y: [data.filt[nadirIdx] || data.nadiry],
+                    mode: 'markers',
+                    marker: { size: 12, color: '#3b82f6', symbol: 'triangle-down' },
+                    name: 'Nadir',
+                    showlegend: true,
+                    hovertemplate: 'Nadir (lowest SpO₂)<br>Time: %{x:.1f}s<br>SpO₂: %{y:.1f}%<extra></extra>'
+                });
+            }
+            
+            // 4. Event End at t=duravg
+            const eventEndIdx = Math.round(duravg - xStart);
+            if (eventEndIdx >= 0 && eventEndIdx < data.filt.length) {
+                markers.push({
+                    x: [duravg],
+                    y: [data.filt[eventEndIdx]],
+                    mode: 'markers',
+                    marker: { size: 12, color: '#ef4444', symbol: 'triangle-down' },
+                    name: 'Event End',
+                    showlegend: true,
+                    hovertemplate: 'Event End<br>Time: %{x}s<br>SpO₂: %{y:.1f}%<extra></extra>'
+                });
+            }
+            
+            // 5. WinFinish (recovery complete)
+            const winFinishTime = data.winfinish + duravg + baselineOffset;
+            const winFinishIdx = Math.round(winFinishTime - xStart);
+            if (winFinishIdx >= 0 && winFinishIdx < data.filt.length) {
+                markers.push({
+                    x: [winFinishTime],
+                    y: [data.filt[winFinishIdx]],
+                    mode: 'markers',
+                    marker: { size: 10, color: '#8b5cf6', symbol: 'triangle-up' },
+                    name: 'WinFinish',
+                    showlegend: true,
+                    hovertemplate: 'Recovery Complete<br>Time: %{x:.1f}s<br>SpO₂: %{y:.1f}%<extra></extra>'
+                });
+            }
+            
+            traces.push(...markers);
+
+            // Add vertical lines matching Python visualization
+            const hbWinStart = data.HBWinStart !== undefined ? data.HBWinStart : -5;
+            const hbWinFinish = data.HBWinFinish !== undefined ? data.HBWinFinish : 45;
+            
+            const shapes = [
+                // Event start line (green)
+                {
+                    type: 'line',
+                    x0: 0,
+                    x1: 0,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: { color: 'rgba(34, 197, 94, 0.5)', width: 2, dash: 'dash' }
+                },
+                // Event end / DurAvg line (gray)
+                {
+                    type: 'line',
+                    x0: duravg,
+                    x1: duravg,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: { color: 'rgba(107, 114, 128, 0.6)', width: 2, dash: 'dot' }
+                },
+                // HB WinStart line (lime) - position relative to event start
+                {
+                    type: 'line',
+                    x0: hbWinStart + duravg,
+                    x1: hbWinStart + duravg,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: { color: 'rgba(132, 204, 22, 0.6)', width: 2, dash: 'dash' }
+                },
+                // HB WinFinish line (magenta) - position relative to event start
+                {
+                    type: 'line',
+                    x0: hbWinFinish + duravg,
+                    x1: hbWinFinish + duravg,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: { color: 'rgba(217, 70, 239, 0.6)', width: 2, dash: 'dash' }
+                }
+            ];
+
+            const layout = {
+                title: `Average SpO₂ Response Around Events (n=${data.events?.length || 0} events)<br><sub>HB=${data.HB?.toFixed(3)} %·min/hr | Event Duration=${duravg.toFixed(1)}s | HB Window: ${hbWinStart}s to +${hbWinFinish}s (rel. to event end) | Display: ${xStart.toFixed(1)}s to ${(xStart + n - 1).toFixed(1)}s</sub>`,
+                xaxis: { 
+                    title: 'Time from Event Start (seconds)',
+                    zeroline: true,
+                    zerolinecolor: '#000',
+                    zerolinewidth: 2
+                },
+                yaxis: { 
+                    title: 'SpO₂ (%)',
+                    range: [Math.min(...data.avg) - 2, Math.max(...data.avg) + 2]
+                },
+                shapes: shapes,
+                hovermode: 'closest',
+                showlegend: true,
+                height: 400
+            };
+
+            Plotly.newPlot('avgResponseChart', traces, layout, { responsive: true });
+        }
+
+        // Global variable to store current result data
+        let currentResultData = null;
+
+        // Download HTML report
+        function downloadHTML() {
+            if (!currentResultData) {
+                alert('No data available. Please run analysis first.');
+                return;
+            }
+
+            const htmlContent = generateHTMLReport(currentResultData);
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `hypoxic_burden_report_${new Date().toISOString().slice(0,10)}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Download PDF report (using print to PDF)
+        function downloadPDF() {
+            if (!currentResultData) {
+                alert('No data available. Please run analysis first.');
+                return;
+            }
+
+            // Open a new window with the report for printing
+            const htmlContent = generateHTMLReport(currentResultData);
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            // Wait for charts to render, then trigger print dialog
+            setTimeout(() => {
+                printWindow.print();
+            }, 1500);
+        }
+
+        // Download example HTML report
+        function downloadExampleReport() {
+            // Create mock example data
+            const exampleData = {
+                HB: 4.784,
+                SleepHour: 7.5,
+                AHI: 0.4,
+                events: [
+                    { Start: 1200, Duration: 34, Type: 'Apnea' },
+                    { Start: 2400, Duration: 28, Type: 'Hypopnea' },
+                    { Start: 3600, Duration: 25, Type: 'Desaturation' }
+                ],
+                spo2: Array.from({length: 27000}, (_, i) => 97 + Math.sin(i/100) * 3 + (i > 13500 && i < 13850 ? -10 : 0)),
+                t: Array.from({length: 27000}, (_, i) => i),
+                avg: Array.from({length: 125}, (_, i) => 97 + Math.exp(-Math.pow((i-50)/20, 2)) * -8),
+                filt: Array.from({length: 125}, (_, i) => 97 + Math.exp(-Math.pow((i-50)/20, 2)) * -8),
+                duravg: 34,
+                winstart: -34,
+                winfinish: 90,
+                HBWinStart: -5,
+                HBWinFinish: 45,
+                nadirx: 50,
+                nadiry: 89
+            };
+
+            const htmlContent = generateHTMLReport(exampleData);
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `example_hypoxic_burden_report.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Generate HTML report with embedded charts
+        function generateHTMLReport(data) {
+            const date = new Date().toISOString().slice(0,10);
+            const spo2ChartDiv = document.getElementById('spo2Chart');
+            const avgChartDiv = document.getElementById('avgResponseChart');
+            const includeAhiInReport = (typeof document !== 'undefined') && (document.getElementById('showAhi')?.checked === true);
+            
+            // Convert Plotly charts to static images
+            const spo2ImagePromise = Plotly.toImage(spo2ChartDiv, { format: 'png', width: 1200, height: 500 });
+            const avgImagePromise = Plotly.toImage(avgChartDiv, { format: 'png', width: 1200, height: 500 });
+
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypoxic Burden Analysis Report - ` + date + `</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background: #fff;
+            color: #2d3748;
+        }
+        h1 { color: #667eea; border-bottom: 3px solid #667eea; padding-bottom: 15px; }
+        h2 { color: #4a5568; margin-top: 40px; border-left: 4px solid #667eea; padding-left: 15px; }
+        .header { text-align: center; margin-bottom: 50px; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .metric-label { font-size: 0.9em; opacity: 0.9; margin-bottom: 8px; }
+        .metric-value { font-size: 2.5em; font-weight: bold; margin: 10px 0; }
+        .metric-unit { font-size: 0.85em; opacity: 0.85; }
+        .chart-container { margin: 40px 0; page-break-inside: avoid; }
+        .chart-container img { width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .info-box {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+        .footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+            text-align: center;
+            color: #718096;
+            font-size: 0.9em;
+        }
+        @media print {
+            body { padding: 20px; }
+            .metric-card { break-inside: avoid; }
+            .chart-container { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🫁 Hypoxic Burden Analysis Report</h1>
+        <p style="color: #718096; font-size: 1.1em;">Generated on ` + date + `</p>
+    </div>
+
+    <div class="info-box">
+        <h3 style="margin-top: 0; color: #2d3748;">About Hypoxic Burden</h3>
+        <p><strong>Hypoxic Burden (HB)</strong> quantifies the cumulative oxygen desaturation load during sleep by integrating 
+        both the depth and duration of SpO₂ drops. This metric has proven to be a stronger predictor of cardiovascular 
+        outcomes than traditional metrics (Azarbarzin et al., AJRCCM, 2019).</p>
+        <p><strong>Methodology:</strong> Sutherland et al. (Sleep, 2022) - HB = Σ (desaturation area below baseline) / total sleep hours</p>
+    </div>
+
+    <h2>📊 Summary Metrics</h2>
+    <div class="metrics">
+        <div class="metric-card">
+            <div class="metric-label">Hypoxic Burden</div>
+            <div class="metric-value">` + (data.HB?.toFixed(3) || '--') + `</div>
+            <div class="metric-unit">%·min/hr</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Sleep Duration</div>
+            <div class="metric-value">` + (data.SleepHour?.toFixed(2) || '--') + `</div>
+            <div class="metric-unit">hours</div>
+        </div>
+        ` + (includeAhiInReport ? `
+        <div class="metric-card">
+            <div class="metric-label">AHI</div>
+            <div class="metric-value">` + (data.AHI?.toFixed(2) || ((data.events?.length && data.SleepHour) ? (data.events.length / data.SleepHour).toFixed(2) : '--')) + `</div>
+            <div class="metric-unit">events/hr</div>
+        </div>
+        ` : ``) + `
+        <div class="metric-card">
+            <div class="metric-label">Events Detected</div>
+            <div class="metric-value">` + (data.events?.length || 0) + `</div>
+            <div class="metric-unit">apneas/hypopneas</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">SpO₂ Samples</div>
+            <div class="metric-value">` + (data.spo2?.length || 0) + `</div>
+            <div class="metric-unit">data points</div>
+        </div>
+    </div>
+
+    <h2>📈 Visualizations</h2>
+    <p style="color: #718096; font-style: italic; margin-bottom: 30px;">
+        Note: For interactive charts with hover details, please use the web interface. 
+        To save these charts as images, right-click and select "Save image as..." from your browser.
+    </p>
+
+    <div class="chart-container">
+        <h3>SpO₂ Time Series with Events</h3>
+        <div id="chart1"></div>
+    </div>
+
+    <div class="chart-container">
+        <h3>Average SpO₂ Response Around Events</h3>
+        <div id="chart2"></div>
+    </div>
+
+    <div class="footer">
+        <p><strong>Hypoxic Burden Calculator</strong> - Node.js Implementation</p>
+        <p>Based on MATLAB reference by Sutherland et al. (Sleep, 2022)</p>
+        <p>Contact: <a href="mailto:monetbrain@gmail.com">monetbrain@gmail.com</a></p>
+        <p>&copy; ` + new Date().getFullYear() + ` - For research and clinical use</p>
+    </div>
+
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"><\/script>
+    <script>
+        // Re-create the charts in this document
+        const resultData = ` + JSON.stringify(data) + `;
+        
+        // Wait for Plotly to load, then render charts
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                renderChart1(resultData);
+                renderChart2(resultData);
+            }, 100);
+        });
+
+        function renderChart1(data) {
+            const t_hours = data.t.map(t => t / 3600);
+            const traces = [{
+                x: t_hours,
+                y: data.spo2,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'SpO₂',
+                line: { color: '#3b82f6', width: 1.5 }
+            }];
+
+            if (data.sleep_t && data.sleep_t.length > 0) {
+                const sleep_hours = data.sleep_t.map(t => t / 3600);
+                traces.push({
+                    x: sleep_hours,
+                    y: data.sleep_a,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Sleep Stage',
+                    yaxis: 'y2',
+                    line: { color: '#8b5cf6', width: 2, shape: 'hv' }
+                });
+            }
+
+            const shapes = [];
+            if (data.events) {
+                data.events.forEach(e => {
+                    const startHours = e.Start / 3600;
+                    const endHours = (e.Start + e.Duration) / 3600;
+                    shapes.push({
+                        type: 'line',
+                        x0: startHours, x1: startHours,
+                        y0: 0, y1: 1, yref: 'paper',
+                        line: { color: 'rgba(239, 68, 68, 0.3)', width: 1, dash: 'dot' }
+                    });
+                    shapes.push({
+                        type: 'line',
+                        x0: endHours, x1: endHours,
+                        y0: 0, y1: 1, yref: 'paper',
+                        line: { color: 'rgba(239, 68, 68, 0.3)', width: 1, dash: 'dot' }
+                    });
+                });
+
+                const apneas = data.events.filter(e => e.Type === 'Apnea');
+                const hypopneas = data.events.filter(e => e.Type === 'Hypopnea');
+                const desats = data.events.filter(e => e.Type === 'Desaturation');
+
+                if (apneas.length > 0) {
+                    traces.push({
+                        x: apneas.map(e => e.Start / 3600),
+                        y: apneas.map(() => 75),
+                        type: 'scatter', mode: 'markers',
+                        name: 'Apnea',
+                        marker: { size: 8, color: '#ef4444', symbol: 'triangle-down' }
+                    });
+                }
+                if (hypopneas.length > 0) {
+                    traces.push({
+                        x: hypopneas.map(e => e.Start / 3600),
+                        y: hypopneas.map(() => 75),
+                        type: 'scatter', mode: 'markers',
+                        name: 'Hypopnea',
+                        marker: { size: 8, color: '#f59e0b', symbol: 'triangle-down' }
+                    });
+                }
+                if (desats.length > 0) {
+                    traces.push({
+                        x: desats.map(e => e.Start / 3600),
+                        y: desats.map(() => 75),
+                        type: 'scatter', mode: 'markers',
+                        name: 'Desaturation',
+                        marker: { size: 8, color: '#06b6d4', symbol: 'triangle-down' }
+                    });
+                }
+            }
+
+            const layout = {
+                title: 'SpO₂ Time Series with Sleep Events',
+                xaxis: { title: 'Time (hours)' },
+                yaxis: { title: 'SpO₂ (%)' },
+                yaxis2: {
+                    title: 'Sleep Stage',
+                    overlaying: 'y', side: 'right',
+                    range: [-0.5, 6.5],
+                    tickmode: 'array',
+                    tickvals: [0, 1, 2, 3, 4, 5, 6],
+                    ticktext: data.desc || ['Wake', 'Stage 1', 'Stage 2', 'Stage 3', 'Stage 4', 'REM', 'Indet']
+                },
+                shapes: shapes,
+                showlegend: true,
+                legend: { orientation: 'h', yanchor: 'top', y: -0.15, xanchor: 'center', x: 0.5 },
+                height: 500
+            };
+
+            Plotly.newPlot('chart1', traces, layout, { responsive: true });
+        }
+
+        function renderChart2(data) {
+            if (!data.avg || data.avg.length === 0) return;
+
+            const duravg = data.duravg || 34;
+            const winstart = data.winstart || -34;
+            const winfinish = data.winfinish || 90;
+            const hbWinStart = data.HBWinStart || -5;
+            const hbWinFinish = data.HBWinFinish || 45;
+            const nadirx = data.nadirx || 0;
+            const nadiry = data.nadiry || 0;
+            const baselineOffset = -10;
+
+            const n = data.avg.length;
+            const xStart = winstart + duravg + baselineOffset;
+            const x = Array.from({length: n}, (_, i) => xStart + i);
+
+            const eventStartIdx = Math.round(0 - xStart);
+            const eventEndIdx = Math.round(duravg - xStart);
+            const nadirIdx = Math.round(nadirx - xStart);
+            const winFinishIdx = data.avg.length - 1;
+
+            const traces = [
+                {
+                    x: x, y: data.avg,
+                    type: 'scatter', mode: 'lines',
+                    name: 'Average SpO₂',
+                    line: { color: '#3b82f6', width: 2 }
+                },
+                {
+                    x: x, y: data.filt,
+                    type: 'scatter', mode: 'lines',
+                    name: 'Filtered (12-pt MA)',
+                    line: { color: '#10b981', width: 2.5 }
+                },
+                {
+                    x: [x[0]], y: [data.filt[0]],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Baseline',
+                    marker: { size: 10, color: '#6b7280', symbol: 'circle' }
+                },
+                {
+                    x: [0], y: [data.filt[eventStartIdx]],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Event Start',
+                    marker: { size: 12, color: '#10b981', symbol: 'triangle-up' }
+                },
+                {
+                    x: [nadirx], y: [nadiry],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Nadir',
+                    marker: { size: 12, color: '#3b82f6', symbol: 'triangle-down' }
+                },
+                {
+                    x: [duravg], y: [data.filt[eventEndIdx]],
+                    type: 'scatter', mode: 'markers',
+                    name: 'Event End',
+                    marker: { size: 12, color: '#ef4444', symbol: 'triangle-down' }
+                },
+                {
+                    x: [x[winFinishIdx]], y: [data.filt[winFinishIdx]],
+                    type: 'scatter', mode: 'markers',
+                    name: 'WinFinish',
+                    marker: { size: 12, color: '#8b5cf6', symbol: 'triangle-up' }
+                }
+            ];
+
+            const shapes = [
+                { type: 'line', x0: 0, x1: 0, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(16, 185, 129, 0.6)', width: 2, dash: 'dash' } },
+                { type: 'line', x0: duravg, x1: duravg, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(107, 114, 128, 0.4)', width: 2, dash: 'dot' } },
+                { type: 'line', x0: hbWinStart + duravg, x1: hbWinStart + duravg, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(132, 204, 22, 0.6)', width: 2, dash: 'dash' } },
+                { type: 'line', x0: hbWinFinish + duravg, x1: hbWinFinish + duravg, y0: 0, y1: 1, yref: 'paper',
+                  line: { color: 'rgba(217, 70, 239, 0.6)', width: 2, dash: 'dash' } }
+            ];
+
+            const layout = {
+                title: 'Average SpO₂ Response Around Events (n=' + (data.events?.length || 0) + ' events)',
+                xaxis: { 
+                    title: 'Time from Event Start (seconds)',
+                    zeroline: true, zerolinecolor: '#000', zerolinewidth: 2
+                },
+                yaxis: { 
+                    title: 'SpO₂ (%)',
+                    range: [Math.min(...data.avg) - 2, Math.max(...data.avg) + 2]
+                },
+                shapes: shapes,
+                showlegend: true,
+                height: 500
+            };
+
+            Plotly.newPlot('chart2', traces, layout, { responsive: true });
+        }
+    <\/script>
+<\/body>
+<\/html>`;
+        }
+    </script>
+
+    <!-- Footer -->
+    <footer style="margin-top: 60px; padding: 30px 0; background: #f7fafc; border-top: 2px solid #e2e8f0; border-radius: 12px; text-align: center;">
+        <div style="max-width: 800px; margin: 0 auto; color: #4a5568;">
+            <p style="font-weight: 600; font-size: 1.1em; margin-bottom: 10px; color: #2d3748;">
+                MoNET@Yonsei Hypoxic Burden Web Service — Research Edition
+            </p>
+            <p style="font-size: 0.95em; line-height: 1.6; margin-bottom: 15px;">
+                Developed at the <strong>Molecular Neuroimaging and Therapy (MoNET)</strong> Laboratory<br>
+                <strong>MoNET@Yonsei University College of Medicine</strong>
+            </p>
+            <p style="font-size: 0.9em; color: #718096; margin-bottom: 10px;">
+                For collaboration or integration inquiries, contact: 
+                <a href="mailto:monetbrain@gmail.com" style="color: #667eea; text-decoration: none;">monetbrain@gmail.com</a>
+            </p>
+            <p style="font-size: 0.85em; color: #a0aec0;">
+                © 2025 Hae-Jeong Park, Ph.D. | MoNET@Yonsei University College of Medicine
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

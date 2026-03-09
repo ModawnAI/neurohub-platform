@@ -16,6 +16,7 @@ import { useZodForm } from "@/lib/use-zod-form";
 import { qcDecisionSchema, reportReviewSchema, type QCDecisionValues, type ReportReviewValues } from "@/lib/schemas";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/toast";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "—";
@@ -26,6 +27,7 @@ function formatBytes(bytes: number | null): string {
 
 function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { id: string; patient_ref: string; status: string } }) {
   const { t } = useTranslation();
+  const { addToast } = useToast();
   const [expanded, setExpanded] = useState(false);
 
   const { data: filesData, isLoading } = useQuery({
@@ -39,7 +41,7 @@ function CaseFileList({ requestId, caseItem }: { requestId: string; caseItem: { 
       const { url } = await getDownloadUrl(requestId, caseItem.id, file.id);
       window.open(url, "_blank");
     } catch {
-      alert(t("expertReviewDetail.errorDownloadUrl"));
+      addToast("error", t("expertReviewDetail.errorDownloadUrl"));
     }
   };
 
@@ -162,9 +164,13 @@ export default function ExpertReviewDetailPage() {
 
   return (
     <div className="stack-lg">
-      <button className="back-link" onClick={() => router.push("/expert/reviews")}>
-        <ArrowLeft size={16} /> {t("expertReviewDetail.backToQueue")}
-      </button>
+      <Breadcrumb
+        items={[
+          { label: locale === "ko" ? "전문가" : "Expert", href: "/expert/dashboard" },
+          { label: t("expertReviews.title"), href: "/expert/reviews" },
+          { label: `${t("requestDetail.requestNumber")}${id.slice(0, 8)}` },
+        ]}
+      />
 
       <div className="page-header">
         <div>

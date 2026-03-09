@@ -142,6 +142,14 @@ class LocalContainerRunner:
         if extra_env:
             env_vars.update(extra_env)
 
+        # Pass extra env vars from job_spec or resource_requirements
+        if job_spec:
+            if isinstance(job_spec.get("extra_env"), dict):
+                env_vars.update(job_spec["extra_env"])
+            rr = job_spec.get("resource_requirements", {})
+            if isinstance(rr.get("extra_env"), dict):
+                env_vars.update(rr["extra_env"])
+
         for key, val in env_vars.items():
             cmd.extend(["-e", f"{key}={val}"])
 
@@ -185,12 +193,16 @@ class LocalContainerRunner:
             logs = stdout + ("\n--- STDERR ---\n" + stderr if stderr.strip() else "")
             duration = int((time.monotonic() - start) * 1000)
 
-            # Parse NEUROHUB_OUTPUT from logs
+            # Parse NEUROHUB_OUTPUT from logs (accept both "NEUROHUB_OUTPUT:" and "NEUROHUB_OUTPUT ")
             technique_output = None
             for line in stdout.splitlines():
+                json_str = None
                 if line.startswith("NEUROHUB_OUTPUT:"):
+                    json_str = line[len("NEUROHUB_OUTPUT:"):].strip()
+                elif line.startswith("NEUROHUB_OUTPUT "):
+                    json_str = line[len("NEUROHUB_OUTPUT "):].strip()
+                if json_str:
                     try:
-                        json_str = line[len("NEUROHUB_OUTPUT:"):].strip()
                         technique_output = json.loads(json_str)
                     except json.JSONDecodeError:
                         logger.warning(f"Failed to parse NEUROHUB_OUTPUT: {line[:200]}")

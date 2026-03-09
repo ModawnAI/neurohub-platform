@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function GlobalError({
   error,
@@ -9,6 +10,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     console.error("Global error:", error);
   }, [error]);
@@ -26,14 +29,14 @@ export default function GlobalError({
       }}
     >
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>
-        오류가 발생했습니다
+        {t("errorPage.title")}
       </h1>
       <p style={{ color: "#64748b", marginBottom: 8, maxWidth: 480 }}>
-        {error.message || "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."}
+        {error.message || t("errorPage.unknownError")}
       </p>
       {error.digest && (
         <p style={{ color: "#94a3b8", fontSize: 12, marginBottom: 24 }}>
-          오류 코드: {error.digest}
+          {t("errorPage.errorCode")}: {error.digest}
         </p>
       )}
       <button
@@ -48,7 +51,7 @@ export default function GlobalError({
           fontWeight: 600,
         }}
       >
-        다시 시도
+        {t("common.retry")}
       </button>
     </div>
   );

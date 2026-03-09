@@ -26,6 +26,17 @@ USER_TYPE_TO_ROLE = {
 }
 
 
+@router.post("/logout")
+async def logout(user: AuthenticatedUser):
+    """Log out the current user.
+
+    For stateless JWT auth (local or Supabase), there is no server-side session
+    to invalidate. The frontend should discard the token on its side.
+    This endpoint exists so the frontend has a proper API to call.
+    """
+    return {"message": "로그아웃 되었습니다", "user_id": str(user.id)}
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, db: DbSession):
     if not settings.use_local_auth:
@@ -41,6 +52,7 @@ async def login(body: LoginRequest, db: DbSession):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="잘못된 이메일 또는 비밀번호입니다")
 
     db_user.last_login_at = datetime.now(timezone.utc)
+    await db.flush()
 
     # Look up institution + role
     member_result = await db.execute(
@@ -71,20 +83,43 @@ async def signup(body: SignupRequest, db: DbSession):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 등록된 이메일입니다")
 
     user_id = uuid.uuid4()
+    display_name = body.name or body.email.split("@")[0]
     db_user = User(
         id=user_id,
         username=body.email,
         email=body.email,
         password_hash=hash_password(body.password),
+        display_name=display_name,
+        user_type="SERVICE_USER",
+        onboarding_completed=True,
     )
     db.add(db_user)
+    await db.flush()
+
+    # Auto-create personal institution + membership
+    org_code = f"personal-{str(user_id)[:8]}"
+    institution = Institution(
+        code=org_code,
+        name=f"{display_name}님의 개인 계정",
+        status="ACTIVE",
+        institution_type="INDIVIDUAL",
+        created_by=user_id,
+    )
+    db.add(institution)
+    await db.flush()
+
+    db.add(InstitutionMember(
+        institution_id=institution.id,
+        user_id=user_id,
+        role_scope="PHYSICIAN",
+    ))
     await db.flush()
 
     token = create_access_token(
         sub=str(user_id),
         email=body.email,
         roles=["PHYSICIAN"],
-        institution_id=settings.default_institution_id,
+        institution_id=str(institution.id),
     )
     return TokenResponse(access_token=token)
 

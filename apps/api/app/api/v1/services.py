@@ -54,7 +54,13 @@ async def list_services(
     user: AuthenticatedUser,
     status: str | None = None,
 ):
-    q = select(ServiceDefinition).where(ServiceDefinition.institution_id == user.institution_id)
+    from sqlalchemy import or_
+    q = select(ServiceDefinition).where(
+        or_(
+            ServiceDefinition.institution_id == user.institution_id,
+            ServiceDefinition.status == "PUBLISHED",
+        )
+    )
     if status:
         q = q.where(ServiceDefinition.status == status)
     q = q.order_by(ServiceDefinition.display_name.asc(), ServiceDefinition.version.desc()).limit(
@@ -72,10 +78,14 @@ async def get_service(
     db: DbSession,
     user: AuthenticatedUser,
 ):
+    from sqlalchemy import or_
     result = await db.execute(
         select(ServiceDefinition).where(
             ServiceDefinition.id == service_id,
-            ServiceDefinition.institution_id == user.institution_id,
+            or_(
+                ServiceDefinition.institution_id == user.institution_id,
+                ServiceDefinition.status == "PUBLISHED",
+            ),
         )
     )
     service = result.scalar_one_or_none()
@@ -327,6 +337,37 @@ async def delete_service(
 
     await db.delete(service)
     await db.flush()
+
+
+@router.post("/admin/services/{service_id}/archive", response_model=ServiceRead)
+async def archive_service(
+    service_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser = Depends(require_roles("SYSTEM_ADMIN")),
+):
+    """Soft-delete a service by setting its status to ARCHIVED.
+
+    Unlike DELETE which permanently removes the service (and is blocked if
+    requests reference it), this endpoint simply marks it as ARCHIVED so it
+    no longer appears in active listings but historical data is preserved.
+    """
+    result = await db.execute(
+        select(ServiceDefinition).where(
+            ServiceDefinition.id == service_id,
+            ServiceDefinition.institution_id == user.institution_id,
+        )
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    if service.status == "ARCHIVED":
+        raise HTTPException(status_code=409, detail="Service is already archived")
+
+    service.status = "ARCHIVED"
+    await db.flush()
+    await db.refresh(service)
+    return _service_to_read(service)
 
 
 @router.patch("/admin/services/{service_id}/deprecate", response_model=ServiceRead)
